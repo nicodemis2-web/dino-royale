@@ -1,0 +1,230 @@
+--!strict
+--[[
+	Main.client.lua
+	===============
+	Client entry point for Dino Royale
+	Initializes all client systems and UI
+]]
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterGui = game:GetService("StarterGui")
+
+-- Wait for shared modules
+ReplicatedStorage:WaitForChild("Shared")
+
+-- Local player
+local localPlayer = Players.LocalPlayer
+
+-- Import shared modules
+local Events = require(ReplicatedStorage.Shared.Events)
+
+-- Client modules (lazy loaded)
+local WeaponController: any = nil
+local InventoryController: any = nil
+local VehicleController: any = nil
+local DeploymentController: any = nil
+local HUDController: any = nil
+local AudioController: any = nil
+
+-- State
+local isInitialized = false
+local currentGameState = "Loading"
+
+--[[
+	Load all client modules
+]]
+local function loadModules()
+	print("[Client] Loading modules...")
+
+	local Controllers = script.Parent.Controllers
+	local UI = script.Parent.UI
+	local Audio = script.Parent.Audio
+
+	-- Controllers
+	WeaponController = require(Controllers.WeaponController)
+	InventoryController = require(Controllers.InventoryController)
+	VehicleController = require(Controllers.VehicleController)
+	DeploymentController = require(Controllers.DeploymentController)
+
+	-- UI
+	HUDController = require(UI.HUDController)
+
+	-- Audio
+	AudioController = require(Audio.AudioController)
+
+	print("[Client] Modules loaded")
+end
+
+--[[
+	Initialize all client systems
+]]
+local function initializeSystems()
+	print("[Client] Initializing systems...")
+
+	-- Disable default Roblox UI elements
+	pcall(function()
+		StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Health, false)
+		StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
+	end)
+
+	-- Initialize in order
+	AudioController.Initialize()
+	HUDController.Initialize()
+	WeaponController.Initialize()
+	InventoryController.Initialize()
+	VehicleController.Initialize()
+	DeploymentController.Initialize()
+
+	print("[Client] Systems initialized")
+end
+
+--[[
+	Handle game state changes
+]]
+local function handleStateChange(newState: string)
+	if newState == "Lobby" then
+		-- Show lobby UI
+		HUDController.OnGameStateChanged("Lobby")
+
+	elseif newState == "Loading" then
+		-- Loading screen
+		HUDController.OnGameStateChanged("Loading")
+
+	elseif newState == "Deploying" then
+		-- Start deployment
+		HUDController.OnGameStateChanged("Deploying")
+		DeploymentController.Enable()
+
+	elseif newState == "Playing" then
+		-- Full gameplay
+		HUDController.OnGameStateChanged("Playing")
+		DeploymentController.Disable()
+		WeaponController.Enable()
+
+	elseif newState == "Ending" then
+		-- Match results
+		HUDController.OnGameStateChanged("Ending")
+		WeaponController.Disable()
+
+	elseif newState == "Spectating" then
+		-- Spectator mode
+		WeaponController.Disable()
+		-- Enable spectator camera
+	end
+end
+
+--[[
+	Handle local player death
+]]
+local function handleDeath(data: any)
+	WeaponController.Disable()
+	VehicleController.Cleanup()
+
+	-- Play death sound
+	AudioController.PlayUISound("Death")
+
+	-- Show elimination UI
+end
+
+--[[
+	Handle local player respawn
+]]
+local function handleRespawn()
+	WeaponController.Enable()
+
+	-- Play respawn sound
+	AudioController.PlayUISound("Heal")
+end
+
+--[[
+	Setup event handlers
+]]
+local function setupEventHandlers()
+	-- Game state changes
+	Events.OnClientEvent("GameState", "StateChanged", function(data)
+		local newState = data.newState
+		print(`[Client] Game state: {currentGameState} -> {newState}`)
+		currentGameState = newState
+
+		handleStateChange(newState)
+	end)
+
+	-- Join lobby
+	Events.OnClientEvent("GameState", "JoinLobby", function()
+		handleStateChange("Lobby")
+	end)
+
+	-- Spectate mode
+	Events.OnClientEvent("GameState", "Spectate", function()
+		handleStateChange("Spectating")
+	end)
+
+	-- Match countdown
+	Events.OnClientEvent("GameState", "Countdown", function(data)
+		-- UI handles countdown display
+	end)
+
+	-- Player death
+	Events.OnClientEvent("Player", "Died", function(data)
+		-- Switch to spectate
+		handleDeath(data)
+	end)
+
+	-- Player respawn (if reboot system used)
+	Events.OnClientEvent("Player", "Respawned", function()
+		handleRespawn()
+	end)
+end
+
+--[[
+	Wait for character
+]]
+local function waitForCharacter()
+	local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
+
+	-- Setup character-specific things
+	local humanoid = character:WaitForChild("Humanoid")
+
+	-- Track death
+	humanoid.Died:Connect(function()
+		Events.FireServer("Player", "Died", {})
+	end)
+
+	return character
+end
+
+--[[
+	Main initialization
+]]
+local function main()
+	print("==========================================")
+	print("  DINO ROYALE - Client Starting")
+	print("==========================================")
+
+	-- Wait for player GUI
+	localPlayer:WaitForChild("PlayerGui")
+
+	loadModules()
+	initializeSystems()
+	setupEventHandlers()
+
+	-- Wait for character
+	waitForCharacter()
+
+	-- Listen for respawns
+	localPlayer.CharacterAdded:Connect(function()
+		waitForCharacter()
+	end)
+
+	isInitialized = true
+
+	print("[Client] Ready!")
+	print("==========================================")
+
+	-- Request initial state from server
+	Events.FireServer("GameState", "RequestState", {})
+end
+
+-- Run
+main()

@@ -1,0 +1,5 @@
+std = "roblox"
+
+[lints]
+empty_if = "warn"
+if_same_then_else = "warn"

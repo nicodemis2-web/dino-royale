@@ -1,0 +1,18 @@
+{
+  "project": "Dino Royale",
+  "language": "luau",
+  "context": [
+    "docs/GDD.md",
+    "docs/architecture.md"
+  ],
+  "conventions": {
+    "strict_types": true,
+    "module_pattern": "class",
+    "naming": {
+      "modules": "PascalCase",
+      "functions": "PascalCase",
+      "variables": "camelCase",
+      "constants": "UPPER_SNAKE_CASE"
+    }
+  }
+}
