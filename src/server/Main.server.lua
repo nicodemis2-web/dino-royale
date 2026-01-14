@@ -25,6 +25,21 @@ local EliminationManager: any = nil
 local DinosaurManager: any = nil
 local BossEventManager: any = nil
 local VehicleManager: any = nil
+local MapManager: any = nil
+local EnvironmentalEventManager: any = nil
+local RevivalManager: any = nil
+local RebootBeaconManager: any = nil
+local ProgressionManager: any = nil
+local PingManager: any = nil
+local LootManager: any = nil
+local CombatManager: any = nil
+local HealingManager: any = nil
+local BattlePassManager: any = nil
+local ShopManager: any = nil
+local TutorialManager: any = nil
+local PartyManager: any = nil
+local RankedManager: any = nil
+local AccessibilityManager: any = nil
 
 -- State
 local isInitialized = false
@@ -41,16 +56,25 @@ local function loadModules()
 	local AI = script.Parent.AI
 	local Vehicles = script.Parent.Vehicles
 	local EventsFolder = script.Parent.Events
+	local Map = script.Parent.Map
 
 	-- Core systems
 	GameManager = require(Core.GameManager)
 	StormManager = require(Core.StormManager)
 	DeploymentManager = require(Core.DeploymentManager)
 
+	-- Map systems
+	MapManager = require(Map.MapManager)
+	EnvironmentalEventManager = require(Map.EnvironmentalEventManager)
+
 	-- Player systems
 	WeaponManager = require(Weapons.WeaponManager)
 	InventoryManager = require(Player.InventoryManager)
 	EliminationManager = require(Player.EliminationManager)
+	RevivalManager = require(Player.RevivalManager)
+	RebootBeaconManager = require(Player.RebootBeaconManager)
+	ProgressionManager = require(Player.ProgressionManager)
+	PingManager = require(Player.PingManager)
 
 	-- AI systems
 	DinosaurManager = require(AI.DinosaurManager)
@@ -58,6 +82,23 @@ local function loadModules()
 
 	-- Vehicle system
 	VehicleManager = require(Vehicles.VehicleManager)
+
+	-- Loot system
+	local Loot = script.Parent.Loot
+	LootManager = require(Loot.LootManager)
+
+	-- Combat system
+	local Combat = script.Parent.Combat
+	CombatManager = require(Combat.CombatManager)
+	HealingManager = require(Combat.HealingManager)
+
+	-- Meta-game systems
+	BattlePassManager = require(Player.BattlePassManager)
+	ShopManager = require(Player.ShopManager)
+	TutorialManager = require(Player.TutorialManager)
+	PartyManager = require(Player.PartyManager)
+	RankedManager = require(Player.RankedManager)
+	AccessibilityManager = require(Player.AccessibilityManager)
 
 	print("[Server] Modules loaded")
 end
@@ -70,14 +111,29 @@ local function initializeSystems()
 
 	-- Initialize in dependency order
 	GameManager.Initialize()
+	MapManager.Initialize() -- Map must init before storm/dinos
 	StormManager.Initialize()
 	DeploymentManager.Initialize()
 	WeaponManager.Initialize()
 	InventoryManager.Initialize()
 	EliminationManager.Initialize()
+	RevivalManager.Initialize()
+	RebootBeaconManager.Initialize()
+	ProgressionManager.Initialize()
+	PingManager.Initialize()
 	DinosaurManager.Initialize()
 	BossEventManager.Initialize()
 	VehicleManager.Initialize()
+	EnvironmentalEventManager.Initialize()
+	LootManager.Initialize()
+	CombatManager.Initialize()
+	HealingManager.Initialize()
+	BattlePassManager.Initialize()
+	ShopManager.Initialize()
+	TutorialManager.Initialize()
+	PartyManager.Initialize()
+	RankedManager.Initialize()
+	AccessibilityManager.Initialize()
 
 	-- Connect systems
 	connectSystems()
@@ -95,21 +151,32 @@ local function connectSystems()
 
 		if newState == "Loading" then
 			-- Reset all systems for new match
+			MapManager.Reset()
 			StormManager.Reset()
 			DinosaurManager.Reset()
 			VehicleManager.Reset()
 			EliminationManager.Reset()
+			EnvironmentalEventManager.Reset()
+			RevivalManager.Reset()
+			RebootBeaconManager.Reset()
+			PingManager.Reset()
+			LootManager.Reset()
+			CombatManager.Reset()
+			HealingManager.Reset()
 
 		elseif newState == "Deploying" then
 			-- Start deployment phase
+			MapManager.StartMatch() -- Initialize POIs and map content
 			DeploymentManager.StartDeployment()
 			DinosaurManager.SpawnInitial()
 			VehicleManager.Initialize() -- Spawns vehicles
+			LootManager.SpawnPOILoot() -- Spawn loot at all POIs
 
 		elseif newState == "Playing" then
 			-- Start the storm
 			StormManager.Start()
 			BossEventManager.Initialize()
+			MapManager.OnMatchPhaseChanged("Playing")
 
 		elseif newState == "Ending" then
 			-- Match ended
@@ -195,6 +262,17 @@ local function setupPlayerHandling()
 		-- Cleanup player
 		InventoryManager.CleanupPlayer(player)
 		WeaponManager.CleanupPlayer(player)
+		RevivalManager.CleanupPlayer(player)
+		RebootBeaconManager.CleanupPlayer(player)
+		PingManager.CleanupPlayer(player)
+		CombatManager.CleanupPlayer(player)
+		HealingManager.CleanupPlayer(player)
+		BattlePassManager.CleanupPlayer(player)
+		ShopManager.CleanupPlayer(player)
+		TutorialManager.CleanupPlayer(player)
+		PartyManager.CleanupPlayer(player)
+		RankedManager.CleanupPlayer(player)
+		AccessibilityManager.CleanupPlayer(player)
 
 		-- Handle vehicle exit
 		local vehicle = VehicleManager.GetPlayerVehicle(player)

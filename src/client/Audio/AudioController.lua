@@ -10,6 +10,7 @@ local Players = game:GetService("Players")
 
 local SoundManager = require(script.Parent.SoundManager)
 local MusicManager = require(script.Parent.MusicManager)
+local AdaptiveMusicController = require(script.Parent.AdaptiveMusicController)
 
 local AudioController = {}
 
@@ -259,6 +260,7 @@ function AudioController.Initialize()
 
 	SoundManager.Initialize()
 	MusicManager.Initialize()
+	AdaptiveMusicController.Initialize()
 
 	applySettings()
 
@@ -274,6 +276,34 @@ function AudioController.Cleanup()
 
 	SoundManager.Cleanup()
 	MusicManager.Cleanup()
+end
+
+--[[
+	Get the adaptive music controller for direct access
+]]
+function AudioController.GetAdaptiveMusicController()
+	return AdaptiveMusicController
+end
+
+--[[
+	Set adaptive music intensity
+]]
+function AudioController.SetMusicIntensity(level: number)
+	AdaptiveMusicController.SetIntensity(level)
+end
+
+--[[
+	Notify combat started (for adaptive music)
+]]
+function AudioController.OnCombatStarted()
+	AdaptiveMusicController.OnCombatStarted()
+end
+
+--[[
+	Notify combat ended (for adaptive music)
+]]
+function AudioController.OnCombatEnded()
+	AdaptiveMusicController.OnCombatEnded()
 end
 
 return AudioController

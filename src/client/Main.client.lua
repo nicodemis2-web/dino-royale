@@ -26,6 +26,20 @@ local VehicleController: any = nil
 local DeploymentController: any = nil
 local HUDController: any = nil
 local AudioController: any = nil
+local MinimapController: any = nil
+local RevivalUI: any = nil
+local LootUI: any = nil
+local SpectatorController: any = nil
+local VictoryScreen: any = nil
+local LobbyScreen: any = nil
+local StormController: any = nil
+local Compass: any = nil
+local BattlePassUI: any = nil
+local ShopUI: any = nil
+local TutorialUI: any = nil
+local PartyUI: any = nil
+local RankedUI: any = nil
+local AccessibilityUI: any = nil
 
 -- State
 local isInitialized = false
@@ -46,9 +60,23 @@ local function loadModules()
 	InventoryController = require(Controllers.InventoryController)
 	VehicleController = require(Controllers.VehicleController)
 	DeploymentController = require(Controllers.DeploymentController)
+	SpectatorController = require(Controllers.SpectatorController)
+	StormController = require(Controllers.StormController)
 
 	-- UI
 	HUDController = require(UI.HUDController)
+	MinimapController = require(UI.Map.MinimapController)
+	RevivalUI = require(UI.Revival.RevivalUI)
+	LootUI = require(UI.Inventory.LootUI)
+	VictoryScreen = require(UI.Components.VictoryScreen)
+	LobbyScreen = require(UI.Components.LobbyScreen)
+	Compass = require(UI.Components.Compass)
+	BattlePassUI = require(UI.Components.BattlePassUI)
+	ShopUI = require(UI.Components.ShopUI)
+	TutorialUI = require(UI.Components.TutorialUI)
+	PartyUI = require(UI.Components.PartyUI)
+	RankedUI = require(UI.Components.RankedUI)
+	AccessibilityUI = require(UI.Components.AccessibilityUI)
 
 	-- Audio
 	AudioController = require(Audio.AudioController)
@@ -71,10 +99,24 @@ local function initializeSystems()
 	-- Initialize in order
 	AudioController.Initialize()
 	HUDController.Initialize()
+	MinimapController.Initialize()
+	RevivalUI.Initialize()
+	LootUI.Initialize()
+	VictoryScreen.Initialize()
+	LobbyScreen.Initialize()
+	Compass.Initialize()
 	WeaponController.Initialize()
 	InventoryController.Initialize()
 	VehicleController.Initialize()
 	DeploymentController.Initialize()
+	SpectatorController.Initialize()
+	StormController.Initialize()
+	BattlePassUI.Initialize()
+	ShopUI.Initialize()
+	TutorialUI.Initialize()
+	PartyUI.Initialize()
+	RankedUI.Initialize()
+	AccessibilityUI.Initialize()
 
 	print("[Client] Systems initialized")
 end
