@@ -44,10 +44,10 @@ export type BiomeConfig = {
 
 local BiomeData = {}
 
--- Map configuration
+-- Map configuration (4km x 4km per GDD Section 3.3)
 BiomeData.MapSize = {
-	width = 2000,
-	height = 2000,
+	width = 4000,
+	height = 4000,
 }
 BiomeData.MapCenter = Vector3.new(0, 0, 0)
 

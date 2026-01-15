@@ -298,10 +298,10 @@ if EliminationManager then
 	if CombatManager then pcall(function() EliminationManager.SetCombatManager(CombatManager) end) end
 end
 
--- Initialize StormManager with map parameters
+-- Initialize StormManager with map parameters (4km map = 2000 stud radius)
 if StormManager and StormManager.Initialize then
 	pcall(function()
-		StormManager.Initialize(Vector3.new(0, 0, 0), 2000)
+		StormManager.Initialize(Vector3.new(0, 0, 0), 2000) -- 4km map radius
 	end)
 end
 
@@ -349,20 +349,57 @@ end
 
 print("===========================================")
 print("  DINO ROYALE SERVER - READY!")
+print("  Map: Isla Primordial (4km x 4km)")
 print("  Terrain: Jungle, Desert, Mountains biomes")
-print("  Spawn: Jungle biome area (200, Y, 200)")
+print("  Spawn: Jungle biome area (400, Y, 400)")
 print("===========================================")
 
--- STEP 13: Handle respawning on death
-Players.PlayerAdded:Connect(function(player)
-	player.CharacterAdded:Connect(function(character)
-		local humanoid = character:WaitForChild("Humanoid")
-		humanoid.Died:Connect(function()
-			print(`[Server] {player.Name} died, respawning in 3 seconds...`)
-			task.wait(3)
-			if player and player.Parent then
-				player:LoadCharacter()
-			end
-		end)
+-- STEP 13: Configure character stats and handle death/respawn
+-- Per GDD Appendix A: WalkSpeed=16, JumpPower=50 (7 stud jump), Health=100
+local Constants = require(ReplicatedStorage.Shared.Constants)
+
+local function configureCharacter(player: Player, character: Model)
+	local humanoid = character:WaitForChild("Humanoid", 5) :: Humanoid?
+	if not humanoid then
+		warn(`[Server] Could not find Humanoid for {player.Name}`)
+		return
+	end
+
+	-- Configure movement per GDD Appendix A
+	humanoid.WalkSpeed = Constants.PLAYER.WALK_SPEED -- 16 studs/sec
+	humanoid.JumpPower = Constants.PLAYER.JUMP_POWER -- 50 (gives ~7 stud jump)
+	humanoid.MaxHealth = Constants.PLAYER.MAX_HEALTH -- 100 HP
+	humanoid.Health = humanoid.MaxHealth
+
+	print(`[Server] Configured {player.Name}: WalkSpeed={humanoid.WalkSpeed}, JumpPower={humanoid.JumpPower}`)
+
+	-- Handle death
+	humanoid.Died:Connect(function()
+		print(`[Server] {player.Name} died, respawning in 3 seconds...`)
+		task.wait(3)
+		if player and player.Parent then
+			player:LoadCharacter()
+		end
 	end)
-end)
+end
+
+-- Connect CharacterAdded for all players (existing and new)
+local function setupPlayer(player: Player)
+	-- Configure character when it spawns
+	player.CharacterAdded:Connect(function(character)
+		configureCharacter(player, character)
+	end)
+
+	-- Configure existing character if any
+	if player.Character then
+		configureCharacter(player, player.Character)
+	end
+end
+
+-- Setup existing players
+for _, player in ipairs(Players:GetPlayers()) do
+	setupPlayer(player)
+end
+
+-- Setup new players
+Players.PlayerAdded:Connect(setupPlayer)

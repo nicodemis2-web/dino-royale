@@ -429,8 +429,9 @@ stateHandlers.Playing = {
 					if rootPart then
 						-- Spawn at random position on terrain within a specific biome area
 						-- Using jungle biome area for initial spawn (positive X, positive Z quadrant)
+						-- Map is 4km x 4km per GDD, so jungle area is roughly 0-2000 in X/Z
 						local angle = math.random() * math.pi / 2 -- 0 to 90 degrees (jungle sector)
-						local distance = math.random(100, 400)
+						local distance = math.random(200, 800) -- Scaled for 4km map
 						local x = math.cos(angle) * distance
 						local z = math.sin(angle) * distance
 

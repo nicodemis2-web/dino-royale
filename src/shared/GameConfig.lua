@@ -8,13 +8,13 @@
 
 local GameConfig = {}
 
--- Match settings
+-- Match settings (per GDD Section 2.2)
 GameConfig.Match = {
 	MinPlayers = 2, -- Minimum to start (for testing, normally 20+)
-	MaxPlayers = 100,
-	LobbyCountdown = 60, -- Seconds in lobby before match starts
-	DeploymentDuration = 120, -- Seconds for deployment phase
-	MatchTimeout = 1800, -- 30 minute max match
+	MaxPlayers = 100, -- 100-player battle royale
+	LobbyCountdown = 60, -- Pre-Game Lobby: 60 seconds
+	DeploymentDuration = 90, -- Deployment phase: 90 seconds (GDD)
+	MatchTimeout = 1200, -- 20 minute max match (GDD: 15-20 min end game)
 }
 
 -- Player settings
@@ -60,49 +60,56 @@ GameConfig.Inventory = {
 	},
 }
 
--- Storm/Zone settings
+-- Storm/Zone settings (per GDD Section 2.3 "Extinction Wave")
+-- Damage values are per second (TickInterval = 1)
 GameConfig.Storm = {
 	Phases = {
+		-- Circle 1: 100% → 60%
 		{
 			waitTime = 180, -- 3 min before first shrink
 			shrinkTime = 120, -- 2 min to shrink
-			damagePerTick = 1,
-			finalRadius = 0.7, -- % of previous
+			damagePerTick = 1, -- 1 HP/sec
+			finalRadius = 0.6, -- Shrinks to 60% of map
 		},
+		-- Circle 2: 60% → 35%
 		{
-			waitTime = 120,
-			shrinkTime = 90,
-			damagePerTick = 2,
-			finalRadius = 0.6,
+			waitTime = 120, -- 2 min wait
+			shrinkTime = 90, -- 1.5 min shrink
+			damagePerTick = 2, -- 2 HP/sec
+			finalRadius = 0.35,
 		},
+		-- Circle 3: 35% → 15%
 		{
 			waitTime = 90,
 			shrinkTime = 60,
-			damagePerTick = 5,
-			finalRadius = 0.5,
+			damagePerTick = 5, -- 5 HP/sec
+			finalRadius = 0.15,
 		},
+		-- Circle 4: 15% → 5%
 		{
 			waitTime = 60,
 			shrinkTime = 45,
-			damagePerTick = 8,
-			finalRadius = 0.4,
+			damagePerTick = 8, -- 8 HP/sec
+			finalRadius = 0.05,
 		},
+		-- Circle 5: 5% → tiny
 		{
 			waitTime = 45,
 			shrinkTime = 30,
-			damagePerTick = 10,
-			finalRadius = 0.3,
+			damagePerTick = 10, -- 10 HP/sec
+			finalRadius = 0.01,
 		},
+		-- Final: Closes completely
 		{
 			waitTime = 30,
 			shrinkTime = 20,
-			damagePerTick = 15,
+			damagePerTick = 15, -- 15 HP/sec
 			finalRadius = 0,
 		},
 	},
 
 	TickInterval = 1, -- Damage every 1 second
-	InitialRadius = 1000, -- Starting zone radius
+	InitialRadius = 2000, -- Starting zone radius (covers 4km map)
 }
 
 -- Weapon settings
@@ -221,16 +228,16 @@ GameConfig.UI = {
 
 -- Debug settings
 GameConfig.Debug = {
-	Enabled = false, -- Set to true for development testing
+	Enabled = true, -- Set to true for development testing
 	ShowHitboxes = false,
 	ShowAIDebug = false,
 	GodMode = false,
 	InfiniteAmmo = false,
 
 	-- Solo testing mode - bypasses player count requirements
-	SoloTestMode = false,
-	SkipLobbyCountdown = false,
-	QuickDeploy = false, -- Shorter deployment phase for testing
+	SoloTestMode = true,
+	SkipLobbyCountdown = true,
+	QuickDeploy = true, -- Shorter deployment phase for testing
 
 	-- Admin user IDs who can use debug commands (add your Roblox UserId)
 	AdminUserIds = {},

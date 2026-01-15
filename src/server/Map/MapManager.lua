@@ -179,18 +179,24 @@ local function setupEventHandlers()
 end
 
 --[[
-	Terrain configuration
+	Terrain configuration (per GDD Section 3.3: 4km x 4km map)
 ]]
 local TERRAIN_CONFIG = {
-	mapSize = 2000, -- Total map size (2000x2000 studs)
-	resolution = 8, -- Terrain cell size
+	mapSize = 4000, -- Total map size (4000x4000 studs = 4km x 4km per GDD)
+	resolution = 16, -- Terrain cell size (larger for performance on 4km map)
 	baseHeight = 0,
 
-	-- Biome regions (angles in radians, map divided into 3 sectors)
+	-- Biome regions (angles in radians, map divided into 3 main sectors)
+	-- Per GDD Section 3.3:
+	-- NORTH: Volcanic Region
+	-- CENTER: Jungle & Research
+	-- EAST: Swamplands
+	-- WEST: Open Plains
+	-- SOUTH: Coastal Area
 	biomes = {
-		jungle = { startAngle = 0, endAngle = math.pi * 2/3 },
-		desert = { startAngle = math.pi * 2/3, endAngle = math.pi * 4/3 },
-		mountains = { startAngle = math.pi * 4/3, endAngle = math.pi * 2 },
+		jungle = { startAngle = 0, endAngle = math.pi * 2/3 },           -- NE sector
+		desert = { startAngle = math.pi * 2/3, endAngle = math.pi * 4/3 }, -- S sector (plains)
+		mountains = { startAngle = math.pi * 4/3, endAngle = math.pi * 2 }, -- NW sector (volcanic)
 	}
 }
 
@@ -363,7 +369,8 @@ local function createBaseTerrain()
 	task.wait(0.1)
 
 	-- Create spawn location directly on terrain (jungle biome area)
-	local spawnX, spawnZ = 200, 200 -- Jungle biome area
+	-- For 4km map, spawn in jungle quadrant (NE sector per GDD)
+	local spawnX, spawnZ = 400, 400 -- Jungle biome area (scaled for 4km map)
 
 	-- Calculate expected terrain height using same formula as generation
 	local biome = getBiomeAtPosition(spawnX, spawnZ)
