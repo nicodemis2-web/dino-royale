@@ -185,7 +185,6 @@ end
 ]]
 local function createDinosaurModel(species: string, position: Vector3): Model
 	-- Raycast to find ground height at spawn position
-	local workspace = game:GetService("Workspace")
 	local rayOrigin = Vector3.new(position.X, 500, position.Z)
 	local rayDirection = Vector3.new(0, -600, 0)
 	local rayResult = workspace:Raycast(rayOrigin, rayDirection)
