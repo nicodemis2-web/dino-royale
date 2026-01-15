@@ -22,8 +22,7 @@ print("[Server] CharacterAutoLoads = false")
 -- STEP 2: State tracking
 local playersToSpawn: {Player} = {}
 local worldReady = false
-local spawnPosition: Vector3 = Vector3.new(400, 50, 400) -- Will be updated by MapManager
-local COUNTDOWN_SECONDS = 10
+local spawnPosition: Vector3 = Vector3.new(200, 50, 200) -- Jungle center on terrain
 
 -- STEP 3: Wait for shared modules
 print("[Server] Waiting for shared modules...")
@@ -175,42 +174,20 @@ print("[Server] GENERATING 4KM x 4KM WORLD...")
 -- Initialize MapManager FIRST - this generates terrain
 safeInit(MapManager, "MapManager")
 
--- Find the spawn location created by MapManager
-local lobbySpawn = Workspace:FindFirstChild("LobbySpawn")
-if lobbySpawn and lobbySpawn:IsA("SpawnLocation") then
-	spawnPosition = lobbySpawn.Position
-	print(`[Server] Found LobbySpawn at {spawnPosition}`)
-else
-	-- FALLBACK: Create a guaranteed spawn area if MapManager failed
-	warn("[Server] LobbySpawn not found! Creating fallback spawn...")
-
-	-- Create a large, visible spawn platform at jungle center (200, Y, 200)
-	local fallbackPlatform = Instance.new("Part")
-	fallbackPlatform.Name = "FallbackSpawnPlatform"
-	fallbackPlatform.Size = Vector3.new(100, 10, 100)
-	fallbackPlatform.Position = Vector3.new(200, 30, 200)
-	fallbackPlatform.Anchored = true
-	fallbackPlatform.CanCollide = true
-	fallbackPlatform.BrickColor = BrickColor.new("Bright green")
-	fallbackPlatform.Material = Enum.Material.Grass
-	fallbackPlatform.Parent = Workspace
-	print("[Server] Created fallback platform at (200, 30, 200)")
-
-	-- Create spawn location on top
-	local fallbackSpawn = Instance.new("SpawnLocation")
-	fallbackSpawn.Name = "LobbySpawn"
-	fallbackSpawn.Size = Vector3.new(50, 1, 50)
-	fallbackSpawn.Position = Vector3.new(200, 37, 200)
-	fallbackSpawn.Anchored = true
-	fallbackSpawn.Transparency = 0.5
-	fallbackSpawn.CanCollide = false
-	fallbackSpawn.Neutral = true
-	fallbackSpawn.Duration = 0
-	fallbackSpawn.Parent = Workspace
-
-	spawnPosition = fallbackSpawn.Position
-	print(`[Server] Created fallback spawn at {spawnPosition}`)
+-- Find terrain height at spawn location using raycast
+local function getTerrainSpawnHeight(x: number, z: number): number
+	local rayOrigin = Vector3.new(x, 500, z)
+	local rayResult = Workspace:Raycast(rayOrigin, Vector3.new(0, -1000, 0))
+	if rayResult then
+		return rayResult.Position.Y + 5 -- 5 studs above terrain
+	end
+	return 50 -- Fallback height
 end
+
+-- Set spawn position on terrain (no platform needed)
+local spawnY = getTerrainSpawnHeight(200, 200)
+spawnPosition = Vector3.new(200, spawnY, 200)
+print(`[Server] Spawn position set to terrain at {spawnPosition}`)
 
 print("[Server] World generation complete!")
 
@@ -288,11 +265,11 @@ worldReady = true
 print("[Server] WORLD IS READY!")
 
 -- ============================================
--- STEP 14: PLAYER SPAWNING WITH COUNTDOWN
+-- STEP 14: PLAYER SPAWNING (DIRECT TO TERRAIN)
 -- ============================================
 
--- Configure character when spawned
-local function configureCharacter(player: Player, character: Model, freezeMovement: boolean)
+-- Configure character when spawned (immediately ready to move)
+local function configureCharacter(player: Player, character: Model)
 	local humanoid = character:WaitForChild("Humanoid", 5) :: Humanoid?
 	if not humanoid then
 		warn(`[Server] Could not find Humanoid for {player.Name}`)
@@ -302,35 +279,15 @@ local function configureCharacter(player: Player, character: Model, freezeMoveme
 	-- Configure per GDD Appendix A
 	humanoid.MaxHealth = Constants.PLAYER.MAX_HEALTH
 	humanoid.Health = humanoid.MaxHealth
+	humanoid.WalkSpeed = Constants.PLAYER.WALK_SPEED
 	humanoid.JumpPower = Constants.PLAYER.JUMP_POWER
 
-	if freezeMovement then
-		humanoid.WalkSpeed = 0 -- Frozen during countdown
-		humanoid.JumpPower = 0
-	else
-		humanoid.WalkSpeed = Constants.PLAYER.WALK_SPEED
-		humanoid.JumpPower = Constants.PLAYER.JUMP_POWER
-	end
-
-	print(`[Server] Configured {player.Name}: WalkSpeed={humanoid.WalkSpeed}`)
+	print(`[Server] Configured {player.Name}: Ready to play!`)
 end
 
--- Unfreeze player after countdown
-local function unfreezePlayer(player: Player)
-	local character = player.Character
-	if not character then return end
-
-	local humanoid = character:FindFirstChildOfClass("Humanoid")
-	if humanoid then
-		humanoid.WalkSpeed = Constants.PLAYER.WALK_SPEED
-		humanoid.JumpPower = Constants.PLAYER.JUMP_POWER
-		print(`[Server] {player.Name} can now move!`)
-	end
-end
-
--- Spawn a player with countdown
-local function spawnPlayerWithCountdown(player: Player)
-	print(`[Server] Spawning {player.Name} with {COUNTDOWN_SECONDS}s countdown...`)
+-- Spawn a player directly on terrain (no countdown)
+local function spawnPlayer(player: Player)
+	print(`[Server] Spawning {player.Name} on terrain...`)
 
 	-- Initialize player systems
 	if InventoryManager and InventoryManager.InitializePlayer then
@@ -346,19 +303,15 @@ local function spawnPlayerWithCountdown(player: Player)
 	-- Wait for character to load
 	local character = player.Character or player.CharacterAdded:Wait()
 
-	-- Configure with frozen movement
-	configureCharacter(player, character, true)
-
-	-- Send countdown to client (they can show UI)
-	for i = COUNTDOWN_SECONDS, 1, -1 do
-		print(`[Server] {player.Name} countdown: {i}`)
-		-- Could fire event to client here for UI
-		task.wait(1)
+	-- Move to spawn position on terrain
+	local rootPart = character:WaitForChild("HumanoidRootPart", 5)
+	if rootPart then
+		rootPart.CFrame = CFrame.new(spawnPosition)
 	end
 
-	-- Unfreeze after countdown
-	unfreezePlayer(player)
-	print(`[Server] {player.Name} GO!`)
+	-- Configure character (ready to move immediately)
+	configureCharacter(player, character)
+	print(`[Server] {player.Name} spawned and ready!`)
 end
 
 -- Handle death/respawn
@@ -402,7 +355,7 @@ Players.PlayerAdded:Connect(function(player)
 	if worldReady then
 		-- World ready, spawn immediately with countdown
 		task.spawn(function()
-			spawnPlayerWithCountdown(player)
+			spawnPlayer(player)
 		end)
 	else
 		-- Queue for later
@@ -429,7 +382,7 @@ print(`[Server] Spawning {#playersToSpawn} queued players...`)
 for _, player in ipairs(playersToSpawn) do
 	if player and player.Parent then
 		task.spawn(function()
-			spawnPlayerWithCountdown(player)
+			spawnPlayer(player)
 		end)
 	end
 end
