@@ -47,6 +47,9 @@ local playersToSpawn: {Player} = {}
 local worldReady = false
 local spawnPosition: Vector3 = Vector3.new(200, 50, 200) -- Jungle center on terrain
 
+-- Connection tracking for cleanup
+local playerConnections: { [Player]: { RBXScriptConnection } } = {}
+
 -- STEP 3: Wait for shared modules
 print("[Server] Waiting for shared modules...")
 local Shared = ReplicatedStorage:WaitForChild("Shared", 10)
@@ -448,7 +451,10 @@ end
 
 -- Handle death/respawn
 local function setupRespawnHandler(player: Player)
-	player.CharacterAdded:Connect(function(character)
+	-- Initialize connection tracking for this player
+	playerConnections[player] = playerConnections[player] or {}
+
+	local characterAddedConn = player.CharacterAdded:Connect(function(character)
 		local humanoid = character:WaitForChild("Humanoid", 5) :: Humanoid?
 		if humanoid then
 			humanoid.WalkSpeed = Constants.PLAYER.WALK_SPEED
@@ -472,7 +478,7 @@ local function setupRespawnHandler(player: Player)
 				end
 			end)
 
-			-- Handle death
+			-- Handle death (no need to track - humanoid is destroyed with character)
 			humanoid.Died:Connect(function()
 				print(`[Server] {player.Name} died, respawning in 3 seconds...`)
 				task.wait(3)
@@ -482,6 +488,8 @@ local function setupRespawnHandler(player: Player)
 			end)
 		end
 	end)
+
+	table.insert(playerConnections[player], characterAddedConn)
 end
 
 -- ============================================
@@ -513,6 +521,17 @@ end)
 -- Handle player leaving
 Players.PlayerRemoving:Connect(function(player)
 	print(`[Server] Player leaving: {player.Name}`)
+
+	-- Clean up player connections
+	local connections = playerConnections[player]
+	if connections then
+		for _, conn in ipairs(connections) do
+			conn:Disconnect()
+		end
+		playerConnections[player] = nil
+	end
+
+	-- Remove from spawn queue
 	for i, p in ipairs(playersToSpawn) do
 		if p == player then
 			table.remove(playersToSpawn, i)

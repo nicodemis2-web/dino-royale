@@ -43,6 +43,9 @@ local onPingExpired = Instance.new("BindableEvent")
 PingManager.OnPingCreated = onPingCreated.Event
 PingManager.OnPingExpired = onPingExpired.Event
 
+-- Thread tracking for cleanup
+local updateThread: thread? = nil
+
 --[[
 	Initialize the ping manager
 ]]
@@ -66,8 +69,8 @@ function PingManager.Initialize()
 	end)
 
 	-- Start update loop
-	task.spawn(function()
-		while true do
+	updateThread = task.spawn(function()
+		while isInitialized do
 			PingManager.Update()
 			task.wait(1)
 		end
@@ -237,6 +240,30 @@ function PingManager.Reset()
 	pingCooldowns = {}
 	-- Don't reset playerTeams - handled by team system
 	print("[PingManager] Reset")
+end
+
+--[[
+	Shutdown and cleanup resources
+]]
+function PingManager.Shutdown()
+	isInitialized = false
+
+	-- Cancel update thread
+	if updateThread then
+		task.cancel(updateThread)
+		updateThread = nil
+	end
+
+	-- Destroy BindableEvents
+	onPingCreated:Destroy()
+	onPingExpired:Destroy()
+
+	-- Clear state
+	activePings = {}
+	pingCooldowns = {}
+	playerTeams = {}
+
+	print("[PingManager] Shutdown complete")
 end
 
 --[[

@@ -37,6 +37,9 @@ PartyManager.OnPartyDisbanded = onPartyDisbanded.Event
 PartyManager.OnPlayerJoined = onPlayerJoined.Event
 PartyManager.OnPlayerLeft = onPlayerLeft.Event
 
+-- Thread tracking for cleanup
+local inviteCleanupThread: thread? = nil
+
 --[[
 	Initialize the party manager
 ]]
@@ -80,8 +83,8 @@ function PartyManager.Initialize()
 	end)
 
 	-- Start invite expiration checker
-	task.spawn(function()
-		while true do
+	inviteCleanupThread = task.spawn(function()
+		while isInitialized do
 			task.wait(5)
 			PartyManager.CleanupExpiredInvites()
 		end
@@ -783,6 +786,33 @@ function PartyManager.GetPartyPlayers(player: Player): { Player }
 	end
 
 	return result
+end
+
+--[[
+	Shutdown and cleanup resources
+]]
+function PartyManager.Shutdown()
+	isInitialized = false
+
+	-- Cancel cleanup thread
+	if inviteCleanupThread then
+		task.cancel(inviteCleanupThread)
+		inviteCleanupThread = nil
+	end
+
+	-- Destroy BindableEvents
+	onPartyCreated:Destroy()
+	onPartyDisbanded:Destroy()
+	onPlayerJoined:Destroy()
+	onPlayerLeft:Destroy()
+
+	-- Clear state
+	parties = {}
+	playerParties = {}
+	pendingInvites = {}
+	playerInvites = {}
+
+	print("[PartyManager] Shutdown complete")
 end
 
 return PartyManager

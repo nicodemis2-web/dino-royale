@@ -41,6 +41,9 @@ local DANGER_CHECK_INTERVAL = 0.5
 local onIntensityChanged = Instance.new("BindableEvent")
 AdaptiveMusicController.OnIntensityChanged = onIntensityChanged.Event
 
+-- Thread tracking for cleanup
+local intensityThread: thread? = nil
+
 --[[
 	Initialize the adaptive music controller
 ]]
@@ -59,7 +62,7 @@ function AdaptiveMusicController.Initialize()
 	AdaptiveMusicController.SetupEventListeners()
 
 	-- Start intensity update loop
-	task.spawn(AdaptiveMusicController.IntensityUpdateLoop)
+	intensityThread = task.spawn(AdaptiveMusicController.IntensityUpdateLoop)
 
 	-- Start in lobby context
 	AdaptiveMusicController.SetContext("Lobby")
@@ -226,7 +229,7 @@ end
 	Intensity update loop - smoothly transitions intensity
 ]]
 function AdaptiveMusicController.IntensityUpdateLoop()
-	while true do
+	while isInitialized do
 		task.wait(DANGER_CHECK_INTERVAL)
 
 		-- Smoothly blend toward target intensity
@@ -427,6 +430,38 @@ end
 function AdaptiveMusicController.OnLowHealth()
 	AdaptiveMusicController.PlayStinger("LowHealth")
 	AdaptiveMusicController.IncreaseIntensity(1)
+end
+
+--[[
+	Shutdown and cleanup resources
+]]
+function AdaptiveMusicController.Shutdown()
+	isInitialized = false
+
+	-- Cancel intensity update thread
+	if intensityThread then
+		task.cancel(intensityThread)
+		intensityThread = nil
+	end
+
+	-- Stop and destroy all sounds
+	for _, sound in pairs(layerSounds) do
+		sound:Stop()
+		sound:Destroy()
+	end
+	layerSounds = {}
+	layerTweens = {}
+
+	-- Destroy music folder
+	if musicFolder then
+		musicFolder:Destroy()
+		musicFolder = nil
+	end
+
+	-- Destroy BindableEvent
+	onIntensityChanged:Destroy()
+
+	print("[AdaptiveMusicController] Shutdown complete")
 end
 
 return AdaptiveMusicController

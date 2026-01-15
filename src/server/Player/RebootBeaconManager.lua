@@ -72,6 +72,9 @@ RebootBeaconManager.OnRebootStarted = onRebootStarted.Event
 RebootBeaconManager.OnRebootCompleted = onRebootCompleted.Event
 RebootBeaconManager.OnRebootCancelled = onRebootCancelled.Event
 
+-- Thread tracking for cleanup
+local updateThread: thread? = nil
+
 --[[
 	Initialize the reboot beacon manager
 ]]
@@ -93,8 +96,8 @@ function RebootBeaconManager.Initialize()
 	end)
 
 	-- Start update loop
-	task.spawn(function()
-		while true do
+	updateThread = task.spawn(function()
+		while isInitialized do
 			RebootBeaconManager.Update()
 			task.wait(0.1)
 		end
@@ -592,6 +595,35 @@ function RebootBeaconManager.CleanupPlayer(player: Player)
 	end
 
 	collectedCards[player] = nil
+end
+
+--[[
+	Shutdown and cleanup resources
+]]
+function RebootBeaconManager.Shutdown()
+	isInitialized = false
+
+	-- Cancel update thread
+	if updateThread then
+		task.cancel(updateThread)
+		updateThread = nil
+	end
+
+	-- Destroy BindableEvents
+	onCardDropped:Destroy()
+	onCardCollected:Destroy()
+	onCardExpired:Destroy()
+	onRebootStarted:Destroy()
+	onRebootCompleted:Destroy()
+	onRebootCancelled:Destroy()
+
+	-- Clear state
+	rebootCards = {}
+	collectedCards = {}
+	rebootBeacons = {}
+	rebootAttempts = {}
+
+	print("[RebootBeaconManager] Shutdown complete")
 end
 
 return RebootBeaconManager

@@ -54,6 +54,7 @@ Events.Inventory = {
 ]]
 Events.GameState = {
 	"MatchStateChanged", -- Server -> All: {newState, data}
+	"StateChanged", -- Server -> All: {newState, oldState} (alias for UI)
 	"StormUpdate", -- Server -> All: {phase, center, radius, nextRadius, timeRemaining}
 	"PlayerCountUpdate", -- Server -> All: {alivePlayers, totalPlayers}
 	"CountdownStarted", -- Server -> All: {duration}
@@ -70,6 +71,12 @@ Events.GameState = {
 	"SupplyDropIncoming", -- Server -> All: {position}
 	"WelcomeMessage", -- Server -> Client: {title, message, controls}
 	"LobbyUpdate", -- Server -> All: {players}
+	"ToggleReady", -- Client -> Server: {ready}
+	"ReturnToLobby", -- Client -> Server: {}
+	-- Boss events
+	"BossEvent", -- Server -> All: {eventType, bossId, data}
+	"BossLootDropped", -- Server -> All: {bossId, position, loot}
+	"BossEventEnded", -- Server -> All: {bossId, reason}
 }
 
 --[[
@@ -82,7 +89,23 @@ Events.Dinosaur = {
 	"DinosaurAttacked", -- Server -> Nearby: {dinoId, targetId, damage}
 	"DinosaurDamaged", -- Server -> Client: {dinoId, damage, newHealth}
 	"DinosaurKilled", -- Server -> All: {dinoId, killerId, species}
+	"DinosaurWarning", -- Server -> Nearby: {dinoId, species, position}
+	"DinosaurCharge", -- Server -> Nearby: {dinoId, targetPosition}
 	"BossSpawned", -- Server -> All: {bossId, species, position}
+	"BossKilled", -- Server -> All: {bossId, killerId, rewards}
+	"BossPhaseChange", -- Server -> All: {bossId, phase, health}
+	-- Species-specific events
+	"PteranodonDive", -- Server -> Nearby: {dinoId, targetPosition}
+	"IndoraptorEcho", -- Server -> Nearby: {dinoId, position}
+	"IndoraptorAmbush", -- Server -> Nearby: {dinoId, targetId}
+	"IndoraptorOpenDoor", -- Server -> Nearby: {dinoId, doorId}
+	"RaptorLeap", -- Server -> Nearby: {dinoId, targetId}
+	"DilosaurSpit", -- Server -> Nearby: {dinoId, targetPosition}
+	"TRexStomp", -- Server -> All: {dinoId, position, radius}
+	"TRexTailSwipe", -- Server -> Nearby: {dinoId, targetIds}
+	"TRexRoar", -- Server -> All: {dinoId, position}
+	"PackAttacking", -- Server -> Nearby: {packId, targetId}
+	"PackCall", -- Server -> Nearby: {packId, position}
 }
 
 --[[
@@ -106,8 +129,31 @@ Events.Vehicle = {
 	"VehicleDamaged", -- Server -> Nearby: {vehicleId, newHealth}
 	"VehicleDestroyed", -- Server -> All: {vehicleId, position}
 	"VehicleSpawned", -- Server -> Nearby: {vehicleId, vehicleType, position}
+	"PlayerEntered", -- Server -> All: {vehicleId, playerId, seat}
+	"PlayerExited", -- Server -> All: {vehicleId, playerId}
+	"Horn", -- Server -> Nearby: {vehicleId}
+	-- Boat events
 	"BoatEnterWater", -- Server -> All: {vehicleId}
 	"BoatExitWater", -- Server -> All: {vehicleId}
+	"BoatBoost", -- Server -> Nearby: {vehicleId, active}
+	"BoatWake", -- Server -> Nearby: {vehicleId, intensity}
+	-- Motorcycle events
+	"MotorcycleNitro", -- Server -> All: {vehicleId, active}
+	"MotorcycleLean", -- Server -> Nearby: {vehicleId, angle}
+	"MotorcycleWheelie", -- Server -> Nearby: {vehicleId, active}
+	"MotorcycleStunt", -- Server -> Nearby: {vehicleId, stuntType}
+	-- ATV events
+	"ATVWheelie", -- Server -> Nearby: {vehicleId, active}
+	"ATVDrift", -- Server -> Nearby: {vehicleId, angle}
+	"ATVLanded", -- Server -> Nearby: {vehicleId, force}
+	"ATVJump", -- Server -> Nearby: {vehicleId, height}
+	-- Helicopter events
+	"HelicopterStartup", -- Server -> All: {vehicleId}
+	"HelicopterShutdown", -- Server -> All: {vehicleId}
+	"HelicopterCrash", -- Server -> All: {vehicleId, position}
+	"HelicopterRotor", -- Server -> Nearby: {vehicleId, speed}
+	-- Jeep events
+	"TurretFire", -- Server -> Nearby: {vehicleId, targetPosition}
 }
 
 --[[
@@ -132,6 +178,8 @@ Events.Map = {
 	"RequestPOIInfo", -- Client -> Server: {poiName}
 	"POIInfo", -- Server -> Client: {name, config, state}
 	"BiomeChanged", -- Server -> Client: {biome, config}
+	"POILooted", -- Server -> All: {poiName, looterId}
+	"POIEvent", -- Server -> All: {poiName, eventType, data}
 }
 
 --[[
@@ -186,9 +234,15 @@ Events.Healing = {
 ]]
 Events.BattlePass = {
 	"GetProgress", -- Client -> Server: {}
-	"ClaimReward", -- Client -> Server: {tier}
+	"RequestData", -- Client -> Server: {} (alias)
+	"ClaimReward", -- Client -> Server: {tier, isPremium?}
+	"PurchasePremium", -- Client -> Server: {}
 	"ProgressUpdate", -- Server -> Client: {tier, xp, rewards}
+	"DataUpdate", -- Server -> Client: {tier, xp, isPremium, rewards} (alias)
 	"RewardClaimed", -- Server -> Client: {tier, reward}
+	"TierUp", -- Server -> Client: {tier, rewards}
+	"XPGained", -- Server -> Client: {amount, newTotal}
+	"PremiumPurchased", -- Server -> Client: {rewards}
 }
 
 --[[
@@ -197,9 +251,21 @@ Events.BattlePass = {
 ]]
 Events.Tutorial = {
 	"GetStatus", -- Client -> Server: {}
+	"RequestProgress", -- Client -> Server: {} (alias)
 	"Complete", -- Client -> Server: {tutorialId}
 	"Skip", -- Client -> Server: {}
+	"SkipTutorial", -- Client -> Server: {} (alias)
+	"StartTutorial", -- Client -> Server: {}
+	"AcknowledgeTip", -- Client -> Server: {tipId}
 	"StatusUpdate", -- Server -> Client: {completedTutorials}
+	"PromptStart", -- Server -> Client: {tutorialId}
+	"StartStage", -- Server -> Client: {stageId, instructions}
+	"StageCompleted", -- Server -> Client: {stageId}
+	"TutorialCompleted", -- Server -> Client: {tutorialId}
+	"TutorialSkipped", -- Server -> Client: {}
+	"ShowTip", -- Server -> Client: {tipId, content}
+	"EnterTraining", -- Server -> Client: {areaId}
+	"ProgressUpdate", -- Server -> Client: {progress}
 }
 
 --[[
@@ -208,8 +274,11 @@ Events.Tutorial = {
 ]]
 Events.Accessibility = {
 	"GetSettings", -- Client -> Server: {}
+	"RequestSettings", -- Client -> Server: {} (alias)
 	"UpdateSettings", -- Client -> Server: {settings}
+	"SaveSettings", -- Client -> Server: {settings} (alias)
 	"SettingsUpdate", -- Server -> Client: {settings}
+	"SettingsLoaded", -- Server -> Client: {settings} (alias)
 }
 
 --[[
@@ -229,9 +298,15 @@ Events.Ping = {
 ]]
 Events.Ranked = {
 	"GetStats", -- Client -> Server: {}
+	"RequestData", -- Client -> Server: {} (alias)
+	"RequestLeaderboard", -- Client -> Server: {}
 	"QueueMatch", -- Client -> Server: {}
 	"LeaveQueue", -- Client -> Server: {}
 	"StatsUpdate", -- Server -> Client: {rank, points, wins}
+	"DataUpdate", -- Server -> Client: {rank, points, stats} (alias)
+	"MatchResult", -- Server -> Client: {result, pointsChange}
+	"LeaderboardUpdate", -- Server -> Client: {leaderboard}
+	"SeasonRewards", -- Server -> Client: {rewards}
 }
 
 --[[
@@ -239,13 +314,34 @@ Events.Ranked = {
 	Party/squad system
 ]]
 Events.Party = {
-	"Create", -- Client -> Server: {}
+	"Create", -- Client -> Server: {gameMode?}
 	"Invite", -- Client -> Server: {playerId}
 	"Join", -- Client -> Server: {partyId}
+	"AcceptInvite", -- Client -> Server: {inviteId} (alias)
+	"DeclineInvite", -- Client -> Server: {inviteId}
 	"Leave", -- Client -> Server: {}
 	"Kick", -- Client -> Server: {playerId}
+	"SetReady", -- Client -> Server: {ready}
+	"RequestData", -- Client -> Server: {}
 	"PartyUpdate", -- Server -> Client: {members, leader}
-	"InviteReceived", -- Server -> Client: {partyId, leaderName}
+	"DataUpdate", -- Server -> Client: {party} (alias)
+	"InviteReceived", -- Server -> Client: {invite, gameMode, memberCount}
+	"InviteSent", -- Server -> Client: {targetName}
+	"InviteDeclined", -- Server -> Client: {targetName}
+	"InvitesUpdate", -- Server -> Client: {invites}
+	"Created", -- Server -> Client: {party}
+	"Joined", -- Server -> Client: {party}
+	"Left", -- Server -> Client: {}
+	"Disbanded", -- Server -> Client: {}
+	"Kicked", -- Server -> Client: {}
+	"MemberJoined", -- Server -> Client: {member}
+	"MemberLeft", -- Server -> Client: {userId, name, newLeader}
+	"MemberKicked", -- Server -> Client: {userId}
+	"MemberReady", -- Server -> Client: {userId, isReady}
+	"AllReady", -- Server -> Client: {}
+	"GameModeChanged", -- Server -> Client: {gameMode, maxSize}
+	"LeaderChanged", -- Server -> Client: {newLeader}
+	"Error", -- Server -> Client: {message}
 }
 
 --[[
@@ -255,9 +351,16 @@ Events.Party = {
 Events.Reboot = {
 	"RequestReboot", -- Client -> Server: {beaconId, cardPlayerId}
 	"CancelReboot", -- Client -> Server: {}
-	"RebootStarted", -- Server -> All: {beaconId, userId}
+	"CardDropped", -- Server -> All: {playerId, playerName, teamId, position}
+	"CardCollected", -- Server -> All: {collectorId, cardPlayerId}
+	"CardExpired", -- Server -> All: {playerId, playerName}
+	"RebootStarted", -- Server -> All: {beaconId, playerId, targetPlayerId, rebootTime}
+	"RebootProgress", -- Server -> Client: {progress, beaconId}
 	"RebootComplete", -- Server -> All: {beaconId, rebootedPlayers}
-	"RebootCancelled", -- Server -> All: {beaconId}
+	"RebootCompleted", -- Server -> All: {rebooterId, rebootedId, beaconId} (alias)
+	"RebootCancelled", -- Server -> All: {beaconId, playerId}
+	"BeaconOnCooldown", -- Server -> Client: {beaconId, cooldownRemaining}
+	"BeaconStateChanged", -- Server -> All: {beaconId, isActive}
 }
 
 --[[
@@ -266,9 +369,15 @@ Events.Reboot = {
 ]]
 Events.Shop = {
 	"GetItems", -- Client -> Server: {}
+	"RequestData", -- Client -> Server: {} (alias)
+	"RequestInventory", -- Client -> Server: {}
 	"Purchase", -- Client -> Server: {itemId}
 	"ItemsUpdate", -- Server -> Client: {items}
+	"DataUpdate", -- Server -> Client: {items, featured} (alias)
+	"InventoryUpdate", -- Server -> Client: {inventory}
 	"PurchaseResult", -- Server -> Client: {success, itemId, error?}
+	"PurchaseSuccess", -- Server -> Client: {itemId, newBalance} (alias)
+	"PurchaseFailed", -- Server -> Client: {itemId, reason} (alias)
 }
 
 --[[
@@ -277,8 +386,65 @@ Events.Shop = {
 ]]
 Events.Loot = {
 	"RequestPickup", -- Client -> Server: {lootId}
+	"PickupLoot", -- Client -> Server: {lootId} (alias)
 	"LootSpawned", -- Server -> Nearby: {lootId, position, itemType}
 	"LootPickedUp", -- Server -> All: {lootId, playerId}
+	"LootDropped", -- Server -> All: {lootId, position, itemType}
+	"ChestSpawned", -- Server -> Nearby: {chestId, position, tier}
+	"ChestOpened", -- Server -> All: {chestId, openerId, loot}
+}
+
+--[[
+	ENVIRONMENT EVENTS
+	Environmental hazards and weather
+]]
+Events.Environment = {
+	"EventWarning", -- Server -> All: {eventType, position, timeUntil}
+	"EventStarted", -- Server -> All: {eventType, data}
+	"EventEnded", -- Server -> All: {eventType}
+	"LavaBomb", -- Server -> Nearby: {position, radius}
+	"StampedeStart", -- Server -> All: {startPosition, direction, count}
+	"PowerOutage", -- Server -> All: {duration, affectedAreas}
+	"MonsoonStart", -- Server -> All: {intensity, duration}
+}
+
+--[[
+	UI EVENTS
+	User interface updates
+]]
+Events.UI = {
+	"ShowBossHealthBar", -- Server -> All: {bossId, bossName, health, maxHealth}
+	"UpdateBossHealthBar", -- Server -> All: {bossId, health, maxHealth}
+	"HideBossHealthBar", -- Server -> All: {bossId}
+	"RequestFullMap", -- Client -> Server: {}
+	"ShowNotification", -- Server -> Client: {title, message, type}
+}
+
+--[[
+	AI EVENTS
+	AI and dinosaur behavior
+]]
+Events.AI = {
+	"LoudNoise", -- Server -> All: {position, radius, intensity}
+	"DinosaurNearby", -- Server -> Client: {isNearby, dinoId, species}
+}
+
+--[[
+	MATCH EVENTS
+	Match-specific events
+]]
+Events.Match = {
+	"Victory", -- Server -> Client: {placement, stats}
+	"Defeat", -- Server -> Client: {placement, stats}
+	"Top10", -- Server -> Client: {placement}
+}
+
+--[[
+	STORM EVENTS
+	Storm-specific client events
+]]
+Events.Storm = {
+	"PlayerInStorm", -- Server -> Client: {isInStorm, damage}
 }
 
 --[[
@@ -288,6 +454,7 @@ Events.Loot = {
 Events.AdminConsole = {
 	"ExecuteCommand", -- Client -> Server: {command, args}
 	"CommandResult", -- Server -> Client: {success, message}
+	"Feedback", -- Server -> Client: {success, message} (alias)
 	"LogMessage", -- Server -> Client: {level, message, timestamp}
 }
 

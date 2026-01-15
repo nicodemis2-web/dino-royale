@@ -53,6 +53,9 @@ HealingManager.OnHealCancelled = onHealCancelled.Event
 HealingManager.OnBuffApplied = onBuffApplied.Event
 HealingManager.OnBuffExpired = onBuffExpired.Event
 
+-- Thread tracking for cleanup
+local updateThread: thread? = nil
+
 --[[
 	Initialize the healing manager
 ]]
@@ -78,8 +81,8 @@ function HealingManager.Initialize()
 	end)
 
 	-- Start update loop
-	task.spawn(function()
-		while true do
+	updateThread = task.spawn(function()
+		while isInitialized do
 			HealingManager.Update()
 			task.wait(0.1)
 		end
@@ -388,6 +391,33 @@ function HealingManager.CleanupPlayer(player: Player)
 		end
 		activeBuffs[player] = nil
 	end
+end
+
+--[[
+	Shutdown and cleanup resources
+]]
+function HealingManager.Shutdown()
+	isInitialized = false
+
+	-- Cancel update thread
+	if updateThread then
+		task.cancel(updateThread)
+		updateThread = nil
+	end
+
+	-- Destroy BindableEvents
+	onHealStarted:Destroy()
+	onHealCompleted:Destroy()
+	onHealCancelled:Destroy()
+	onBuffApplied:Destroy()
+	onBuffExpired:Destroy()
+
+	-- Clear state
+	activeHeals = {}
+	activeBuffs = {}
+	healingInProgress = {}
+
+	print("[HealingManager] Shutdown complete")
 end
 
 return HealingManager

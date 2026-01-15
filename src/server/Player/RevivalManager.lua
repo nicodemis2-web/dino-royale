@@ -60,6 +60,9 @@ RevivalManager.OnPlayerBledOut = onPlayerBledOut.Event
 RevivalManager.OnReviveStarted = onReviveStarted.Event
 RevivalManager.OnReviveCancelled = onReviveCancelled.Event
 
+-- Thread tracking for cleanup
+local updateThread: thread? = nil
+
 --[[
 	Initialize the revival manager
 ]]
@@ -87,8 +90,8 @@ function RevivalManager.Initialize()
 	end)
 
 	-- Start update loop
-	task.spawn(function()
-		while true do
+	updateThread = task.spawn(function()
+		while isInitialized do
 			RevivalManager.Update()
 			task.wait(0.1)
 		end
@@ -520,6 +523,34 @@ function RevivalManager.CleanupPlayer(player: Player)
 		end
 	end
 	playerTeams[player] = nil
+end
+
+--[[
+	Shutdown and cleanup resources
+]]
+function RevivalManager.Shutdown()
+	isInitialized = false
+
+	-- Cancel update thread
+	if updateThread then
+		task.cancel(updateThread)
+		updateThread = nil
+	end
+
+	-- Destroy BindableEvents
+	onPlayerDowned:Destroy()
+	onPlayerRevived:Destroy()
+	onPlayerBledOut:Destroy()
+	onReviveStarted:Destroy()
+	onReviveCancelled:Destroy()
+
+	-- Clear state
+	downedPlayers = {}
+	reviveAttempts = {}
+	playerTeams = {}
+	teamMembers = {}
+
+	print("[RevivalManager] Shutdown complete")
 end
 
 return RevivalManager
