@@ -104,7 +104,7 @@ function AccessibilityManager.SendSettings(player: Player)
 	local settings = playerSettings[player]
 	if not settings then return end
 
-	Events.FireClient(player, "Accessibility", "SettingsLoaded", {
+	Events.FireClient("Accessibility", "SettingsLoaded", player, {
 		settings = settings,
 	})
 end

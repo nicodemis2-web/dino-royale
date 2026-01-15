@@ -133,9 +133,9 @@ end
 ]]
 local function setupEvents()
 	-- Player health updates
-	local healthConn = Events.OnClientEvent("Player", "HealthUpdate", function(data)
+	local healthConn = Events.OnClientEvent("Combat", "HealthUpdate", function(data)
 		if healthDisplay then
-			healthDisplay:Update(data.health, data.maxHealth, data.shield, data.maxShield)
+			healthDisplay:Update(data.health, data.maxHealth, data.armor or 0, data.maxArmor or 100)
 		end
 	end)
 	table.insert(connections, healthConn)
@@ -159,56 +159,10 @@ local function setupEvents()
 	end)
 	table.insert(connections, healConn)
 
-	-- Weapon equipped
-	local equipConn = Events.OnClientEvent("Weapon", "Equipped", function(data)
-		if weaponSlots then
-			weaponSlots:SetSlot(data.slotIndex, {
-				weaponId = data.weaponId,
-				weaponName = data.weaponName,
-				rarity = data.rarity,
-				ammo = data.currentAmmo,
-				maxAmmo = data.maxAmmo,
-				icon = data.icon,
-			})
-			weaponSlots:SelectSlot(data.slotIndex)
-		end
-	end)
-	table.insert(connections, equipConn)
-
-	-- Weapon unequipped
-	local unequipConn = Events.OnClientEvent("Weapon", "Unequipped", function(data)
-		if weaponSlots then
-			weaponSlots:ClearSlot(data.slotIndex)
-		end
-	end)
-	table.insert(connections, unequipConn)
-
-	-- Ammo update
-	local ammoConn = Events.OnClientEvent("Weapon", "AmmoUpdate", function(data)
-		if ammoDisplay then
-			ammoDisplay:Update(data.currentMag, data.maxMag, data.reserve)
-		end
-		if weaponSlots then
-			weaponSlots:UpdateAmmo(data.slotIndex, data.currentMag)
-		end
-	end)
-	table.insert(connections, ammoConn)
-
-	-- Reload start
-	local reloadStartConn = Events.OnClientEvent("Weapon", "ReloadStart", function(data)
-		if ammoDisplay then
-			ammoDisplay:StartReload(data.duration)
-		end
-	end)
-	table.insert(connections, reloadStartConn)
-
-	-- Reload cancel
-	local reloadCancelConn = Events.OnClientEvent("Weapon", "ReloadCancel", function()
-		if ammoDisplay then
-			ammoDisplay:CancelReload()
-		end
-	end)
-	table.insert(connections, reloadCancelConn)
+	-- Note: Weapon slot updates and ammo updates are handled through Inventory.InventoryUpdate
+	-- The following functionality is now integrated there:
+	-- - Weapon equipped/unequipped -> Updates weapon slots from inventory.weapons
+	-- - Ammo update -> Updates ammo display from inventory.weapons and inventory.ammo
 
 	-- Hit marker
 	local hitConn = Events.OnClientEvent("Combat", "HitConfirm", function(data)
@@ -269,55 +223,66 @@ local function setupEvents()
 	end)
 	table.insert(connections, matchConn)
 
-	-- Storm timer
-	local stormTimerConn = Events.OnClientEvent("Storm", "TimerUpdate", function(data)
+	-- Storm update (from GameState category)
+	local stormUpdateConn = Events.OnClientEvent("GameState", "StormUpdate", function(data)
 		if matchInfo then
 			matchInfo:UpdateStormTimer(data.timeRemaining)
 		end
 		if minimap then
-			if data.stormCenter and data.stormRadius then
-				minimap:SetStormCircle(data.stormCenter, data.stormRadius)
+			if data.center and data.radius then
+				minimap:SetStormCircle(data.center, data.radius)
 			end
-			if data.safeCenter and data.safeRadius then
-				minimap:SetSafeZone(data.safeCenter, data.safeRadius)
+			if data.nextRadius then
+				minimap:SetSafeZone(data.center, data.nextRadius)
 			end
 		end
 	end)
-	table.insert(connections, stormTimerConn)
+	table.insert(connections, stormUpdateConn)
 
-	-- Storm damage
-	local stormDamageConn = Events.OnClientEvent("Storm", "StormDamage", function(data)
-		if damageIndicator then
-			damageIndicator:ShowStormDamage()
-		end
-	end)
-	table.insert(connections, stormDamageConn)
+	-- Damage taken from storm (via DamageTaken with sourceType check)
+	-- Note: Storm damage is handled in DamageTaken listener above via sourceType field
 
-	-- Interaction prompt
-	local interactShowConn = Events.OnClientEvent("Interaction", "ShowPrompt", function(data)
-		if interactionPrompt then
-			interactionPrompt:Show({
-				actionText = data.actionText,
-				objectText = data.objectText,
-				keyCode = data.keyCode,
-				holdDuration = data.holdDuration,
-				rarity = data.rarity,
-			})
-		end
-	end)
-	table.insert(connections, interactShowConn)
+	-- Note: Interaction prompts are handled via Roblox ProximityPrompt instances
+	-- which fire local events on the client, not through remote events
 
-	local interactHideConn = Events.OnClientEvent("Interaction", "HidePrompt", function()
-		if interactionPrompt then
-			interactionPrompt:Hide()
-		end
-	end)
-	table.insert(connections, interactHideConn)
-
-	-- Inventory updates
-	local inventoryConn = Events.OnClientEvent("Inventory", "Update", function(data)
+	-- Inventory updates (main weapon/ammo data source)
+	local inventoryConn = Events.OnClientEvent("Inventory", "InventoryUpdate", function(data)
 		if inventoryScreen then
-			inventoryScreen:SetItems(data.items)
+			inventoryScreen:SetItems(data)
+		end
+
+		-- Update weapon slots from inventory data
+		if weaponSlots and data.weapons then
+			-- Clear and repopulate all slots
+			for slot = 1, 5 do
+				local weaponData = data.weapons[slot]
+				if weaponData then
+					weaponSlots:SetSlot(slot, {
+						weaponId = weaponData.id,
+						weaponName = weaponData.id, -- Name lookup could be added
+						rarity = weaponData.rarity,
+						ammo = weaponData.currentAmmo,
+						maxAmmo = 30, -- Would come from WeaponData lookup
+						icon = "",
+					})
+				else
+					weaponSlots:ClearSlot(slot)
+				end
+			end
+		end
+
+		-- Update ammo display for currently selected weapon
+		if ammoDisplay and data.weapons and data.currentWeaponSlot then
+			local currentWeapon = data.weapons[data.currentWeaponSlot]
+			if currentWeapon then
+				-- Get reserve ammo from inventory ammo pool
+				local WeaponData = require(game.ReplicatedStorage.Shared.Config.WeaponData)
+				local ammoType = WeaponData.GetAmmoType(currentWeapon.id)
+				local reserveAmmo = ammoType and data.ammo and data.ammo[ammoType] or currentWeapon.reserveAmmo or 0
+				ammoDisplay:Update(currentWeapon.currentAmmo, 30, reserveAmmo)
+			else
+				ammoDisplay:Update(0, 0, 0)
+			end
 		end
 	end)
 	table.insert(connections, inventoryConn)

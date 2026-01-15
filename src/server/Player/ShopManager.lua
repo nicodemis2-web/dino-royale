@@ -273,7 +273,7 @@ function ShopManager.PurchaseItem(player: Player, itemId: string)
 
 	-- Check if already owned
 	if inventory.ownedItems[itemId] then
-		Events.FireClient(player, "Shop", "PurchaseFailed", {
+		Events.FireClient("Shop", "PurchaseFailed", player, {
 			reason = "AlreadyOwned",
 			itemId = itemId,
 		})
@@ -286,7 +286,7 @@ function ShopManager.PurchaseItem(player: Player, itemId: string)
 		or table.find(currentShopState.specialItems, itemId)
 
 	if not inRotation then
-		Events.FireClient(player, "Shop", "PurchaseFailed", {
+		Events.FireClient("Shop", "PurchaseFailed", player, {
 			reason = "NotAvailable",
 			itemId = itemId,
 		})
@@ -317,7 +317,7 @@ function ShopManager.PurchaseItem(player: Player, itemId: string)
 	})
 
 	-- Notify client
-	Events.FireClient(player, "Shop", "PurchaseSuccess", {
+	Events.FireClient("Shop", "PurchaseSuccess", player, {
 		itemId = itemId,
 		price = price,
 	})
@@ -403,7 +403,7 @@ function ShopManager.SendShopData(player: Player)
 		end
 	end
 
-	Events.FireClient(player, "Shop", "DataUpdate", {
+	Events.FireClient("Shop", "DataUpdate", player, {
 		featured = featuredData,
 		daily = dailyData,
 		special = specialData,
@@ -423,7 +423,7 @@ function ShopManager.SendInventory(player: Player)
 		table.insert(ownedList, itemId)
 	end
 
-	Events.FireClient(player, "Shop", "InventoryUpdate", {
+	Events.FireClient("Shop", "InventoryUpdate", player, {
 		ownedItems = ownedList,
 	})
 end

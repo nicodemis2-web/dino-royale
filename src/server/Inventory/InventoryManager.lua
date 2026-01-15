@@ -64,10 +64,19 @@ local MAX_AMMO = {
 }
 
 --[[
-	Initialize inventory for a player
+	Initialize the InventoryManager module (call once on server start)
+]]
+function InventoryManager.Initialize()
+	-- Set up event listeners
+	InventoryManager.InitializeEvents()
+	print("[InventoryManager] Initialized")
+end
+
+--[[
+	Initialize inventory for a specific player
 	@param player The player to initialize
 ]]
-function InventoryManager.Initialize(player: Player)
+function InventoryManager.InitializePlayer(player: Player)
 	local userId = player.UserId
 
 	playerInventories[userId] = {
@@ -87,9 +96,6 @@ function InventoryManager.Initialize(player: Player)
 		currentWeaponSlot = 1,
 	}
 
-	-- Listen for inventory events
-	-- These are connected per-player in the main server init
-
 	-- Cleanup on player leaving
 	local ancestryConn = player.AncestryChanged:Connect(function(_, parent)
 		if not parent then
@@ -97,10 +103,12 @@ function InventoryManager.Initialize(player: Player)
 		end
 	end)
 	playerConnections[userId] = ancestryConn
+
+	print(`[InventoryManager] Initialized inventory for {player.Name}`)
 end
 
 --[[
-	Initialize event listeners (call once on server start)
+	Initialize event listeners
 ]]
 function InventoryManager.InitializeEvents()
 	Events.OnServerEvent("Inventory", "PickupItem", function(player, data)
@@ -192,9 +200,17 @@ function InventoryManager.AddWeapon(player: Player, weaponId: string, rarity: st
 		return { success = false }
 	end
 
-	-- Create weapon instance
+	-- Create weapon instance (comes with one full mag)
 	local weapon = WeaponBase.new(weaponId, rarity :: any)
+	weapon.state.reserveAmmo = 0 -- Reserve ammo comes from inventory pool now
 	inventory.weapons[emptySlot] = weapon
+
+	-- Add starting ammo to inventory pool (2 extra mags worth)
+	local ammoType = WeaponData.GetAmmoType(weaponId)
+	if ammoType then
+		local startingAmmo = weaponDef.magSize * 2
+		InventoryManager.AddAmmo(player, ammoType, startingAmmo)
+	end
 
 	-- Send update to client
 	InventoryManager.SendInventoryUpdate(player)
@@ -695,11 +711,17 @@ function InventoryManager.SendInventoryUpdate(player: Player)
 		return
 	end
 
-	-- Serialize weapons
+	-- Serialize weapons with reserve ammo synced from inventory pool
 	local serializedWeapons = {}
 	for slot, weapon in pairs(inventory.weapons) do
 		if weapon then
-			serializedWeapons[slot] = weapon:Serialize()
+			local serialized = weapon:Serialize()
+			-- Sync reserve ammo with inventory ammo pool
+			local ammoType = WeaponData.GetAmmoType(weapon.id)
+			if ammoType and inventory.ammo[ammoType] then
+				serialized.reserveAmmo = inventory.ammo[ammoType]
+			end
+			serializedWeapons[slot] = serialized
 		end
 	end
 
@@ -781,13 +803,6 @@ function InventoryManager.CleanupPlayer(player: Player)
 	playerInventories[userId] = nil
 end
 
---[[
-	Initialize a player's inventory (alias for Initialize)
-	@param player The player to initialize
-]]
-function InventoryManager.InitializePlayer(player: Player)
-	InventoryManager.Initialize(player)
-end
 
 --[[
 	Reset all inventory state for new match

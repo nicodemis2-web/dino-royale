@@ -172,7 +172,7 @@ function RankedManager.ProcessMatchResult(player: Player, placement: number, kil
 	end
 
 	-- Notify player
-	Events.FireClient(player, "Ranked", "MatchResult", {
+	Events.FireClient("Ranked", "MatchResult", player, {
 		placement = placement,
 		kills = kills,
 		rpChange = rpChange,
@@ -234,7 +234,7 @@ function RankedManager.SendRankData(player: Player)
 	local tier = RankedData.GetTier(rank.tier)
 	if not tier then return end
 
-	Events.FireClient(player, "Ranked", "DataUpdate", {
+	Events.FireClient("Ranked", "DataUpdate", player, {
 		rank = rank,
 		displayName = RankedData.GetRankDisplayName(rank.rp),
 		rpToNext = RankedData.GetRPToNextRank(rank.rp),
@@ -284,7 +284,7 @@ function RankedManager.SendLeaderboard(player: Player)
 		end
 	end
 
-	Events.FireClient(player, "Ranked", "LeaderboardUpdate", {
+	Events.FireClient("Ranked", "LeaderboardUpdate", player, {
 		topPlayers = topPlayers,
 		playerRank = playerRankPosition,
 		totalPlayers = #leaderboard,
@@ -323,7 +323,7 @@ function RankedManager.EndSeason()
 	for player, rank in pairs(playerRanks) do
 		local rewards = RankedData.SeasonRewards[rank.peakTier]
 		if rewards then
-			Events.FireClient(player, "Ranked", "SeasonRewards", {
+			Events.FireClient("Ranked", "SeasonRewards", player, {
 				tier = rank.peakTier,
 				rewards = rewards,
 			})

@@ -141,7 +141,7 @@ function BattlePassManager.AddXP(player: Player, amount: number, source: string?
 			onTierUp:Fire(player, tier)
 
 			-- Notify client
-			Events.FireClient(player, "BattlePass", "TierUp", {
+			Events.FireClient("BattlePass", "TierUp", player, {
 				tier = tier,
 				xp = battlePass.xp,
 			})
@@ -149,7 +149,7 @@ function BattlePassManager.AddXP(player: Player, amount: number, source: string?
 	end
 
 	-- Send XP update
-	Events.FireClient(player, "BattlePass", "XPGained", {
+	Events.FireClient("BattlePass", "XPGained", player, {
 		amount = amount,
 		total = battlePass.xp,
 		tier = battlePass.tier,
@@ -200,7 +200,7 @@ function BattlePassManager.ClaimReward(player: Player, tier: number, isPremiumRe
 	battlePass.claimedRewards[claimKey] = true
 
 	-- Notify
-	Events.FireClient(player, "BattlePass", "RewardClaimed", {
+	Events.FireClient("BattlePass", "RewardClaimed", player, {
 		tier = tier,
 		isPremium = isPremiumReward,
 		reward = reward,
@@ -279,7 +279,7 @@ function BattlePassManager.PurchasePremium(player: Player)
 	battlePass.isPremium = true
 	battlePass.purchaseDate = os.time()
 
-	Events.FireClient(player, "BattlePass", "PremiumPurchased", {
+	Events.FireClient("BattlePass", "PremiumPurchased", player, {
 		seasonNumber = battlePass.seasonNumber,
 	})
 
@@ -322,7 +322,7 @@ function BattlePassManager.SendBattlePassData(player: Player)
 	local battlePass = playerBattlePasses[player]
 	if not battlePass then return end
 
-	Events.FireClient(player, "BattlePass", "DataUpdate", {
+	Events.FireClient("BattlePass", "DataUpdate", player, {
 		seasonNumber = battlePass.seasonNumber,
 		seasonName = BattlePassData.CurrentSeason.seasonName,
 		seasonTheme = BattlePassData.CurrentSeason.theme,

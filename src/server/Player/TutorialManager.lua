@@ -126,7 +126,7 @@ end
 	Prompt new player to start tutorial
 ]]
 function TutorialManager.PromptTutorial(player: Player)
-	Events.FireClient(player, "Tutorial", "PromptStart", {
+	Events.FireClient("Tutorial", "PromptStart", player, {
 		totalDuration = TutorialData.GetTotalDuration(),
 		rewards = { "Starter Skin", "100 XP Boost" },
 	})
@@ -147,7 +147,7 @@ function TutorialManager.StartTutorial(player: Player)
 		return
 	end
 
-	Events.FireClient(player, "Tutorial", "StartStage", {
+	Events.FireClient("Tutorial", "StartStage", player, {
 		stage = nextStage,
 	})
 
@@ -191,7 +191,7 @@ function TutorialManager.CompleteStage(player: Player, stageId: string)
 		end
 	end
 
-	Events.FireClient(player, "Tutorial", "StageCompleted", {
+	Events.FireClient("Tutorial", "StageCompleted", player, {
 		stageId = stageId,
 		rewards = stage.rewards,
 	})
@@ -205,7 +205,7 @@ function TutorialManager.CompleteStage(player: Player, stageId: string)
 		TutorialManager.CompleteTutorial(player)
 	else
 		-- Start next stage
-		Events.FireClient(player, "Tutorial", "StartStage", {
+		Events.FireClient("Tutorial", "StartStage", player, {
 			stage = nextStage,
 		})
 	end
@@ -223,7 +223,7 @@ function TutorialManager.CompleteTutorial(player: Player)
 	-- Grant completion rewards
 	TutorialManager.GrantReward(player, "TutorialCompletion")
 
-	Events.FireClient(player, "Tutorial", "TutorialCompleted", {
+	Events.FireClient("Tutorial", "TutorialCompleted", player, {
 		rewards = { "Starter Skin", "100 XP Boost" },
 	})
 
@@ -241,7 +241,7 @@ function TutorialManager.SkipTutorial(player: Player)
 	progress.tutorialCompleted = true
 	-- Mark all stages as skipped (not completed, but no longer needed)
 
-	Events.FireClient(player, "Tutorial", "TutorialSkipped", {})
+	Events.FireClient("Tutorial", "TutorialSkipped", player, {})
 	print(`[TutorialManager] {player.Name} skipped tutorial`)
 end
 
@@ -271,7 +271,7 @@ function TutorialManager.TriggerTip(player: Player, trigger: string)
 		local timesShown = progress.shownTips[tip.id] or 0
 		if timesShown < tip.showCount then
 			-- Show this tip
-			Events.FireClient(player, "Tutorial", "ShowTip", {
+			Events.FireClient("Tutorial", "ShowTip", player, {
 				tipId = tip.id,
 				message = tip.message,
 				priority = tip.priority,
@@ -312,7 +312,7 @@ function TutorialManager.EnterTrainingGrounds(player: Player, mode: string)
 	-- TODO: Teleport to training grounds place or instance
 	print(`[TutorialManager] {player.Name} entering training: {mode}`)
 
-	Events.FireClient(player, "Tutorial", "EnterTraining", {
+	Events.FireClient("Tutorial", "EnterTraining", player, {
 		mode = mode,
 	})
 end
@@ -329,7 +329,7 @@ function TutorialManager.SendProgress(player: Player)
 		stageProgress[stage.id] = progress.completedStages[stage.id] or false
 	end
 
-	Events.FireClient(player, "Tutorial", "ProgressUpdate", {
+	Events.FireClient("Tutorial", "ProgressUpdate", player, {
 		completedStages = stageProgress,
 		matchesPlayed = progress.matchesPlayed,
 		tutorialCompleted = progress.tutorialCompleted,

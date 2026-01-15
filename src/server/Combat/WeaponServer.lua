@@ -50,12 +50,17 @@ local fireTimestamps = {} :: { [number]: { number } }
 -- Reference to HealthManager (set during initialization)
 local HealthManager: any = nil
 
+-- Reference to InventoryManager (set during initialization)
+local InventoryManager: any = nil
+
 --[[
 	Initialize the weapon server
 	@param healthManager Reference to HealthManager module
+	@param inventoryManager Reference to InventoryManager module (optional)
 ]]
-function WeaponServer.Initialize(healthManager: any)
+function WeaponServer.Initialize(healthManager: any, inventoryManager: any?)
 	HealthManager = healthManager
+	InventoryManager = inventoryManager
 
 	-- Listen for weapon fire events
 	Events.OnServerEvent("Combat", "WeaponFire", function(player, data)
@@ -364,18 +369,70 @@ function WeaponServer.HandleWeaponReload(player: Player, data: any)
 		return
 	end
 
-	-- Start reload
-	local started = weapon:Reload()
-	if not started then
+	-- Check if we have ammo in inventory pool
+	local ammoType = WeaponData.GetAmmoType(weapon.id)
+	local availableAmmo = 0
+
+	if InventoryManager and ammoType then
+		local inventory = InventoryManager.GetInventory(player)
+		if inventory then
+			availableAmmo = inventory.ammo[ammoType] or 0
+		end
+	else
+		-- Fallback to weapon's reserve ammo if no inventory manager
+		availableAmmo = weapon.state.reserveAmmo
+	end
+
+	-- Can't reload without ammo
+	if availableAmmo <= 0 then
 		return
 	end
+
+	-- Can't reload if mag is full
+	if weapon.state.currentAmmo >= weapon.definition.magSize then
+		return
+	end
+
+	-- Start reload
+	weapon.state.isReloading = true
 
 	-- Schedule reload completion
 	task.delay(weapon.stats.reloadTime, function()
 		-- Verify player still has weapon and is still reloading
 		local currentWeapon = playerWeapons[player.UserId]
-		if currentWeapon and currentWeapon.id == weaponId and currentWeapon.state.isReloading then
-			WeaponBase.CompleteReload(currentWeapon)
+		if not currentWeapon or currentWeapon.id ~= weaponId or not currentWeapon.state.isReloading then
+			return
+		end
+
+		-- Calculate ammo to transfer
+		local ammoNeeded = currentWeapon.definition.magSize - currentWeapon.state.currentAmmo
+		local ammoToTransfer = 0
+
+		if InventoryManager and ammoType then
+			-- Get current inventory ammo
+			local inventory = InventoryManager.GetInventory(player)
+			if inventory then
+				local poolAmmo = inventory.ammo[ammoType] or 0
+				ammoToTransfer = math.min(ammoNeeded, poolAmmo)
+
+				-- Consume ammo from inventory pool
+				if ammoToTransfer > 0 then
+					InventoryManager.ConsumeAmmo(player, ammoType, ammoToTransfer)
+				end
+			end
+		else
+			-- Fallback to weapon's reserve ammo
+			ammoToTransfer = math.min(ammoNeeded, currentWeapon.state.reserveAmmo)
+			currentWeapon.state.reserveAmmo = currentWeapon.state.reserveAmmo - ammoToTransfer
+		end
+
+		-- Add ammo to magazine
+		currentWeapon.state.currentAmmo = currentWeapon.state.currentAmmo + ammoToTransfer
+		currentWeapon.state.isReloading = false
+
+		-- Send inventory update to client
+		if InventoryManager then
+			InventoryManager.SendInventoryUpdate(player)
 		end
 	end)
 end
