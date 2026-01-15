@@ -394,40 +394,60 @@ local function spawnPlayer(player: Player)
 	-- Configure character (ready to move immediately)
 	configureCharacter(player, character)
 
-	-- Debug mode: Give starting weapons and ammo
-	if GameConfig.Debug.Enabled and GameConfig.Debug.SoloTestMode then
-		task.defer(function()
-			task.wait(0.5) -- Wait for inventory to be fully initialized
+	-- Give starting weapons and ammo (always give loadout on spawn)
+	task.defer(function()
+		task.wait(0.5) -- Wait for inventory to be fully initialized
 
-			if InventoryManager then
-				-- Give starter pistol
-				pcall(function()
-					InventoryManager.AddWeapon(player, "Pistol", "Common")
-					print(`[Server] Gave {player.Name} starting Pistol`)
-				end)
+		if InventoryManager then
+			-- Give starter pistol (RangerSidearm is the pistol weapon ID)
+			pcall(function()
+				local result = InventoryManager.AddWeapon(player, "RangerSidearm", "Common")
+				if result.success then
+					print(`[Server] Gave {player.Name} starting RangerSidearm (slot {result.slot})`)
+				else
+					warn(`[Server] Failed to give RangerSidearm to {player.Name}`)
+				end
+			end)
 
-				-- Give starter assault rifle
-				pcall(function()
-					InventoryManager.AddWeapon(player, "AssaultRifle", "Common")
-					print(`[Server] Gave {player.Name} starting AssaultRifle`)
-				end)
+			-- Give starter assault rifle (RangerAR is the AR weapon ID)
+			pcall(function()
+				local result = InventoryManager.AddWeapon(player, "RangerAR", "Common")
+				if result.success then
+					print(`[Server] Gave {player.Name} starting RangerAR (slot {result.slot})`)
+				else
+					warn(`[Server] Failed to give RangerAR to {player.Name}`)
+				end
+			end)
 
-				-- Give starting ammo
-				pcall(function()
-					InventoryManager.AddAmmo(player, "LightAmmo", 120)
-					InventoryManager.AddAmmo(player, "MediumAmmo", 90)
-					print(`[Server] Gave {player.Name} starting ammo`)
-				end)
+			-- Give starter SMG for variety
+			pcall(function()
+				local result = InventoryManager.AddWeapon(player, "RaptorSMG", "Common")
+				if result.success then
+					print(`[Server] Gave {player.Name} starting RaptorSMG (slot {result.slot})`)
+				end
+			end)
 
-				-- Give some healing items
-				pcall(function()
-					InventoryManager.AddConsumable(player, "Bandage", 5)
-					InventoryManager.AddConsumable(player, "MiniShield", 3)
-					print(`[Server] Gave {player.Name} starting consumables`)
-				end)
-			end
-		end)
-	end
+			-- Give starting ammo
+			pcall(function()
+				InventoryManager.AddAmmo(player, "LightAmmo", 150)
+				InventoryManager.AddAmmo(player, "MediumAmmo", 120)
+				print(`[Server] Gave {player.Name} starting ammo`)
+			end)
+
+			-- Give some healing items
+			pcall(function()
+				InventoryManager.AddConsumable(player, "Bandage", 5)
+				InventoryManager.AddConsumable(player, "MiniShield", 3)
+				print(`[Server] Gave {player.Name} starting consumables`)
+			end)
+
+			-- Force send inventory update to client
+			pcall(function()
+				InventoryManager.SendInventoryUpdate(player)
+				print(`[Server] Sent inventory update to {player.Name}`)
+			end)
+		end
+	end)
 
 	print(`[Server] {player.Name} spawned and ready!`)
 

@@ -11,6 +11,7 @@ local Players = game:GetService("Players")
 
 local DinosaurData = require(game.ReplicatedStorage.Shared.Config.DinosaurData)
 local Events = require(game.ReplicatedStorage.Shared.Events)
+local DinosaurVisuals = require(script.Parent.DinosaurVisuals)
 
 -- Forward declaration for BehaviorTree (to avoid cyclic import)
 local BehaviorTree: any = nil
@@ -727,14 +728,18 @@ function DinosaurBase:SetModel(model: Model)
 
 	-- Set attributes for client-side targeting UI
 	local speciesData = DinosaurData.AllDinosaurs[self.species]
+	local tier = speciesData and speciesData.tier or "Common"
 	model:SetAttribute("Species", self.species)
 	model:SetAttribute("Health", self.stats.health)
 	model:SetAttribute("MaxHealth", self.stats.maxHealth)
-	model:SetAttribute("Tier", speciesData and speciesData.tier or "Common")
+	model:SetAttribute("Tier", tier)
 	model:SetAttribute("DinosaurId", self.id)
 
 	-- Add dinosaur tag for CollectionService queries
 	model:AddTag("Dinosaur")
+
+	-- Apply visual effects (glow, particles, neon markings based on tier/species)
+	DinosaurVisuals.ApplyVisuals(model, self.species, tier)
 end
 
 --[[

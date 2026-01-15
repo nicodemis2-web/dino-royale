@@ -390,11 +390,20 @@ function HUDController.OnGameStateChanged(newState: string)
 	local previousState = currentGameState
 	currentGameState = newState
 
+	print(`[HUDController] State changed: {previousState} -> {newState}`)
+
 	-- Transition duration
 	local FADE_DURATION = 0.2
 
 	if newState == "Lobby" then
-		HUDController.SetHUDVisible(false, FADE_DURATION)
+		-- Show HUD even in lobby for testing (minimal elements)
+		HUDController.SetHUDVisible(true, FADE_DURATION)
+		if ammoDisplay then
+			ammoDisplay:SetVisible(false)
+		end
+		if weaponSlots then
+			weaponSlots.frame.Visible = false
+		end
 
 	elseif newState == "Loading" then
 		HUDController.SetHUDVisible(false, FADE_DURATION)
@@ -568,11 +577,22 @@ function HUDController.Initialize()
 		ConfirmDialog.Initialize()
 	end
 
-	-- Start with HUD hidden (lobby state)
-	HUDController.SetHUDVisible(false)
+	-- Start with HUD visible for immediate feedback
+	-- Individual components will be shown/hidden based on game state
+	HUDController.SetHUDVisible(true)
+
+	-- Show crosshair immediately
+	if crosshair then
+		crosshair:SetVisible(true)
+	end
+
+	-- Show health display immediately
+	if healthDisplay then
+		healthDisplay:Update(100, 100, 0, 100)
+	end
 
 	isInitialized = true
-	print("[HUDController] Initialized")
+	print("[HUDController] Initialized - HUD visible")
 end
 
 --[[
