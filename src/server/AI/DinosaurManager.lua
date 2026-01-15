@@ -181,26 +181,100 @@ local function selectRandomSpecies(biome: string?): string?
 end
 
 --[[
-	Create a dinosaur model (placeholder)
+	Create a dinosaur model (placeholder - visible colored box)
 ]]
 local function createDinosaurModel(species: string, position: Vector3): Model
+	-- Raycast to find ground height at spawn position
+	local workspace = game:GetService("Workspace")
+	local rayOrigin = Vector3.new(position.X, 500, position.Z)
+	local rayDirection = Vector3.new(0, -600, 0)
+	local rayResult = workspace:Raycast(rayOrigin, rayDirection)
+
+	local spawnHeight = position.Y
+	if rayResult then
+		spawnHeight = rayResult.Position.Y + 3 -- Spawn slightly above ground
+	end
+	local spawnPosition = Vector3.new(position.X, spawnHeight, position.Z)
+
 	-- In production, would clone from ReplicatedStorage
 	local model = Instance.new("Model")
 	model.Name = species
 
-	-- Create placeholder parts
-	local rootPart = Instance.new("Part")
-	rootPart.Name = "HumanoidRootPart"
-	rootPart.Size = Vector3.new(4, 4, 8)
-	rootPart.CFrame = CFrame.new(position)
-	rootPart.Anchored = false
-	rootPart.CanCollide = true
-	rootPart.Parent = model
+	-- Get species data for size scaling
+	local speciesData = DinosaurData.AllDinosaurs[species]
+	local tier = speciesData and speciesData.tier or "Common"
 
+	-- Size based on tier
+	local sizeMultiplier = ({
+		Common = 1,
+		Uncommon = 1.5,
+		Rare = 2,
+		Epic = 3,
+		Legendary = 5,
+	})[tier] or 1
+
+	-- Color based on tier for visibility
+	local tierColors = {
+		Common = BrickColor.new("Bright green"),
+		Uncommon = BrickColor.new("Bright blue"),
+		Rare = BrickColor.new("Bright violet"),
+		Epic = BrickColor.new("Bright orange"),
+		Legendary = BrickColor.new("Bright red"),
+	}
+
+	-- Create body (main part)
+	local body = Instance.new("Part")
+	body.Name = "HumanoidRootPart"
+	body.Size = Vector3.new(4 * sizeMultiplier, 3 * sizeMultiplier, 8 * sizeMultiplier)
+	body.CFrame = CFrame.new(spawnPosition)
+	body.Anchored = false
+	body.CanCollide = true
+	body.BrickColor = tierColors[tier] or BrickColor.new("Medium stone grey")
+	body.Material = Enum.Material.SmoothPlastic
+	body.Parent = model
+
+	-- Create head
+	local head = Instance.new("Part")
+	head.Name = "Head"
+	head.Size = Vector3.new(2 * sizeMultiplier, 2 * sizeMultiplier, 3 * sizeMultiplier)
+	head.CFrame = CFrame.new(spawnPosition + Vector3.new(0, 1 * sizeMultiplier, 4 * sizeMultiplier))
+	head.Anchored = false
+	head.CanCollide = false
+	head.BrickColor = tierColors[tier] or BrickColor.new("Medium stone grey")
+	head.Material = Enum.Material.SmoothPlastic
+	head.Parent = model
+
+	-- Weld head to body
+	local headWeld = Instance.new("WeldConstraint")
+	headWeld.Part0 = body
+	headWeld.Part1 = head
+	headWeld.Parent = head
+
+	-- Create humanoid
 	local humanoid = Instance.new("Humanoid")
+	humanoid.MaxHealth = speciesData and speciesData.health or 100
+	humanoid.Health = humanoid.MaxHealth
+	humanoid.WalkSpeed = speciesData and speciesData.speed or 16
 	humanoid.Parent = model
 
-	model.PrimaryPart = rootPart
+	-- Add name label
+	local billboardGui = Instance.new("BillboardGui")
+	billboardGui.Size = UDim2.new(0, 100, 0, 40)
+	billboardGui.StudsOffset = Vector3.new(0, 3 * sizeMultiplier, 0)
+	billboardGui.Adornee = body
+	billboardGui.Parent = model
+
+	local nameLabel = Instance.new("TextLabel")
+	nameLabel.Size = UDim2.new(1, 0, 1, 0)
+	nameLabel.BackgroundTransparency = 1
+	nameLabel.Text = species
+	nameLabel.TextColor3 = Color3.new(1, 1, 1)
+	nameLabel.TextStrokeTransparency = 0
+	nameLabel.Font = Enum.Font.GothamBold
+	nameLabel.TextScaled = true
+	nameLabel.Parent = billboardGui
+
+	model.PrimaryPart = body
 	model.Parent = workspace
 
 	return model
@@ -524,10 +598,12 @@ function DinosaurManager.Initialize()
 	loadModules()
 	findSpawnPoints()
 
-	-- Spawn initial dinosaurs
+	-- Spawn initial dinosaurs around the spawn area (jungle biome)
+	-- Player spawns at (400, Y, 400), so spawn dinos in a ring around that
 	local initialCount = math.min(20, MAX_ACTIVE_DINOSAURS)
+	local spawnCenter = Vector3.new(400, 50, 400) -- Jungle biome spawn area
 
-	for _ = 1, initialCount do
+	for i = 1, initialCount do
 		-- Random position if no spawn points
 		local position: Vector3
 
@@ -535,10 +611,13 @@ function DinosaurManager.Initialize()
 			local point = spawnPoints[math.random(1, #spawnPoints)]
 			position = point.position
 		else
-			position = Vector3.new(
-				math.random(-500, 500),
+			-- Spawn in a ring around the player spawn (100-300 studs away)
+			local angle = (i / initialCount) * math.pi * 2 + math.random() * 0.5
+			local distance = 100 + math.random() * 200
+			position = spawnCenter + Vector3.new(
+				math.cos(angle) * distance,
 				50,
-				math.random(-500, 500)
+				math.sin(angle) * distance
 			)
 		end
 
@@ -547,6 +626,8 @@ function DinosaurManager.Initialize()
 			DinosaurManager.SpawnDinosaur(species, position)
 		end
 	end
+
+	print(`[DinosaurManager] Spawned {initialCount} initial dinosaurs around spawn area`)
 
 	-- Update loop
 	local updateConnection = RunService.Heartbeat:Connect(function(dt)
