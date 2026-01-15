@@ -184,16 +184,12 @@ end
 	Create a dinosaur model (placeholder - visible colored box)
 ]]
 local function createDinosaurModel(species: string, position: Vector3): Model
-	-- Raycast to find ground height at spawn position
-	local rayOrigin = Vector3.new(position.X, 500, position.Z)
-	local rayDirection = Vector3.new(0, -600, 0)
-	local rayResult = workspace:Raycast(rayOrigin, rayDirection)
-
-	local spawnHeight = position.Y
-	if rayResult then
-		spawnHeight = rayResult.Position.Y + 3 -- Spawn slightly above ground
-	end
+	-- Fixed spawn height above the spawn platform for testing
+	-- The spawn platform is at around Y=56, terrain varies
+	local spawnHeight = 60 -- Fixed height above spawn platform
 	local spawnPosition = Vector3.new(position.X, spawnHeight, position.Z)
+
+	print(`[DinosaurManager] Model spawn position: {spawnPosition}`)
 
 	-- In production, would clone from ReplicatedStorage
 	local model = Instance.new("Model")
