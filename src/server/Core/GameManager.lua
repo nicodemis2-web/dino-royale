@@ -307,22 +307,14 @@ stateHandlers.Loading = {
 			stormManager.Initialize(mapCenter, mapRadius)
 		end
 
-		-- Debug: Quick deploy mode - skip helicopter, drop directly to terrain
-		if GameConfig.Debug.Enabled and GameConfig.Debug.QuickDeploy then
-			task.delay(1, function()
-				if currentState == "Loading" then
-					-- Skip deploying, go straight to playing
-					GameManager.TransitionTo("Playing", { quickDeploy = true })
-				end
-			end)
-		else
-			-- Short delay then transition to deploying
-			task.delay(3, function()
-				if currentState == "Loading" then
-					GameManager.TransitionTo("Deploying")
-				end
-			end)
-		end
+		-- ALWAYS skip helicopter - spawn directly on terrain
+		-- Players are already positioned on terrain by Main.server.lua
+		task.delay(1, function()
+			if currentState == "Loading" then
+				-- Go straight to playing - no helicopter deployment
+				GameManager.TransitionTo("Playing", { directSpawn = true })
+			end
+		end)
 	end,
 
 	OnUpdate = function(_dt)
@@ -336,74 +328,24 @@ stateHandlers.Loading = {
 
 --[[
 	DEPLOYING STATE
-	Helicopter flight, players can jump
+	DISABLED - No longer used, players spawn directly on terrain
+	Kept as pass-through in case accidentally called
 ]]
 stateHandlers.Deploying = {
 	OnEnter = function(_data)
-		print("[GameManager] Deployment phase started")
-
-		-- Debug: Use shorter deploy time for quick testing
-		local deployTime = Constants.MATCH.DEPLOY_TIME
-		if GameConfig.Debug.Enabled and GameConfig.Debug.QuickDeploy then
-			deployTime = 15 -- 15 seconds for testing
-		end
-
-		-- Generate flight path
-		local flightPath = {
-			startPoint = Vector3.new(-2000, 500, 0),
-			endPoint = Vector3.new(2000, 500, 0),
-			duration = deployTime,
-		}
-
-		stateData.flightPath = flightPath
-		stateData.deployStartTime = tick()
-		stateData.jumpedPlayers = {} :: { [number]: boolean }
-
-		-- Teleport all players to helicopter starting position
-		for _, player in ipairs(Players:GetPlayers()) do
-			local character = player.Character
-			if character then
-				local rootPart = character:FindFirstChild("HumanoidRootPart") :: BasePart?
-				if rootPart then
-					-- Position player at helicopter start (slightly offset per player)
-					local offset = Vector3.new(math.random(-5, 5), 0, math.random(-5, 5))
-					rootPart.CFrame = CFrame.new(flightPath.startPoint + offset)
-					rootPart.AssemblyLinearVelocity = Vector3.zero -- Stop any falling
-					print(`[GameManager] Positioned {player.Name} on helicopter`)
-				end
-			end
-		end
-
-		-- Broadcast flight path to clients
-		Events.FireAllClients("GameState", "DeployReady", {
-			flightPath = flightPath,
-		})
-
-		-- Initialize deployment manager if available
-		if deploymentManager then
-			deploymentManager.StartDeployment(flightPath)
-		end
+		print("[GameManager] Deploying state called - redirecting to Playing (helicopter disabled)")
+		-- Immediately transition to Playing - no helicopter
+		task.defer(function()
+			GameManager.TransitionTo("Playing", { directSpawn = true })
+		end)
 	end,
 
 	OnUpdate = function(_dt)
-		local elapsed = tick() - stateData.deployStartTime
-		local remaining = Constants.MATCH.DEPLOY_TIME - elapsed
-
-		stateData.timeRemaining = remaining
-
-		-- Auto-eject remaining players at end
-		if remaining <= 0 then
-			-- Force eject any players still on helicopter
-			if deploymentManager then
-				deploymentManager.ForceEjectAll()
-			end
-
-			GameManager.TransitionTo("Playing")
-		end
+		-- No-op - should transition immediately
 	end,
 
 	OnExit = function()
-		print("[GameManager] Deployment phase ended")
+		print("[GameManager] Deployment phase skipped")
 	end,
 }
 
@@ -418,46 +360,31 @@ stateHandlers.Playing = {
 		stateData.matchStartTime = tick()
 		stateData.supplyDropTimer = 120 -- First supply drop after 2 minutes
 
-		-- Quick deploy mode: teleport players directly to terrain
-		if data and data.quickDeploy then
-			print("[GameManager] Quick deploy - teleporting players to terrain...")
+		-- Direct spawn mode: players are already on terrain from Main.server.lua
+		-- Just verify they're in valid positions
+		if data and data.directSpawn then
+			print("[GameManager] Direct spawn mode - players already on terrain")
 			for _, player in ipairs(Players:GetPlayers()) do
 				task.spawn(function()
-					-- Wait for character to exist
-					local character = player.Character or player.CharacterAdded:Wait()
-					local rootPart = character:WaitForChild("HumanoidRootPart", 5) :: BasePart?
-					if rootPart then
-						-- Spawn at random position on terrain within a specific biome area
-						-- Using jungle biome area for initial spawn (positive X, positive Z quadrant)
-						-- Map is 4km x 4km per GDD, so jungle area is roughly 0-2000 in X/Z
-						local angle = math.random() * math.pi / 2 -- 0 to 90 degrees (jungle sector)
-						local distance = math.random(200, 800) -- Scaled for 4km map
-						local x = math.cos(angle) * distance
-						local z = math.sin(angle) * distance
-
-						-- Find terrain height at this position (use raycast)
-						local rayOrigin = Vector3.new(x, 500, z)
-						local rayDirection = Vector3.new(0, -1000, 0)
-						local rayParams = RaycastParams.new()
-						rayParams.FilterType = Enum.RaycastFilterType.Exclude
-						rayParams.FilterDescendantsInstances = {character}
-
-						local result = workspace:Raycast(rayOrigin, rayDirection, rayParams)
-						local spawnY = 30 -- Default height if raycast fails (reasonable for jungle terrain)
-						if result then
-							spawnY = result.Position.Y + 5 -- 5 studs above ground
-							print(`[GameManager] Raycast found terrain at Y={result.Position.Y}`)
-						else
-							print(`[GameManager] Warning: Raycast didn't hit terrain at ({x}, {z}), using default Y={spawnY}`)
+					local character = player.Character
+					if character then
+						local rootPart = character:FindFirstChild("HumanoidRootPart") :: BasePart?
+						if rootPart then
+							-- Check if player is at invalid position (falling/void)
+							if rootPart.Position.Y < -10 or rootPart.Position.Y > 600 then
+								-- Rescue player to terrain
+								local rayResult = workspace:Raycast(
+									Vector3.new(200, 500, 200),
+									Vector3.new(0, -1000, 0)
+								)
+								local safeY = rayResult and (rayResult.Position.Y + 5) or 30
+								rootPart.CFrame = CFrame.new(200, safeY, 200)
+								rootPart.AssemblyLinearVelocity = Vector3.zero
+								print(`[GameManager] Rescued {player.Name} to terrain`)
+							else
+								print(`[GameManager] {player.Name} already at valid position: {rootPart.Position}`)
+							end
 						end
-
-						local spawnPos = Vector3.new(x, spawnY, z)
-						rootPart.CFrame = CFrame.new(spawnPos)
-						rootPart.AssemblyLinearVelocity = Vector3.zero
-
-						print(`[GameManager] Teleported {player.Name} to {spawnPos} (Jungle biome)`)
-					else
-						warn(`[GameManager] Could not find HumanoidRootPart for {player.Name}`)
 					end
 				end)
 			end
