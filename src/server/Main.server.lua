@@ -184,23 +184,23 @@ else
 	-- FALLBACK: Create a guaranteed spawn area if MapManager failed
 	warn("[Server] LobbySpawn not found! Creating fallback spawn...")
 
-	-- Create a large, visible spawn platform
+	-- Create a large, visible spawn platform at jungle center (200, Y, 200)
 	local fallbackPlatform = Instance.new("Part")
 	fallbackPlatform.Name = "FallbackSpawnPlatform"
 	fallbackPlatform.Size = Vector3.new(100, 10, 100)
-	fallbackPlatform.Position = Vector3.new(400, 25, 400)
+	fallbackPlatform.Position = Vector3.new(200, 30, 200)
 	fallbackPlatform.Anchored = true
 	fallbackPlatform.CanCollide = true
 	fallbackPlatform.BrickColor = BrickColor.new("Bright green")
 	fallbackPlatform.Material = Enum.Material.Grass
 	fallbackPlatform.Parent = Workspace
-	print("[Server] Created fallback platform at (400, 25, 400)")
+	print("[Server] Created fallback platform at (200, 30, 200)")
 
 	-- Create spawn location on top
 	local fallbackSpawn = Instance.new("SpawnLocation")
 	fallbackSpawn.Name = "LobbySpawn"
 	fallbackSpawn.Size = Vector3.new(50, 1, 50)
-	fallbackSpawn.Position = Vector3.new(400, 32, 400)
+	fallbackSpawn.Position = Vector3.new(200, 37, 200)
 	fallbackSpawn.Anchored = true
 	fallbackSpawn.Transparency = 0.5
 	fallbackSpawn.CanCollide = false

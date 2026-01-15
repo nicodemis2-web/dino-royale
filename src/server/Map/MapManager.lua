@@ -180,70 +180,103 @@ end
 
 --[[
 	Terrain configuration (per GDD Section 3.3: 4km x 4km map)
+
+	GDD Map Layout:
+	- NORTH: Volcanic Region (High Danger) - Geothermal Plant, Lava Caves, T-Rex Paddock
+	- CENTER: Jungle & Research (Main POIs) - Visitor Center, Research Complex, Hammond Villa
+	- EAST: Swamplands (Medium Danger) - River Delta, Research Outpost, Boat Dock
+	- WEST: Open Plains (Beginner Friendly) - Herbivore Valley, Safari Lodge
+	- SOUTH: Coastal Area (Mixed) - Harbor, Lighthouse, Beach Resort
 ]]
 local TERRAIN_CONFIG = {
-	mapSize = 4000, -- Total map size (4000x4000 studs = 4km x 4km per GDD)
-	resolution = 16, -- Terrain cell size (larger for performance on 4km map)
-	baseHeight = 0,
-
-	-- Biome regions (angles in radians, map divided into 3 main sectors)
-	-- Per GDD Section 3.3:
-	-- NORTH: Volcanic Region
-	-- CENTER: Jungle & Research
-	-- EAST: Swamplands
-	-- WEST: Open Plains
-	-- SOUTH: Coastal Area
-	biomes = {
-		jungle = { startAngle = 0, endAngle = math.pi * 2/3 },           -- NE sector
-		desert = { startAngle = math.pi * 2/3, endAngle = math.pi * 4/3 }, -- S sector (plains)
-		mountains = { startAngle = math.pi * 4/3, endAngle = math.pi * 2 }, -- NW sector (volcanic)
-	}
+	mapSize = 4000, -- 4km x 4km (4000 studs)
+	resolution = 48, -- Cell size for balance of detail vs performance
+	baseHeight = 15,
+	waterLevel = -2,
 }
 
 --[[
-	Get biome at world position
+	Get biome at world position based on GDD layout
+	Uses quadrant-based system with smooth transitions
 ]]
 local function getBiomeAtPosition(x: number, z: number): string
-	local angle = math.atan2(z, x) + math.pi -- Convert to 0-2π range
+	local halfSize = TERRAIN_CONFIG.mapSize / 2
 
-	if angle >= TERRAIN_CONFIG.biomes.jungle.startAngle and angle < TERRAIN_CONFIG.biomes.jungle.endAngle then
-		return "jungle"
-	elseif angle >= TERRAIN_CONFIG.biomes.desert.startAngle and angle < TERRAIN_CONFIG.biomes.desert.endAngle then
-		return "desert"
-	else
-		return "mountains"
+	-- Normalize to -1 to 1 range
+	local nx = x / halfSize
+	local nz = z / halfSize
+
+	-- Distance from center for coastal detection
+	local distFromCenter = math.sqrt(nx * nx + nz * nz)
+
+	-- SOUTH (z > 0.5): Coastal Area
+	if nz > 0.4 and distFromCenter > 0.5 then
+		return "coastal"
 	end
+
+	-- NORTH (z < -0.4): Volcanic Region
+	if nz < -0.4 then
+		return "volcanic"
+	end
+
+	-- EAST (x > 0.4): Swamplands
+	if nx > 0.4 then
+		return "swamp"
+	end
+
+	-- WEST (x < -0.4): Open Plains
+	if nx < -0.4 then
+		return "plains"
+	end
+
+	-- CENTER: Jungle (default for main play area)
+	return "jungle"
 end
 
 --[[
 	Get terrain height at position based on biome
 ]]
 local function getHeightAtPosition(x: number, z: number, biome: string): number
-	local distance = math.sqrt(x * x + z * z)
-	local normalizedDist = distance / TERRAIN_CONFIG.mapSize
+	local base = TERRAIN_CONFIG.baseHeight
 
-	-- Base noise for variation
-	local noise1 = math.noise(x / 200, z / 200) * 15
-	local noise2 = math.noise(x / 50, z / 50) * 5
+	-- Multi-octave noise for natural terrain
+	local noise1 = math.noise(x / 300, z / 300, 1) * 20  -- Large features
+	local noise2 = math.noise(x / 100, z / 100, 2) * 10  -- Medium features
+	local noise3 = math.noise(x / 40, z / 40, 3) * 5     -- Small details
 
 	if biome == "jungle" then
-		-- Jungle: Rolling hills, medium height
-		local jungleNoise = math.noise(x / 100, z / 100) * 25
-		return TERRAIN_CONFIG.baseHeight + noise1 + noise2 + jungleNoise + 5
+		-- Jungle: Rolling hills with dense variation (15-45 height)
+		local jungleBase = math.noise(x / 150, z / 150, 4) * 15
+		return base + noise1 + noise2 + noise3 + jungleBase + 10
 
-	elseif biome == "desert" then
-		-- Desert: Flat with gentle dunes
-		local duneNoise = math.noise(x / 150, z / 150) * 10
-		local smallDunes = math.noise(x / 30, z / 30) * 3
-		return TERRAIN_CONFIG.baseHeight + duneNoise + smallDunes
+	elseif biome == "plains" then
+		-- Plains: Mostly flat with gentle rolling hills (10-25 height)
+		local plainNoise = math.noise(x / 200, z / 200, 5) * 8
+		return base + plainNoise + noise3 * 0.5
 
-	else -- mountains
-		-- Mountains: High peaks, dramatic elevation
-		local mountainNoise = math.noise(x / 80, z / 80) * 60
-		local peakNoise = math.max(0, math.noise(x / 40, z / 40)) * 40
-		local ridges = math.abs(math.noise(x / 60, z / 60)) * 30
-		return TERRAIN_CONFIG.baseHeight + mountainNoise + peakNoise + ridges + 20
+	elseif biome == "volcanic" then
+		-- Volcanic: Dramatic peaks and valleys (20-100 height)
+		local volcanoBase = math.noise(x / 120, z / 120, 6) * 40
+		local peaks = math.max(0, math.noise(x / 60, z / 60, 7)) * 35
+		local ridges = math.abs(math.noise(x / 80, z / 80, 8)) * 20
+		return base + volcanoBase + peaks + ridges + 15
+
+	elseif biome == "swamp" then
+		-- Swamp: Low-lying with water channels (5-20 height)
+		local swampBase = math.noise(x / 100, z / 100, 9) * 8
+		local channels = math.abs(math.noise(x / 50, z / 50, 10)) * 5
+		return base + swampBase - channels - 5
+
+	elseif biome == "coastal" then
+		-- Coastal: Beach sloping to water (0-15 height)
+		local distFromCenter = math.sqrt(x * x + z * z)
+		local normalizedDist = distFromCenter / (TERRAIN_CONFIG.mapSize / 2)
+		local coastSlope = (1 - normalizedDist) * 15
+		local dunes = math.noise(x / 80, z / 80, 11) * 5
+		return math.max(0, coastSlope + dunes)
 	end
+
+	return base + noise1
 end
 
 --[[
@@ -251,133 +284,210 @@ end
 ]]
 local function getMaterialAtPosition(biome: string, height: number): Enum.Material
 	if biome == "jungle" then
-		if height > 30 then
+		if height > 40 then
 			return Enum.Material.Rock
-		elseif height > 10 then
+		elseif height > 25 then
 			return Enum.Material.LeafyGrass
 		else
 			return Enum.Material.Grass
 		end
 
-	elseif biome == "desert" then
-		if height > 15 then
-			return Enum.Material.Sandstone
+	elseif biome == "plains" then
+		if height > 20 then
+			return Enum.Material.Grass
 		else
-			return Enum.Material.Sand
+			return Enum.Material.Ground
 		end
 
-	else -- mountains
-		if height > 80 then
-			return Enum.Material.Snow
+	elseif biome == "volcanic" then
+		if height > 70 then
+			return Enum.Material.CrackedLava
 		elseif height > 50 then
-			return Enum.Material.Glacier
-		elseif height > 30 then
+			return Enum.Material.Basalt
+		elseif height > 35 then
 			return Enum.Material.Slate
 		else
 			return Enum.Material.Rock
 		end
+
+	elseif biome == "swamp" then
+		if height > 15 then
+			return Enum.Material.LeafyGrass
+		elseif height > 8 then
+			return Enum.Material.Mud
+		else
+			return Enum.Material.Ground
+		end
+
+	elseif biome == "coastal" then
+		if height > 10 then
+			return Enum.Material.Grass
+		elseif height > 3 then
+			return Enum.Material.Sand
+		else
+			return Enum.Material.Sand
+		end
 	end
+
+	return Enum.Material.Grass
 end
 
 --[[
-	Create the multi-biome terrain
+	Create the full 4km x 4km multi-biome terrain
 ]]
 local function createBaseTerrain()
 	local terrain = workspace.Terrain
 
-	print("[MapManager] Generating 4km x 4km terrain...")
+	print("===========================================")
+	print("[MapManager] GENERATING ISLA PRIMORDIAL")
+	print("  Size: 4km x 4km (4000 studs)")
+	print("  Biomes: Jungle, Plains, Volcanic, Swamp, Coastal")
+	print("===========================================")
 
-	-- Clean up any existing spawns first
-	for _, name in ipairs({"TempSpawnPlatform", "SpawnPlatform", "TempSpawn", "MainSpawn", "LobbySpawn", "LobbyPlatform", "TempLobbyPlatform"}) do
+	-- Clean up existing spawn points
+	local cleanupNames = {
+		"TempSpawnPlatform", "SpawnPlatform", "TempSpawn", "MainSpawn",
+		"LobbySpawn", "LobbyPlatform", "TempLobbyPlatform", "FallbackSpawnPlatform"
+	}
+	for _, name in ipairs(cleanupNames) do
 		local obj = workspace:FindFirstChild(name)
 		if obj then
 			obj:Destroy()
-			print(`[MapManager] Removed {name}`)
 		end
 	end
 
-	-- Clear any existing terrain
+	-- Clear existing terrain
 	terrain:Clear()
 
-	-- SPAWN AREA CONFIG - Jungle biome at (400, Y, 400)
-	local spawnX, spawnZ = 400, 400
-	local spawnAreaSize = 200 -- Large flat area around spawn
-	local baseTerrainHeight = 20 -- Fixed base height for reliable spawning
+	-- =============================================
+	-- PHASE 1: Create spawn area in Jungle (CENTER)
+	-- =============================================
+	local spawnX, spawnZ = 200, 200 -- Jungle center area
+	local spawnAreaSize = 150
+	local spawnHeight = 25
 
-	-- STEP 1: Create a guaranteed flat spawn area FIRST
-	print("[MapManager] Creating spawn area...")
+	print("[MapManager] Phase 1: Creating spawn area...")
 	terrain:FillBlock(
-		CFrame.new(spawnX, baseTerrainHeight / 2, spawnZ),
-		Vector3.new(spawnAreaSize, baseTerrainHeight, spawnAreaSize),
+		CFrame.new(spawnX, spawnHeight / 2, spawnZ),
+		Vector3.new(spawnAreaSize, spawnHeight, spawnAreaSize),
 		Enum.Material.Grass
 	)
 
-	-- STEP 2: Create spawn platform on top of terrain
+	-- Spawn platform
 	local spawnPlatform = Instance.new("Part")
 	spawnPlatform.Name = "LobbyPlatform"
-	spawnPlatform.Size = Vector3.new(50, 3, 50)
-	spawnPlatform.Position = Vector3.new(spawnX, baseTerrainHeight + 2, spawnZ)
+	spawnPlatform.Size = Vector3.new(60, 3, 60)
+	spawnPlatform.Position = Vector3.new(spawnX, spawnHeight + 2, spawnZ)
 	spawnPlatform.Anchored = true
 	spawnPlatform.BrickColor = BrickColor.new("Bright green")
 	spawnPlatform.Material = Enum.Material.Grass
 	spawnPlatform.Parent = workspace
-	print(`[MapManager] Spawn platform at ({spawnX}, {baseTerrainHeight + 2}, {spawnZ})`)
 
-	-- STEP 3: Create spawn location
+	-- Spawn location
 	local spawnLocation = Instance.new("SpawnLocation")
 	spawnLocation.Name = "LobbySpawn"
-	spawnLocation.Size = Vector3.new(30, 1, 30)
-	spawnLocation.Position = Vector3.new(spawnX, baseTerrainHeight + 5, spawnZ)
+	spawnLocation.Size = Vector3.new(40, 1, 40)
+	spawnLocation.Position = Vector3.new(spawnX, spawnHeight + 5, spawnZ)
 	spawnLocation.Anchored = true
-	spawnLocation.Transparency = 0.5 -- Semi-visible for debugging
+	spawnLocation.Transparency = 0.8
 	spawnLocation.CanCollide = false
 	spawnLocation.Neutral = true
 	spawnLocation.Duration = 0
 	spawnLocation.Parent = workspace
-	print(`[MapManager] Spawn location at ({spawnX}, {baseTerrainHeight + 5}, {spawnZ})`)
 
-	-- STEP 4: Generate terrain chunks around spawn (simplified for performance)
-	print("[MapManager] Generating surrounding terrain...")
+	print(`[MapManager] Spawn created at ({spawnX}, {spawnHeight + 5}, {spawnZ})`)
+
+	-- =============================================
+	-- PHASE 2: Generate full terrain in chunks
+	-- =============================================
+	print("[MapManager] Phase 2: Generating terrain chunks...")
+
 	local mapSize = TERRAIN_CONFIG.mapSize
-	local resolution = 64 -- Larger chunks for faster generation
+	local resolution = TERRAIN_CONFIG.resolution
 	local halfSize = mapSize / 2
 	local totalCells = 0
+	local biomeCounts = { jungle = 0, plains = 0, volcanic = 0, swamp = 0, coastal = 0 }
 
+	-- Generate terrain in a grid pattern
 	for x = -halfSize, halfSize, resolution do
 		for z = -halfSize, halfSize, resolution do
-			-- Skip the spawn area (already created)
+			-- Skip spawn area
 			local distFromSpawn = math.sqrt((x - spawnX)^2 + (z - spawnZ)^2)
-			if distFromSpawn > spawnAreaSize then
+			if distFromSpawn > spawnAreaSize * 0.7 then
 				local biome = getBiomeAtPosition(x, z)
 				local height = getHeightAtPosition(x, z, biome)
 				local material = getMaterialAtPosition(biome, height)
 
-				-- Fill terrain column from below ground to surface
+				-- Ensure minimum height above water
+				height = math.max(height, 5)
+
+				-- Fill terrain block
 				terrain:FillBlock(
-					CFrame.new(x, height / 2, z),
-					Vector3.new(resolution, height + 20, resolution),
+					CFrame.new(x, height / 2 - 5, z),
+					Vector3.new(resolution, height + 15, resolution),
 					material
 				)
+
 				totalCells = totalCells + 1
+				biomeCounts[biome] = (biomeCounts[biome] or 0) + 1
 			end
 		end
 
-		-- Yield to prevent timeout
-		if totalCells % 500 == 0 then
+		-- Yield periodically to prevent timeout
+		if totalCells % 200 == 0 then
 			task.wait()
 		end
 	end
 
-	-- STEP 5: Add water in low areas
+	-- =============================================
+	-- PHASE 3: Add water bodies
+	-- =============================================
+	print("[MapManager] Phase 3: Adding water...")
+
+	-- Ocean around coastal areas
 	terrain:FillBlock(
-		CFrame.new(0, -5, 0),
-		Vector3.new(mapSize, 10, mapSize),
+		CFrame.new(0, TERRAIN_CONFIG.waterLevel, halfSize * 0.8),
+		Vector3.new(mapSize, 8, mapSize * 0.4),
 		Enum.Material.Water
 	)
 
-	print("[MapManager] Terrain generation complete!")
+	-- Swamp water channels
+	terrain:FillBlock(
+		CFrame.new(halfSize * 0.6, TERRAIN_CONFIG.waterLevel, 0),
+		Vector3.new(mapSize * 0.3, 6, mapSize * 0.5),
+		Enum.Material.Water
+	)
+
+	-- Central lake
+	terrain:FillBlock(
+		CFrame.new(0, TERRAIN_CONFIG.waterLevel - 2, 0),
+		Vector3.new(300, 8, 300),
+		Enum.Material.Water
+	)
+
+	-- =============================================
+	-- PHASE 4: Add volcanic lava pools
+	-- =============================================
+	print("[MapManager] Phase 4: Adding volcanic features...")
+
+	-- Lava pools in volcanic region (north)
+	for i = 1, 5 do
+		local lavaX = math.random(-500, 500)
+		local lavaZ = -halfSize + math.random(200, 800)
+		terrain:FillBlock(
+			CFrame.new(lavaX, 30, lavaZ),
+			Vector3.new(math.random(40, 80), 10, math.random(40, 80)),
+			Enum.Material.CrackedLava
+		)
+	end
+
+	print("===========================================")
+	print("[MapManager] TERRAIN GENERATION COMPLETE!")
 	print(`  Total cells: {totalCells}`)
-	print(`  Spawn area: ({spawnX}, {baseTerrainHeight + 5}, {spawnZ})`)
+	print(`  Jungle: {biomeCounts.jungle} | Plains: {biomeCounts.plains}`)
+	print(`  Volcanic: {biomeCounts.volcanic} | Swamp: {biomeCounts.swamp}`)
+	print(`  Coastal: {biomeCounts.coastal}`)
+	print("===========================================")
 end
 
 --[[
