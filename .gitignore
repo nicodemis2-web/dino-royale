@@ -3,6 +3,8 @@
 *.rbxlx
 *.rbxm
 *.rbxmx
+*.lock
+sourcemap.json
 
 # Wally
 Packages/
