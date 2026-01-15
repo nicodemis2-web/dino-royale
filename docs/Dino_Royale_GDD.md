@@ -810,59 +810,374 @@ Report Option: Report suspicious players while spectating
 ## 12. UI/UX Design
 
 
-### 12.1 HUD Elements
+### 12.1 Design Philosophy
 
-Health/Shield Bar: Bottom left, amber-colored health, blue shield
+Dino Royale's HUD follows AAA FPS best practices with a focus on clarity, minimal obstruction, and instant feedback. The UI is designed to be "almost invisible" - providing critical information before the player realizes they need it while maintaining maximum situational awareness.
 
-Minimap: Top right, shows storm, teammates, dinosaur warnings
-
-Inventory Bar: Bottom center, 5 weapon slots + equipment
-
-Ammo Counter: Bottom right, current weapon ammo
-
-Kill Feed: Top left, shows eliminations including dinosaur kills
-
-Dinosaur Proximity: Pulsing indicator when large predators nearby
-
-Damage Direction: Directional indicators for gunshots and footsteps
-
-Storm Info: Top center, storm timer and distance
-
-Hit Markers: Visual and audio cues for hits
-
-Player Count: Top right corner, updates in real-time
+**Core Principles:**
+- **Minimalist by Default**: Show only essential information during gameplay
+- **Contextual Display**: Elements appear when relevant, hide when not needed
+- **Instant Feedback**: All player actions receive immediate visual/audio confirmation
+- **High Contrast**: Critical information readable in any lighting condition
+- **Consistent Visual Language**: Amber/fossil theme with jungle green accents throughout
 
 
-### 12.2 HUD Layout Diagram
+### 12.2 HUD Elements Overview
 
-+------------------------------------------------------------------+
-
-|  [Kill Feed]              [Storm Timer]         [Player Count]  |
-
-|                                                      [Minimap]   |
-
-|                                                                  |
-
-|                                                                  |
-
-|                        [Center Screen]                           |
-
-|                         [Crosshair]                              |
-
-|                       [Damage Indicators]                        |
-
-|                                                                  |
-
-|                                                                  |
-
-|  [Health Bar]                                    [Ammo Counter]  |
-
-|  [Shield Bar]         [Weapon Slots 1-5]         [Equipment]     |
-
-+------------------------------------------------------------------+
+| Element | Position | Priority | Description |
+|---|---|---|---|
+| Health Bar | Bottom-left | Critical | Player HP with animated fill, damage/heal effects |
+| Shield Bar | Above health | Critical | Blue shield with segmented display |
+| Ammo Counter | Bottom-right | High | Magazine/reserve with weapon icon |
+| Crosshair | Center | Critical | Dynamic reticle with bloom/spread feedback |
+| Hit Markers | Center | High | Confirmation X with headshot/kill variants |
+| Damage Indicators | Center ring | High | Directional arrows showing damage source |
+| Weapon Slots | Bottom-center | Medium | 5 slots with rarity borders, selection highlight |
+| Minimap | Top-right | Medium | Player position, teammates, storm, pings |
+| Kill Feed | Top-right | Low | Recent eliminations with weapon icons |
+| Storm Timer | Top-center | Medium | Phase timer, distance to safe zone |
+| Player Count | Top-right | Low | Alive players counter |
+| Compass | Top-center | Medium | 360° bearing with POI markers |
 
 
-### 12.3 Menu Structure
+### 12.3 HUD Layout Diagram
+
+```
++------------------------------------------------------------------------+
+|                                                                        |
+| [Kill Feed]              [Compass 360°]              [Player Count]    |
+| └ Recent kills           └ Bearing + POI markers     └ 47 alive        |
+|                          [Storm: 2:45 | 150m]                          |
+|                                                                         |
+|                                                      ┌─────────────┐   |
+|                                                      │   MINIMAP   │   |
+|                                                      │ ○ You       │   |
+|                                                      │ ◇ Team      │   |
+|                                                      │ ⚠ Danger    │   |
+|                                                      └─────────────┘   |
+|                                                                        |
+|                           ╲     ╱                                      |
+|                    [Dmg]   ╲ + ╱   [Dmg]    ← Damage Indicators        |
+|                            ╱ + ╲            ← Crosshair Center         |
+|                           ╱     ╲                                      |
+|                                                                        |
+|                      [PRESS E TO PICKUP]    ← Interaction Prompt       |
+|                                                                        |
+| ┌──────────────┐                              ┌───────────────────┐    |
+| │ ████████░░░░ │  [1][2][3][4][5]             │  30 / 90          │    |
+| │ HP: 75/100   │   └ Weapon Slots             │  ══════ RANGER AR │    |
+| │ ████████████ │     (Rarity colored)         │  [Reload: R]      │    |
+| │ Shield: 50   │                              └───────────────────┘    |
+| └──────────────┘                                                       |
++------------------------------------------------------------------------+
+```
+
+
+### 12.4 Health & Shield Display System
+
+The health display is the single most critical HUD element, designed to be glanceable and instantly understandable.
+
+**Health Bar Design:**
+
+| State | Color | Effect |
+|---|---|---|
+| Full (76-100%) | Bright Green (#32C832) | Solid fill, subtle glow |
+| Medium (26-75%) | Amber Yellow (#FFC832) | Gradient transition |
+| Low (1-25%) | Warning Red (#FF3232) | Pulsing glow, heartbeat sound |
+| Critical (<15%) | Deep Red + Vignette | Screen edge vignette, rapid pulse |
+| Healing | Green Flash | +HP number floats upward |
+| Damage | Red Flash | -HP number, screen shake, flash |
+
+**Shield Bar Design:**
+- Segmented into 4 sections (25 shield each)
+- Blue color (#3296FF) with electric shimmer effect
+- Cracks appear as shield depletes
+- Shattering animation when shield breaks
+- Regeneration shows segments rebuilding
+
+**Health Numbers:**
+- Large, bold font (GothamBold, 28pt)
+- Damage numbers float up and fade (red, -amount)
+- Heal numbers float up and fade (green, +amount)
+- Critical hits show larger numbers
+
+**Animated Transitions:**
+```lua
+-- Health bar uses smooth tweening
+TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+-- Damage ghost bar (shows previous health briefly)
+-- White/gray bar behind current health that catches up slowly
+GhostBarDelay = 0.5 seconds
+GhostBarTweenTime = 0.8 seconds
+```
+
+
+### 12.5 Ammo Display System
+
+Ammo counter provides instant weapon status without requiring the player to look away from center screen.
+
+**Layout:**
+```
+┌─────────────────────────┐
+│  [Gun Icon]  30 / 90    │  ← Magazine / Reserve
+│  ════════════════════   │  ← Ammo type bar (colored)
+│  RANGER AR    [R]       │  ← Weapon name, reload key hint
+└─────────────────────────┘
+```
+
+**Ammo Type Colors:**
+
+| Ammo Type | Color | Icon Shape |
+|---|---|---|
+| Light Rounds | Yellow (#FFD700) | Small bullet |
+| Medium Rounds | Orange (#FF8C00) | Medium bullet |
+| Heavy Rounds | Red (#DC143C) | Large bullet |
+| Shells | Brown (#8B4513) | Shell casing |
+| Special | Purple (#9932CC) | Star/unique |
+
+**States:**
+
+| Condition | Visual Effect |
+|---|---|
+| Full Magazine | White text, solid bar |
+| Low Ammo (<25%) | Yellow text, bar blinks |
+| Empty Magazine | Red text "RELOAD", flashing |
+| Reloading | Progress bar, "..." text |
+| No Reserve | Red reserve number, "OUT" |
+
+**Reload Animation:**
+- Horizontal progress bar fills left-to-right
+- Magazine text shows "..." during reload
+- Completion flash (blue glow pulse)
+- Satisfying "click" sound on completion
+
+
+### 12.6 Crosshair System
+
+Dynamic crosshair provides weapon state feedback and accurate aiming information.
+
+**Crosshair Types:**
+
+| Weapon Type | Crosshair Style | Behavior |
+|---|---|---|
+| Assault Rifle | Cross (+) | Expands with bloom |
+| SMG | Circle with dot | Larger, more expansion |
+| Shotgun | Circle with spread dots | Shows pellet pattern |
+| Sniper | Fine cross + dot | Minimal, steady |
+| Pistol | Small cross | Quick reset |
+
+**Dynamic Behaviors:**
+
+| Action | Crosshair Response |
+|---|---|
+| Standing Still | Smallest size, tightest spread |
+| Walking | Slight expansion |
+| Running | Moderate expansion |
+| Jumping | Maximum expansion |
+| Crouching | 25% smaller than standing |
+| ADS (Aim Down Sights) | 40% smaller, focused |
+| Firing | Expands per shot (bloom) |
+| Recovery | Contracts back over time |
+
+**Hit Feedback (Crosshair):**
+- Brief white flash on hit
+- X marker appears on hit confirm
+- Gold/yellow for headshots
+- Red X for kills
+
+**Customization Options:**
+
+| Setting | Options |
+|---|---|
+| Color | White, Green, Cyan, Magenta, Yellow, Custom |
+| Style | Default, Dot, Cross, Circle, Chevron |
+| Size | 50% - 200% scale |
+| Opacity | 25% - 100% |
+| Center Dot | On/Off |
+| Outline | On/Off (black border for visibility) |
+
+
+### 12.7 Hit Marker & Damage Feedback System
+
+Immediate feedback when dealing damage is critical for satisfying gunplay.
+
+**Hit Marker Design:**
+```
+Standard Hit:    Headshot:        Kill Confirm:
+     ╲   ╱           ╲   ╱            ╲   ╱
+       X               X  ★             X
+     ╱   ╲           ╱   ╲            ╱   ╲
+   (White)        (Gold/Yellow)    (Red, larger)
+```
+
+**Hit Marker Specifications:**
+
+| Hit Type | Color | Size | Sound | Duration |
+|---|---|---|---|---|
+| Body Shot | White | 30px | Soft tick | 0.15s |
+| Limb Shot | Light Gray | 25px | Soft tick | 0.15s |
+| Headshot | Gold (#FFD700) | 40px | Sharp ping | 0.2s |
+| Critical/Kill | Red (#FF4444) | 50px | Elimination sound | 0.3s |
+| Shield Break | Blue flash | 35px | Shield crack | 0.2s |
+
+**Damage Numbers (Floating Combat Text):**
+
+| Type | Color | Animation |
+|---|---|---|
+| Normal Damage | White | Float up, fade |
+| Headshot | Yellow/Gold | Float up + scale up |
+| Critical | Red | Float up + shake |
+| Dinosaur | Orange | Float up + claw icon |
+
+**Screen Damage Effects:**
+
+| Damage Source | Visual Effect |
+|---|---|
+| Gunfire | Red flash on edges, directional arrow |
+| Dinosaur Attack | Orange vignette, claw scratch overlay |
+| Storm/Extinction Wave | Purple pulsing vignette |
+| Fall Damage | Full-screen red flash (brief) |
+| Explosion | Screen shake + white flash |
+
+
+### 12.8 Directional Damage Indicators
+
+2D indicators around screen center showing attack direction - critical for situational awareness.
+
+**Indicator Design:**
+- Red chevrons/arrows pointing toward damage source
+- Positioned in a ring around screen center (150px radius)
+- Intensity (opacity) based on damage amount
+- Multiple simultaneous indicators supported
+
+**Indicator Specifications:**
+
+| Source Type | Color | Icon | Duration |
+|---|---|---|---|
+| Player Gunfire | Red (#FF3232) | Arrow/Chevron | 2.0s |
+| Dinosaur Attack | Orange (#FF9632) | Claw mark | 2.5s |
+| Explosion | Yellow (#FFFF32) | Burst | 1.5s |
+| Storm Damage | Purple (#9932FF) | Edge vignette | Continuous |
+
+**Calculation:**
+```lua
+-- Direction calculated from camera look vector to damage source
+-- Flattened to horizontal plane for 2D display
+local angle = math.atan2(cross.Y, dot)  -- Returns screen rotation angle
+```
+
+
+### 12.9 World-Space UI (BillboardGui)
+
+Health bars and information displayed above characters and creatures in 3D space.
+
+**Player Health Bars (Above Head):**
+
+| Property | Value |
+|---|---|
+| Size | 60 studs wide, 8 studs tall |
+| Offset | 3 studs above head |
+| Max Distance | 100 studs (fades 80-100) |
+| Display | Health bar + username |
+
+**Design:**
+```
+┌─────────────────────────────┐
+│  ████████████░░░░░░░░░░░░░  │  ← Health (green→yellow→red)
+│  DinoHunter2024             │  ← Username
+└─────────────────────────────┘
+```
+
+**Teammate vs Enemy:**
+
+| Type | Health Bar Color | Name Color | Border |
+|---|---|---|---|
+| Self | Green | White | None |
+| Teammate | Blue | Blue | Blue glow |
+| Enemy | Red | Red | None |
+| Downed Ally | Yellow pulse | White | Yellow |
+
+**Dinosaur Health Bars:**
+
+| Tier | Bar Color | Extra Info |
+|---|---|---|
+| Common | Green | Species name |
+| Uncommon | Yellow | Species + tier icon |
+| Rare | Blue | Species + tier + behavior icon |
+| Epic | Purple | Large bar + threat warning |
+| Legendary | Gold | Boss bar (screen top), phase indicator |
+
+**Boss Health Bar (T-Rex, Indoraptor):**
+- Displayed at top-center of screen
+- Full width bar with dinosaur name
+- Phase indicators for multi-phase fights
+- Rage meter for enrage mechanics
+
+
+### 12.10 Weapon Slots Display
+
+Quick-access weapon inventory showing all 5 slots with visual feedback.
+
+**Slot Design:**
+```
+┌───┐ ┌───┐ ┌───┐ ┌───┐ ┌───┐
+│ 1 │ │ 2 │ │ 3 │ │ 4 │ │ 5 │
+│[W]│ │[W]│ │   │ │[H]│ │[G]│
+└───┘ └───┘ └───┘ └───┘ └───┘
+  ▲ Selected (glowing border)
+```
+
+**Rarity Border Colors:**
+
+| Rarity | Border Color | Glow |
+|---|---|---|
+| Common | Gray (#808080) | None |
+| Uncommon | Green (#32CD32) | Subtle |
+| Rare | Blue (#3296FF) | Medium |
+| Epic | Purple (#9932CC) | Strong |
+| Legendary | Gold (#FFD700) | Animated shimmer |
+
+**Slot States:**
+
+| State | Visual |
+|---|---|
+| Empty | Dark background, faded number |
+| Occupied | Weapon icon, rarity border |
+| Selected | Bright glow, scale up 110% |
+| Low Ammo | Blinking ammo indicator |
+| Reloading | Circular progress overlay |
+
+
+### 12.11 Kill Feed
+
+Elimination notifications displayed in top-right corner.
+
+**Format:**
+```
+[Killer Icon] KillerName [Weapon] VictimName [Victim Icon]
+```
+
+**Kill Types & Icons:**
+
+| Kill Type | Icon | Color |
+|---|---|---|
+| Weapon Kill | Weapon silhouette | Rarity color |
+| Headshot | Skull with crosshair | Gold |
+| Melee | Fist | White |
+| Vehicle | Vehicle icon | Blue |
+| Storm | Storm icon | Purple |
+| Dinosaur | Dino silhouette | Orange |
+| Fall | Down arrow | White |
+
+**Highlighting:**
+- Your kills: Gold background highlight
+- Your death: Red background highlight
+- Teammate kills: Blue text
+- Streak kills (3+): Fire effect on entry
+
+
+### 12.12 Menu Structure
 
 
 | Menu | Sub-Menus | Description |
@@ -876,19 +1191,59 @@ Player Count: Top right corner, updates in real-time
 | Settings | Controls, Audio, Video, Accessibility | Game configuration |
 
 
-### 12.4 Inventory Screen
+### 12.13 Inventory Screen
 
 Full-screen inventory accessible via Tab key. Shows equipped weapons, consumables, ammo counts, and nearby ground loot for quick swapping.
 
-Weapon Management: Drag-and-drop or click to equip/swap
+**Layout:**
+- Left panel: Player loadout (5 weapon slots + equipment)
+- Center panel: Backpack items and consumables
+- Right panel: Ground loot in proximity
+- Bottom bar: Ammo counts by type
 
-Consumable Stacks: Stack splitting with Shift+Click
+**Interactions:**
+- Weapon Management: Drag-and-drop or click to equip/swap
+- Consumable Stacks: Stack splitting with Shift+Click
+- Ammo Overview: Shows live ammo for each type (color-coded bars)
+- Proximity Loot: Quick pickup from ground loot
+- Drop Items: Right-click to drop items, drag to ground area
 
-Ammo Overview: Shows live ammo for each type
 
-Proximity Loot: Quick pickup from ground loot
+### 12.14 UI Animation Standards
 
-Drop Items: Right-click to drop items
+All UI elements follow consistent animation standards for polish and responsiveness.
+
+**Timing Standards:**
+
+| Animation Type | Duration | Easing |
+|---|---|---|
+| Quick feedback (hit, damage) | 0.1-0.2s | Quad Out |
+| State transitions | 0.2-0.3s | Quad InOut |
+| Menu transitions | 0.3-0.4s | Back Out |
+| Fade in/out | 0.2s | Linear |
+| Value changes (HP, ammo) | 0.3s | Quad Out |
+
+**Common Effects:**
+- Scale pulse on important events (1.0 → 1.2 → 1.0)
+- Glow/bloom on critical information
+- Color flash for state changes
+- Smooth number counting (not instant jumps)
+
+
+### 12.15 HUD Customization Options
+
+Players can customize HUD to their preferences.
+
+| Setting | Options | Default |
+|---|---|---|
+| HUD Scale | 75% - 150% | 100% |
+| HUD Opacity | 25% - 100% | 85% |
+| Crosshair Style | Multiple presets + custom | Default |
+| Damage Numbers | On/Off/Stacked | On |
+| Kill Feed | On/Off/Minimal | On |
+| Minimap Size | Small/Medium/Large | Medium |
+| Colorblind Mode | Off/Protanopia/Deuteranopia/Tritanopia | Off |
+| Screen Shake | 0% - 100% | 100% |
 
 
 ## 13. Audio Design

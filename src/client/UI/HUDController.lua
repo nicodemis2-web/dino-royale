@@ -26,6 +26,8 @@ local InventoryScreen: any = nil
 local ToastNotification: any = nil
 local ConfirmDialog: any = nil
 local UIHelpers: any = nil
+local Crosshair: any = nil
+local WorldHealthBar: any = nil
 
 local HUDController = {}
 
@@ -42,6 +44,7 @@ local matchInfo: any = nil
 local damageIndicator: any = nil
 local interactionPrompt: any = nil
 local inventoryScreen: any = nil
+local crosshair: any = nil
 
 -- Main HUD ScreenGui
 local hudGui: ScreenGui? = nil
@@ -72,6 +75,8 @@ local function loadComponents()
 	ToastNotification = require(Components.ToastNotification)
 	ConfirmDialog = require(Components.ConfirmDialog)
 	UIHelpers = require(script.Parent.UIHelpers)
+	Crosshair = require(Components.Crosshair)
+	WorldHealthBar = require(Components.WorldHealthBar)
 end
 
 --[[
@@ -121,11 +126,17 @@ local function createComponents()
 	-- Damage indicators (fullscreen)
 	damageIndicator = DamageIndicator.new(hudGui)
 
+	-- Crosshair (center screen)
+	crosshair = Crosshair.new(hudGui)
+
 	-- Interaction prompt (bottom center, above weapon slots)
 	interactionPrompt = InteractionPrompt.new(hudGui, UDim2.new(0.5, 0, 1, -100))
 
 	-- Inventory screen (separate ScreenGui)
 	inventoryScreen = InventoryScreen.new(playerGui, 20)
+
+	-- Start world health bar update loop
+	WorldHealthBar.StartUpdateLoop()
 end
 
 --[[
@@ -526,6 +537,10 @@ function HUDController.GetComponent(name: string): any
 		return interactionPrompt
 	elseif name == "InventoryScreen" then
 		return inventoryScreen
+	elseif name == "Crosshair" then
+		return crosshair
+	elseif name == "WorldHealthBar" then
+		return WorldHealthBar
 	end
 	return nil
 end
@@ -609,6 +624,12 @@ function HUDController.Cleanup()
 	end
 	connections = {}
 
+	-- Stop world health bar updates
+	if WorldHealthBar then
+		WorldHealthBar.StopUpdateLoop()
+		WorldHealthBar.ClearAll()
+	end
+
 	-- Destroy components
 	if healthDisplay then
 		healthDisplay:Destroy()
@@ -630,6 +651,9 @@ function HUDController.Cleanup()
 	end
 	if damageIndicator then
 		damageIndicator:Destroy()
+	end
+	if crosshair then
+		crosshair:Destroy()
 	end
 	if interactionPrompt then
 		interactionPrompt:Destroy()
