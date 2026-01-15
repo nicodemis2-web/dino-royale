@@ -40,6 +40,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local BiomeManager = require(script.Parent.BiomeManager)
 local POIManager = require(script.Parent.POIManager)
 local EnvironmentalEventManager = require(script.Parent.EnvironmentalEventManager)
+local FloraGenerator = require(script.Parent.FloraGenerator)
 
 -- Shared data modules (read-only configuration)
 local BiomeData = require(ReplicatedStorage.Shared.BiomeData)
@@ -1777,58 +1778,102 @@ local function createCave(terrain: Terrain, entrancePos: Vector3, caveDepth: num
 end
 
 -- =============================================
--- FOLIAGE CLUSTER FUNCTIONS
+-- FOLIAGE CLUSTER FUNCTIONS (Using FloraGenerator)
 -- =============================================
 
--- Create a cluster of trees
+-- Map old tree type names to FloraGenerator tree types
+local TREE_TYPE_MAP = {
+	pine = "CoastalPine",
+	oak = "Oak",
+	birch = "Birch",
+	jungle = "JungleGiant",
+	jungleMedium = "JungleMedium",
+	palm = "Palm",
+	dead = "DeadTree",
+	cypress = "Cypress",
+	charred = "CharredTree",
+	heatResistant = "HeatResistant",
+}
+
+-- Map tree types to biomes for proper coloring
+local TREE_BIOME_MAP = {
+	pine = "Coastal",
+	oak = "Plains",
+	birch = "Plains",
+	jungle = "Jungle",
+	jungleMedium = "Jungle",
+	palm = "Coastal",
+	dead = "Swamp",
+	cypress = "Swamp",
+	charred = "Volcanic",
+	heatResistant = "Volcanic",
+}
+
+-- Create a cluster of trees using FloraGenerator
 local function createTreeCluster(centerPos: Vector3, radius: number, count: number, treeType: string, baseHeight: number)
+	local floraType = TREE_TYPE_MAP[treeType] or "Oak"
+	local biome = TREE_BIOME_MAP[treeType] or "Plains"
+
 	for i = 1, count do
 		local angle = math.random() * math.pi * 2
 		local dist = math.random() * radius
 		local x = centerPos.X + math.cos(angle) * dist
 		local z = centerPos.Z + math.sin(angle) * dist
-		local height = baseHeight + math.random(-3, 5)
 
 		local treePos = Vector3.new(x, centerPos.Y, z)
 
-		if treeType == "pine" then
-			createPineTree(treePos, height)
-		elseif treeType == "oak" then
-			createOakTree(treePos, height)
-		elseif treeType == "birch" then
-			createBirchTree(treePos, height)
-		elseif treeType == "jungle" then
-			createJungleTree(treePos, height)
-		elseif treeType == "palm" then
-			createPalmTree(treePos, height)
-		elseif treeType == "dead" then
-			createDeadTree(treePos, height)
-		else
-			createTree(treePos, height)
+		-- Use FloraGenerator for proper tree creation
+		pcall(function()
+			FloraGenerator.CreateTree(treePos, floraType, biome)
+		end)
+
+		-- Yield periodically to prevent lag
+		if i % 5 == 0 then
+			task.wait()
 		end
 	end
 end
 
--- Create a rock formation cluster
-local function createRockFormation(centerPos: Vector3, rockCount: number, minSize: number, maxSize: number, material: Enum.Material?)
-	for i = 1, rockCount do
-		local angle = math.random() * math.pi * 2
-		local dist = math.random(5, 30)
-		local x = centerPos.X + math.cos(angle) * dist
-		local z = centerPos.Z + math.sin(angle) * dist
-		local size = minSize + math.random() * (maxSize - minSize)
+-- Create a single tree using FloraGenerator
+local function createFloraTree(position: Vector3, treeType: string)
+	local floraType = TREE_TYPE_MAP[treeType] or "Oak"
+	local biome = TREE_BIOME_MAP[treeType] or "Plains"
 
-		createRock(Vector3.new(x, centerPos.Y, z), size, material)
-	end
+	pcall(function()
+		FloraGenerator.CreateTree(position, floraType, biome)
+	end)
 end
 
--- Create grass patch using terrain
+-- Create a rock formation cluster using FloraGenerator
+local function createRockFormation(centerPos: Vector3, rockCount: number, minSize: number, maxSize: number, material: Enum.Material?)
+	-- Use FloraGenerator for rock clusters
+	local biome = "Plains"
+	if material == Enum.Material.Basalt then
+		biome = "Volcanic"
+	elseif material == Enum.Material.Sandstone then
+		biome = "Coastal"
+	end
+
+	pcall(function()
+		FloraGenerator.CreateRockCluster(centerPos, math.max(minSize, maxSize), rockCount, biome)
+	end)
+end
+
+-- Create grass patch using FloraGenerator
 local function createGrassPatch(terrain: Terrain, centerPos: Vector3, radius: number)
+	-- Use terrain for base grass
 	terrain:FillBlock(
 		CFrame.new(centerPos.X, centerPos.Y + 1, centerPos.Z),
 		Vector3.new(radius * 2, 3, radius * 2),
 		Enum.Material.LeafyGrass
 	)
+
+	-- Add detailed grass clusters using FloraGenerator
+	if math.random() > 0.5 then
+		pcall(function()
+			FloraGenerator.CreateGrassCluster(centerPos, radius * 0.5, "Plains")
+		end)
+	end
 end
 
 --[[
@@ -2325,12 +2370,23 @@ local function createBaseTerrain()
 		local treeX = math.random(-600, 600)
 		local treeZ = math.random(-600, 500)
 		if math.abs(treeX) > 100 or math.abs(treeZ - (-200)) > 80 then
-			createJungleTree(Vector3.new(treeX, 25, treeZ), math.random(22, 38))
+			createFloraTree(Vector3.new(treeX, 25, treeZ), math.random() > 0.5 and "jungle" or "jungleMedium")
 		end
+		if i % 10 == 0 then task.wait() end
 	end
 	-- Grass patches in jungle
 	for i = 1, 20 do
 		createGrassPatch(terrain, Vector3.new(math.random(-500, 500), 25, math.random(-500, 400)), math.random(20, 50))
+	end
+	-- Jungle flower patches (tropical flowers)
+	for i = 1, 15 do
+		pcall(function()
+			FloraGenerator.CreateFlowerPatch(
+				Vector3.new(math.random(-500, 500), 25, math.random(-500, 400)),
+				math.random(5, 15),
+				"Jungle"
+			)
+		end)
 	end
 
 	-- === PLAINS VEGETATION (sparse trees, grass) ===
@@ -2345,7 +2401,8 @@ local function createBaseTerrain()
 	for i = 1, 30 do
 		local treeX = plainsCenter.X + math.random(-700, 700)
 		local treeZ = plainsCenter.Z + math.random(-700, 700)
-		createBirchTree(Vector3.new(treeX, 15, treeZ), math.random(12, 18))
+		createFloraTree(Vector3.new(treeX, 15, treeZ), "birch")
+		if i % 10 == 0 then task.wait() end
 	end
 	-- Large grass patches
 	for i = 1, 30 do
@@ -2355,14 +2412,25 @@ local function createBaseTerrain()
 	for i = 1, 8 do
 		createRockFormation(Vector3.new(plainsCenter.X + math.random(-500, 500), 18, plainsCenter.Z + math.random(-500, 500)), math.random(4, 8), 3, 10)
 	end
+	-- Plains flower patches (wildflowers)
+	for i = 1, 25 do
+		pcall(function()
+			FloraGenerator.CreateFlowerPatch(
+				Vector3.new(plainsCenter.X + math.random(-600, 600), 18, plainsCenter.Z + math.random(-600, 600)),
+				math.random(8, 20),
+				"Plains"
+			)
+		end)
+	end
 
-	-- === VOLCANIC VEGETATION (sparse pine, many rocks) ===
+	-- === VOLCANIC VEGETATION (sparse charred trees, many rocks) ===
 	print("[MapManager] Adding volcanic vegetation...")
-	-- Sparse pine trees on slopes
+	-- Sparse charred/heat-resistant trees on slopes
 	for i = 1, 25 do
 		local treeX = volcanicCenter.X + math.random(-700, 700)
 		local treeZ = volcanicCenter.Z + math.random(-400, 500)
-		createPineTree(Vector3.new(treeX, 45, treeZ), math.random(15, 28))
+		createFloraTree(Vector3.new(treeX, 45, treeZ), math.random() > 0.6 and "charred" or "heatResistant")
+		if i % 10 == 0 then task.wait() end
 	end
 	-- Many rock formations
 	for i = 1, 20 do
@@ -2390,11 +2458,12 @@ local function createBaseTerrain()
 		local clusterZ = swampCenter.Z + math.random(-500, 500)
 		createTreeCluster(Vector3.new(clusterX, 12, clusterZ), 50, math.random(3, 6), "dead", 15)
 	end
-	-- Individual dead trees
+	-- Individual dead and cypress trees
 	for i = 1, 40 do
 		local treeX = swampCenter.X + math.random(-600, 600)
 		local treeZ = swampCenter.Z + math.random(-600, 600)
-		createDeadTree(Vector3.new(treeX, 12, treeZ), math.random(10, 22))
+		createFloraTree(Vector3.new(treeX, 12, treeZ), math.random() > 0.4 and "dead" or "cypress")
+		if i % 10 == 0 then task.wait() end
 	end
 	-- Swamp stilt houses
 	for i = 1, 6 do
@@ -2425,11 +2494,12 @@ local function createBaseTerrain()
 		local clusterZ = coastalCenter.Z + math.random(-300, 200)
 		createTreeCluster(Vector3.new(clusterX, 10, clusterZ), 60, math.random(4, 7), "palm", 18)
 	end
-	-- Individual palms
+	-- Individual palms and coastal pines
 	for i = 1, 50 do
 		local palmX = coastalCenter.X + math.random(-800, 800)
 		local palmZ = coastalCenter.Z + math.random(-400, 300)
-		createPalmTree(Vector3.new(palmX, 8, palmZ), math.random(14, 22))
+		createFloraTree(Vector3.new(palmX, 8, palmZ), math.random() > 0.3 and "palm" or "pine")
+		if i % 10 == 0 then task.wait() end
 	end
 	-- Beach rocks and formations
 	for i = 1, 12 do
