@@ -43,6 +43,20 @@ local DEFAULT_FOV = 70
 local ADS_FOV_MULTIPLIER = 0.7
 local FOV_LERP_SPEED = 15
 
+-- Enhanced ADS settings
+local ADS_OFFSET = Vector3.new(0.4, -0.1, -0.3) -- Right, down, forward offset to sights
+local ADS_OFFSET_LERP_SPEED = 12
+local ADS_SENSITIVITY_MULTIPLIER = 0.6
+
+-- Recoil settings
+local recoilOffset = Vector2.new(0, 0) -- Current recoil offset (pitch, yaw)
+local recoilRecoverySpeed = 8
+local currentADSOffset = Vector3.new(0, 0, 0)
+
+-- Visual feedback
+local screenShakeAmount = 0
+local screenShakeDecay = 10
+
 --[[
 	Initialize the weapon controller
 ]]
@@ -191,6 +205,9 @@ function WeaponController.TryFire()
 	local fireResult = currentWeapon:Fire(origin, direction)
 
 	if fireResult.success then
+		-- Apply recoil
+		WeaponController.ApplyRecoil(currentWeapon)
+
 		-- Play immediate feedback
 		if onFireCallback then
 			onFireCallback(currentWeapon, origin, fireResult.spread or direction)
@@ -270,7 +287,7 @@ function WeaponController.ExitADS()
 end
 
 --[[
-	Update camera FOV for ADS
+	Update camera FOV, ADS offset, and recoil for enhanced weapon feel
 	@param dt Delta time
 ]]
 function WeaponController.UpdateCamera(dt: number)
@@ -280,6 +297,7 @@ function WeaponController.UpdateCamera(dt: number)
 	end
 
 	local targetFOV = DEFAULT_FOV
+	local targetOffset = Vector3.new(0, 0, 0)
 
 	if isADS and currentWeapon then
 		local scopeZoom = currentWeapon.definition.scopeZoom or 1
@@ -288,12 +306,91 @@ function WeaponController.UpdateCamera(dt: number)
 		else
 			targetFOV = DEFAULT_FOV * ADS_FOV_MULTIPLIER
 		end
+		-- Apply ADS offset to bring camera to sights
+		targetOffset = ADS_OFFSET
 	end
 
-	-- Smooth lerp
+	-- Smooth FOV lerp
 	local currentFOV = camera.FieldOfView
 	local newFOV = currentFOV + (targetFOV - currentFOV) * math.min(1, FOV_LERP_SPEED * dt)
 	camera.FieldOfView = newFOV
+
+	-- Smooth ADS offset lerp
+	currentADSOffset = currentADSOffset:Lerp(targetOffset, math.min(1, ADS_OFFSET_LERP_SPEED * dt))
+
+	-- Apply recoil recovery (gradually return to center)
+	if recoilOffset.Magnitude > 0.001 then
+		recoilOffset = recoilOffset:Lerp(Vector2.new(0, 0), math.min(1, recoilRecoverySpeed * dt))
+	end
+
+	-- Apply screen shake decay
+	if screenShakeAmount > 0.001 then
+		screenShakeAmount = screenShakeAmount * math.exp(-screenShakeDecay * dt)
+	else
+		screenShakeAmount = 0
+	end
+
+	-- Apply combined camera effects (recoil + shake + ADS offset)
+	local character = localPlayer.Character
+	if character then
+		local humanoid = character:FindFirstChild("Humanoid") :: Humanoid?
+		if humanoid then
+			-- Apply camera offset through CameraOffset (shifts view without rotating)
+			local shakeOffset = Vector3.new(
+				(math.random() - 0.5) * screenShakeAmount * 0.1,
+				(math.random() - 0.5) * screenShakeAmount * 0.1,
+				0
+			)
+			humanoid.CameraOffset = currentADSOffset + shakeOffset
+		end
+	end
+end
+
+--[[
+	Apply recoil from weapon fire
+	@param weapon The weapon that fired
+]]
+function WeaponController.ApplyRecoil(weapon: WeaponInstance)
+	if not weapon then return end
+
+	local weaponDef = weapon.definition
+	local recoilAmount = weaponDef.recoil or 2
+
+	-- Reduce recoil when ADS
+	if isADS then
+		recoilAmount = recoilAmount * 0.6
+	end
+
+	-- Add vertical recoil with slight horizontal variation
+	local verticalRecoil = recoilAmount
+	local horizontalRecoil = (math.random() - 0.5) * recoilAmount * 0.3
+
+	recoilOffset = recoilOffset + Vector2.new(verticalRecoil, horizontalRecoil)
+
+	-- Add screen shake on fire
+	screenShakeAmount = screenShakeAmount + recoilAmount * 0.5
+
+	-- Apply immediate camera kick
+	local camera = workspace.CurrentCamera
+	if camera then
+		local kickAngle = CFrame.Angles(
+			math.rad(-recoilAmount * 0.8), -- Pitch up
+			math.rad(horizontalRecoil * 0.5), -- Slight yaw
+			0
+		)
+		camera.CFrame = camera.CFrame * kickAngle
+	end
+end
+
+--[[
+	Get current mouse sensitivity multiplier (reduced when ADS)
+	@return Sensitivity multiplier
+]]
+function WeaponController.GetSensitivityMultiplier(): number
+	if isADS then
+		return ADS_SENSITIVITY_MULTIPLIER
+	end
+	return 1
 end
 
 --[[

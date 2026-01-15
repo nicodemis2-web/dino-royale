@@ -54,10 +54,10 @@ local playerConnections = {} :: { [number]: RBXScriptConnection }
 local worldItems = {} :: { [string]: WorldItem }
 local worldItemCounter = 0
 
--- Max ammo capacities
+-- Max ammo capacities (300 max for light/medium ammo)
 local MAX_AMMO = {
-	LightAmmo = 999,
-	MediumAmmo = 999,
+	LightAmmo = 300,
+	MediumAmmo = 300,
 	HeavyAmmo = 60,
 	Shells = 60,
 	SpecialAmmo = 30,

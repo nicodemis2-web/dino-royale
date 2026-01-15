@@ -76,7 +76,7 @@ ItemData.Healing = {
 		category = "Healing" :: "Healing",
 		healAmount = 75,
 		useTime = 7,
-		maxStack = 5,
+		maxStack = 2,
 		maxHealTo = 100,
 	},
 	DinoAdrenaline = {
@@ -100,7 +100,7 @@ ItemData.Shields = {
 		category = "Shield" :: "Shield",
 		shieldAmount = 50,
 		useTime = 4,
-		maxStack = 6,
+		maxStack = 2,
 	},
 	MegaSerum = {
 		name = "Mega Serum",
@@ -191,13 +191,13 @@ ItemData.Ammo = {
 	LightAmmo = {
 		name = "Light Ammo",
 		category = "Ammo" :: "Ammo",
-		maxStack = 999,
+		maxStack = 300,
 		weapons = { "SMG", "Pistol" },
 	},
 	MediumAmmo = {
 		name = "Medium Ammo",
 		category = "Ammo" :: "Ammo",
-		maxStack = 999,
+		maxStack = 300,
 		weapons = { "AssaultRifle", "DMR" },
 	},
 	HeavyAmmo = {

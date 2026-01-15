@@ -145,40 +145,86 @@ function WeaponEffects.CreateHitMarkerUI()
 end
 
 --[[
-	Play muzzle flash effect
+	Play muzzle flash effect with enhanced visuals
 	@param weaponModel The weapon model (optional)
 	@param weaponType The weapon type/category
 ]]
 function WeaponEffects.MuzzleFlash(weaponModel: Model?, weaponType: string)
-	-- Find muzzle attachment or default position
-	local muzzlePosition = Vector3.zero
+	-- Find muzzle position from character
+	local character = localPlayer.Character
+	if not character then return end
 
-	if weaponModel then
-		local muzzle = weaponModel:FindFirstChild("Muzzle", true)
-		if muzzle and muzzle:IsA("Attachment") then
-			muzzlePosition = muzzle.WorldPosition
-		elseif muzzle and muzzle:IsA("BasePart") then
-			muzzlePosition = muzzle.Position
-		end
+	local rootPart = character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not rootPart then return end
+
+	local camera = workspace.CurrentCamera
+	if not camera then return end
+
+	-- Calculate muzzle position (in front of camera)
+	local muzzleOffset = Vector3.new(0.3, -0.2, -2) -- Right, down, forward
+	local muzzlePosition = camera.CFrame:PointToWorldSpace(muzzleOffset)
+
+	-- Flash intensity based on weapon type
+	local flashIntensity = 3
+	local flashRange = 10
+	local flashDuration = 0.05
+
+	if weaponType == "Shotgun" then
+		flashIntensity = 5
+		flashRange = 15
+		flashDuration = 0.08
+	elseif weaponType == "Sniper" then
+		flashIntensity = 4
+		flashRange = 12
+		flashDuration = 0.06
+	elseif weaponType == "SMG" or weaponType == "Pistol" then
+		flashIntensity = 2
+		flashRange = 8
+		flashDuration = 0.04
 	end
 
 	-- Create flash light
 	local flash = Instance.new("PointLight")
-	flash.Brightness = 3
-	flash.Range = 10
+	flash.Brightness = flashIntensity
+	flash.Range = flashRange
 	flash.Color = Color3.fromRGB(255, 200, 100)
+	flash.Parent = rootPart
 
-	-- Parent to character or workspace
-	local character = localPlayer.Character
-	if character then
-		local rootPart = character:FindFirstChild("HumanoidRootPart")
-		if rootPart then
-			flash.Parent = rootPart
-		end
-	end
+	-- Create muzzle flash part (visual cone)
+	local flashPart = Instance.new("Part")
+	flashPart.Name = "MuzzleFlash"
+	flashPart.Anchored = true
+	flashPart.CanCollide = false
+	flashPart.CanQuery = false
+	flashPart.Size = Vector3.new(0.3, 0.3, 0.5)
+	flashPart.Material = Enum.Material.Neon
+	flashPart.Color = Color3.fromRGB(255, 180, 50)
+	flashPart.Transparency = 0.3
+	flashPart.CFrame = CFrame.new(muzzlePosition, muzzlePosition + camera.CFrame.LookVector)
+	flashPart.Parent = workspace
 
-	-- Quick flash
-	Debris:AddItem(flash, 0.05)
+	-- Add sparkle effect
+	local sparkles = Instance.new("ParticleEmitter")
+	sparkles.Color = ColorSequence.new(Color3.fromRGB(255, 200, 100))
+	sparkles.LightEmission = 1
+	sparkles.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.2),
+		NumberSequenceKeypoint.new(1, 0),
+	})
+	sparkles.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.3),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	sparkles.Lifetime = NumberRange.new(0.05, 0.1)
+	sparkles.Rate = 0 -- Will emit manually
+	sparkles.Speed = NumberRange.new(10, 20)
+	sparkles.SpreadAngle = Vector2.new(30, 30)
+	sparkles.Parent = flashPart
+	sparkles:Emit(weaponType == "Shotgun" and 15 or 8)
+
+	-- Quick flash cleanup
+	Debris:AddItem(flash, flashDuration)
+	Debris:AddItem(flashPart, flashDuration * 2)
 end
 
 --[[
@@ -259,7 +305,7 @@ function WeaponEffects.ImpactEffect(position: Vector3, normal: Vector3, material
 end
 
 --[[
-	Eject shell casing
+	Eject shell casing with realistic physics
 	@param origin Ejection origin
 	@param weaponType The weapon type
 ]]
@@ -269,27 +315,73 @@ function WeaponEffects.ShellCasing(origin: Vector3, weaponType: string)
 		return
 	end
 
-	-- Size based on weapon type
+	local camera = workspace.CurrentCamera
+	if not camera then return end
+
+	-- Calculate ejection position (to the right of camera view)
+	local ejectionOffset = Vector3.new(0.4, -0.1, -0.5) -- Right, slightly down, forward
+	local ejectionPos = camera.CFrame:PointToWorldSpace(ejectionOffset)
+
+	-- Size and color based on weapon type
 	if weaponType == "Shotgun" then
-		shell.Size = Vector3.new(0.2, 0.2, 0.5)
-		shell.Color = Color3.fromRGB(200, 50, 50) -- Red shell
+		shell.Size = Vector3.new(0.2, 0.2, 0.6)
+		shell.Color = Color3.fromRGB(200, 50, 50) -- Red shotgun shell
+		shell.Material = Enum.Material.Plastic
 	elseif weaponType == "Sniper" then
-		shell.Size = Vector3.new(0.15, 0.15, 0.6)
+		shell.Size = Vector3.new(0.12, 0.12, 0.8)
+		shell.Color = Color3.fromRGB(180, 150, 80) -- Large brass casing
+	elseif weaponType == "AssaultRifle" or weaponType == "DMR" then
+		shell.Size = Vector3.new(0.08, 0.08, 0.4)
+		shell.Color = Color3.fromRGB(200, 170, 100) -- Standard brass
+	elseif weaponType == "SMG" or weaponType == "Pistol" then
+		shell.Size = Vector3.new(0.06, 0.06, 0.25)
+		shell.Color = Color3.fromRGB(200, 170, 100) -- Small brass
 	else
 		shell.Size = Vector3.new(0.1, 0.1, 0.3)
+		shell.Color = Color3.fromRGB(200, 170, 100)
 	end
 
-	shell.Position = origin
+	-- Set position and enable physics
+	shell.Position = ejectionPos
 	shell.Anchored = false
 	shell.Parent = workspace
 
-	-- Apply ejection velocity
-	local ejectDirection = Vector3.new(math.random() - 0.5, 1, math.random() - 0.5).Unit
-	shell.AssemblyLinearVelocity = ejectDirection * 10
+	-- Calculate ejection direction (right and up relative to camera)
+	local rightVector = camera.CFrame.RightVector
+	local upVector = camera.CFrame.UpVector
+	local backVector = -camera.CFrame.LookVector
+
+	-- Add randomness to ejection
+	local randomAngle = math.random() * 0.3 - 0.15
+	local ejectDirection = (rightVector + upVector * 0.5 + backVector * 0.2).Unit
+	ejectDirection = ejectDirection + Vector3.new(randomAngle, math.random() * 0.2, randomAngle)
+
+	-- Apply velocity and spin
+	local ejectSpeed = weaponType == "Shotgun" and 8 or 12
+	shell.AssemblyLinearVelocity = ejectDirection * ejectSpeed
+	shell.AssemblyAngularVelocity = Vector3.new(
+		math.random() * 30 - 15,
+		math.random() * 30 - 15,
+		math.random() * 30 - 15
+	)
+
+	-- Play casing sound when it lands (delayed)
+	task.delay(0.3, function()
+		local clingSound = Instance.new("Sound")
+		clingSound.Volume = 0.15
+		clingSound.Pitch = 0.8 + math.random() * 0.4
+		clingSound.RollOffMinDistance = 5
+		clingSound.RollOffMaxDistance = 30
+		clingSound.Parent = shell
+		clingSound:Play()
+		Debris:AddItem(clingSound, 0.5)
+	end)
 
 	-- Return to pool after landing
-	task.delay(2, function()
+	task.delay(3, function()
 		shell.Anchored = true
+		shell.AssemblyLinearVelocity = Vector3.zero
+		shell.AssemblyAngularVelocity = Vector3.zero
 		shell.Parent = nil
 	end)
 end

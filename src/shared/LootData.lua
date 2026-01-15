@@ -88,11 +88,11 @@ LootData.Items = {
 	TranqDartGun = { id = "TranqDartGun", name = "TranqDartGun", displayName = "Tranq Dart Gun", category = "Weapon", rarity = "Epic", stackable = false, maxStack = 1, weight = 12 },
 	Flamethrower = { id = "Flamethrower", name = "Flamethrower", displayName = "Flamethrower", category = "Weapon", rarity = "Legendary", stackable = false, maxStack = 1, weight = 2 },
 
-	-- AMMO
-	LightAmmo = { id = "LightAmmo", name = "LightAmmo", displayName = "Light Ammo", category = "Ammo", rarity = "Common", stackable = true, maxStack = 999, weight = 100 },
-	MediumAmmo = { id = "MediumAmmo", name = "MediumAmmo", displayName = "Medium Ammo", category = "Ammo", rarity = "Common", stackable = true, maxStack = 999, weight = 80 },
-	HeavyAmmo = { id = "HeavyAmmo", name = "HeavyAmmo", displayName = "Heavy Ammo", category = "Ammo", rarity = "Common", stackable = true, maxStack = 999, weight = 60 },
-	ShotgunShells = { id = "ShotgunShells", name = "ShotgunShells", displayName = "Shotgun Shells", category = "Ammo", rarity = "Common", stackable = true, maxStack = 999, weight = 50 },
+	-- AMMO (30 rounds per cache drop, 300 max capacity for light/medium)
+	LightAmmo = { id = "LightAmmo", name = "LightAmmo", displayName = "Light Ammo", category = "Ammo", rarity = "Common", stackable = true, maxStack = 300, weight = 100 },
+	MediumAmmo = { id = "MediumAmmo", name = "MediumAmmo", displayName = "Medium Ammo", category = "Ammo", rarity = "Common", stackable = true, maxStack = 300, weight = 80 },
+	HeavyAmmo = { id = "HeavyAmmo", name = "HeavyAmmo", displayName = "Heavy Ammo", category = "Ammo", rarity = "Common", stackable = true, maxStack = 60, weight = 60 },
+	ShotgunShells = { id = "ShotgunShells", name = "ShotgunShells", displayName = "Shotgun Shells", category = "Ammo", rarity = "Common", stackable = true, maxStack = 60, weight = 50 },
 	Rockets = { id = "Rockets", name = "Rockets", displayName = "Rockets", category = "Ammo", rarity = "Rare", stackable = true, maxStack = 20, weight = 15 },
 	FuelCanister = { id = "FuelCanister", name = "FuelCanister", displayName = "Fuel Canister", category = "Ammo", rarity = "Uncommon", stackable = true, maxStack = 100, weight = 30 },
 
@@ -206,8 +206,9 @@ function LootData.GetDropAmount(item: LootItem, tier: LootTier): number
 	end
 
 	local baseAmounts = {
-		Ammo = { Low = { 10, 20 }, Medium = { 20, 40 }, High = { 30, 60 }, VeryHigh = { 50, 80 }, Legendary = { 80, 120 } },
-		Healing = { Low = { 1, 2 }, Medium = { 2, 3 }, High = { 2, 4 }, VeryHigh = { 3, 5 }, Legendary = { 4, 6 } },
+		-- Ammo drops are standardized to 30 rounds per cache
+		Ammo = { Low = { 30, 30 }, Medium = { 30, 30 }, High = { 30, 30 }, VeryHigh = { 30, 30 }, Legendary = { 30, 60 } },
+		Healing = { Low = { 1, 1 }, Medium = { 1, 1 }, High = { 1, 2 }, VeryHigh = { 1, 2 }, Legendary = { 2, 2 } },
 		Equipment = { Low = { 1, 1 }, Medium = { 1, 2 }, High = { 1, 2 }, VeryHigh = { 2, 3 }, Legendary = { 2, 4 } },
 		Material = { Low = { 10, 25 }, Medium = { 20, 50 }, High = { 40, 80 }, VeryHigh = { 60, 100 }, Legendary = { 80, 150 } },
 	}
