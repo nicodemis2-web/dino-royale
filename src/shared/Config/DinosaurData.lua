@@ -303,10 +303,15 @@ DinosaurData.TierSpawnRates = {
 -- Lookup table for all dinosaurs by ID
 DinosaurData.AllDinosaurs = {} :: { [string]: DinosaurDefinition }
 
--- Populate AllDinosaurs lookup
+-- Lookup table for species names by tier (for DinosaurManager.selectRandomSpecies)
+DinosaurData.ByTier = {} :: { [string]: { string } }
+
+-- Populate AllDinosaurs and ByTier lookups
 for _, tier in pairs({ "Common", "Uncommon", "Rare", "Epic", "Legendary" }) do
+	DinosaurData.ByTier[tier] = {}
 	for dinoId, dinoDef in pairs(DinosaurData[tier]) do
 		DinosaurData.AllDinosaurs[dinoId] = dinoDef
+		table.insert(DinosaurData.ByTier[tier], dinoId)
 	end
 end
 
