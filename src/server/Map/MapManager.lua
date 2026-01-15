@@ -286,6 +286,40 @@ local function createBaseTerrain()
 	local resolution = TERRAIN_CONFIG.resolution
 	local halfSize = mapSize / 2
 
+	-- Clean up any temporary spawns from Main.server.lua FIRST
+	-- Handle both old and new naming conventions for compatibility
+	local tempNames = {"TempSpawnPlatform", "SpawnPlatform"}
+	for _, name in ipairs(tempNames) do
+		local tempPlatform = workspace:FindFirstChild(name)
+		if tempPlatform then
+			tempPlatform:Destroy()
+			print(`[MapManager] Removed {name}`)
+		end
+	end
+
+	local spawnNames = {"TempSpawn", "MainSpawn"}
+	for _, name in ipairs(spawnNames) do
+		local tempSpawn = workspace:FindFirstChild(name)
+		if tempSpawn then
+			tempSpawn:Destroy()
+			print(`[MapManager] Removed {name}`)
+		end
+	end
+
+	-- Clean up any existing spawns
+	local existingSpawn = workspace:FindFirstChild("LobbySpawn")
+	if existingSpawn then
+		existingSpawn:Destroy()
+	end
+	local existingPlatform = workspace:FindFirstChild("LobbyPlatform")
+	if existingPlatform then
+		existingPlatform:Destroy()
+	end
+	local tempLobbyPlatform = workspace:FindFirstChild("TempLobbyPlatform")
+	if tempLobbyPlatform then
+		tempLobbyPlatform:Destroy()
+	end
+
 	-- Clear any existing terrain
 	terrain:Clear()
 
@@ -320,30 +354,61 @@ local function createBaseTerrain()
 		Enum.Material.Water
 	)
 
-	-- Create spawn location for lobby (center of map, elevated platform)
-	local spawnPlatform = Instance.new("Part")
-	spawnPlatform.Name = "LobbyPlatform"
-	spawnPlatform.Size = Vector3.new(50, 5, 50)
-	spawnPlatform.Position = Vector3.new(0, 25, 0)
-	spawnPlatform.Anchored = true
-	spawnPlatform.Material = Enum.Material.Concrete
-	spawnPlatform.Color = Color3.fromRGB(120, 120, 120)
-	spawnPlatform.Parent = workspace
-
-	local spawnLocation = Instance.new("SpawnLocation")
-	spawnLocation.Name = "LobbySpawn"
-	spawnLocation.Size = Vector3.new(20, 1, 20)
-	spawnLocation.Position = Vector3.new(0, 28, 0)
-	spawnLocation.Anchored = true
-	spawnLocation.Material = Enum.Material.SmoothPlastic
-	spawnLocation.Color = Color3.fromRGB(80, 80, 80)
-	spawnLocation.Neutral = true
-	spawnLocation.Parent = workspace
-
 	print("[MapManager] Terrain generated!")
 	print("  Jungle: North-East sector (LeafyGrass, rolling hills)")
 	print("  Desert: South sector (Sand, dunes)")
 	print("  Mountains: North-West sector (Snow peaks, rock cliffs)")
+
+	-- Wait a frame for terrain to settle before raycasting
+	task.wait(0.1)
+
+	-- Create spawn location directly on terrain (jungle biome area)
+	local spawnX, spawnZ = 200, 200 -- Jungle biome area
+
+	-- Calculate expected terrain height using same formula as generation
+	local biome = getBiomeAtPosition(spawnX, spawnZ)
+	local calculatedHeight = getHeightAtPosition(spawnX, spawnZ, biome)
+	print(`[MapManager] Calculated terrain height at spawn: {calculatedHeight} (biome: {biome})`)
+
+	-- Also try raycast as backup verification
+	local rayOrigin = Vector3.new(spawnX, 500, spawnZ)
+	local rayDirection = Vector3.new(0, -1000, 0)
+	local rayResult = workspace:Raycast(rayOrigin, rayDirection)
+
+	local terrainHeight = calculatedHeight -- Use calculated height as primary
+	if rayResult then
+		print(`[MapManager] Raycast hit at Y={rayResult.Position.Y}`)
+		-- Use raycast if it found something reasonable
+		if math.abs(rayResult.Position.Y - calculatedHeight) < 50 then
+			terrainHeight = rayResult.Position.Y
+		end
+	else
+		print("[MapManager] Raycast didn't hit terrain, using calculated height")
+	end
+
+	-- Create a visible spawn platform so players have something solid to stand on
+	local spawnPlatform = Instance.new("Part")
+	spawnPlatform.Name = "LobbyPlatform"
+	spawnPlatform.Size = Vector3.new(30, 2, 30)
+	spawnPlatform.Position = Vector3.new(spawnX, terrainHeight + 1, spawnZ)
+	spawnPlatform.Anchored = true
+	spawnPlatform.BrickColor = BrickColor.new("Bright green")
+	spawnPlatform.Material = Enum.Material.Grass
+	spawnPlatform.Parent = workspace
+	print(`[MapManager] Created spawn platform at Y={terrainHeight + 1}`)
+
+	-- Create spawn location on top of platform
+	local spawnLocation = Instance.new("SpawnLocation")
+	spawnLocation.Name = "LobbySpawn"
+	spawnLocation.Size = Vector3.new(20, 1, 20)
+	spawnLocation.Position = Vector3.new(spawnX, terrainHeight + 4, spawnZ)
+	spawnLocation.Anchored = true
+	spawnLocation.Transparency = 1 -- Invisible
+	spawnLocation.CanCollide = false
+	spawnLocation.Neutral = true
+	spawnLocation.Parent = workspace
+
+	print(`[MapManager] Spawn created at ({spawnX}, {terrainHeight + 4}, {spawnZ})`)
 end
 
 --[[

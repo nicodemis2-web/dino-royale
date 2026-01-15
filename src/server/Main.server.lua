@@ -3,19 +3,135 @@
 	Main.server.lua
 	===============
 	Server entry point for Dino Royale
-	Initializes all server systems and manages game lifecycle
+	SIMPLIFIED VERSION - Focus on getting basic spawning working
 ]]
+
+print("===========================================")
+print("  DINO ROYALE SERVER - INITIALIZING")
+print("===========================================")
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
 
--- Wait for shared modules
-ReplicatedStorage:WaitForChild("Shared")
+-- STEP 1: Disable auto-spawning FIRST
+Players.CharacterAutoLoads = false
+print("[Server] CharacterAutoLoads = false")
 
--- Import modules
-local Events = require(ReplicatedStorage.Shared.Events)
+-- STEP 2: Create a TEMPORARY spawn platform immediately
+-- This will be replaced by MapManager once terrain is generated
+local function createTempSpawnPlatform()
+	print("[Server] Creating temporary spawn platform...")
 
--- Server modules (lazy loaded)
+	-- Remove ALL existing spawn locations first
+	for _, obj in ipairs(Workspace:GetDescendants()) do
+		if obj:IsA("SpawnLocation") then
+			obj:Destroy()
+		end
+	end
+
+	-- Remove old platforms (use consistent naming for cleanup)
+	local oldPlatform = Workspace:FindFirstChild("TempSpawnPlatform")
+	if oldPlatform then oldPlatform:Destroy() end
+	local oldSpawn = Workspace:FindFirstChild("TempSpawn")
+	if oldSpawn then oldSpawn:Destroy() end
+
+	-- Create a large, visible platform (TEMPORARY - will be replaced by MapManager)
+	local platform = Instance.new("Part")
+	platform.Name = "TempSpawnPlatform"
+	platform.Size = Vector3.new(100, 10, 100)
+	platform.Position = Vector3.new(0, 50, 0)  -- 50 studs up
+	platform.Anchored = true
+	platform.CanCollide = true
+	platform.BrickColor = BrickColor.new("Bright green")
+	platform.Material = Enum.Material.Grass
+	platform.TopSurface = Enum.SurfaceType.Smooth
+	platform.BottomSurface = Enum.SurfaceType.Smooth
+	platform.Parent = Workspace
+
+	-- Create spawn location ON the platform
+	local spawn = Instance.new("SpawnLocation")
+	spawn.Name = "TempSpawn"
+	spawn.Size = Vector3.new(20, 1, 20)
+	spawn.Position = Vector3.new(0, 56, 0)  -- On top of platform
+	spawn.Anchored = true
+	spawn.CanCollide = false
+	spawn.Transparency = 0.5
+	spawn.BrickColor = BrickColor.new("White")
+	spawn.Neutral = true
+	spawn.Duration = 0  -- No force field
+	spawn.Parent = Workspace
+
+	print("[Server] Temporary spawn platform created at Y=50, spawn at Y=56")
+	return platform, spawn
+end
+
+-- Create TEMP platform RIGHT NOW (MapManager will replace with proper biome terrain)
+local tempSpawnPlatform, tempSpawnLocation = createTempSpawnPlatform()
+
+-- STEP 3: Track players waiting to spawn
+local playersToSpawn: {Player} = {}
+local systemReady = false
+
+-- STEP 4: Handle player joining - queue them for spawning
+Players.PlayerAdded:Connect(function(player)
+	print(`[Server] Player joined: {player.Name}`)
+
+	if systemReady then
+		-- System is ready, spawn immediately
+		print(`[Server] Spawning {player.Name} immediately`)
+		task.spawn(function()
+			task.wait(0.5)  -- Small delay to ensure everything is ready
+			player:LoadCharacter()
+		end)
+	else
+		-- Queue for later
+		print(`[Server] Queueing {player.Name} for spawn`)
+		table.insert(playersToSpawn, player)
+	end
+end)
+
+-- Handle players who are already connected
+for _, player in ipairs(Players:GetPlayers()) do
+	print(`[Server] Existing player found: {player.Name}`)
+	table.insert(playersToSpawn, player)
+end
+
+-- STEP 5: Handle player leaving
+Players.PlayerRemoving:Connect(function(player)
+	print(`[Server] Player leaving: {player.Name}`)
+	-- Remove from queue if present
+	for i, p in ipairs(playersToSpawn) do
+		if p == player then
+			table.remove(playersToSpawn, i)
+			break
+		end
+	end
+end)
+
+-- STEP 6: Wait for shared modules
+print("[Server] Waiting for shared modules...")
+local Shared = ReplicatedStorage:WaitForChild("Shared", 10)
+if not Shared then
+	warn("[Server] WARNING: Shared folder not found after 10 seconds!")
+else
+	print("[Server] Shared modules found")
+end
+
+-- STEP 7: Try to load Events module
+local Events
+local eventsLoaded = pcall(function()
+	Events = require(ReplicatedStorage.Shared.Events)
+	Events.Initialize()
+	print("[Server] Events initialized")
+end)
+
+if not eventsLoaded then
+	warn("[Server] WARNING: Failed to load Events module")
+end
+
+-- STEP 8: Declare module variables
 local GameManager: any = nil
 local StormManager: any = nil
 local DeploymentManager: any = nil
@@ -42,325 +158,211 @@ local RankedManager: any = nil
 local AccessibilityManager: any = nil
 local AdminConsole: any = nil
 
--- State
-local isInitialized = false
+-- STEP 9: Load modules safely
+print("[Server] Loading modules...")
 
---[[
-	Load all server modules
-]]
-local function loadModules()
-	print("[Server] Loading modules...")
-
-	local Core = script.Parent.Core
-	local Player = script.Parent.Player
-	local Weapons = script.Parent.Weapons
-	local AI = script.Parent.AI
-	local Vehicles = script.Parent.Vehicles
-	local EventsFolder = script.Parent.Events
-	local Map = script.Parent.Map
-
-	-- Core systems
-	GameManager = require(Core.GameManager)
-	StormManager = require(Core.StormManager)
-	DeploymentManager = require(Core.DeploymentManager)
-	AdminConsole = require(Core.AdminConsole)
-
-	-- Map systems
-	MapManager = require(Map.MapManager)
-	EnvironmentalEventManager = require(Map.EnvironmentalEventManager)
-
-	-- Player systems
-	WeaponManager = require(Weapons.WeaponManager)
-	InventoryManager = require(Player.InventoryManager)
-	EliminationManager = require(Player.EliminationManager)
-	RevivalManager = require(Player.RevivalManager)
-	RebootBeaconManager = require(Player.RebootBeaconManager)
-	ProgressionManager = require(Player.ProgressionManager)
-	PingManager = require(Player.PingManager)
-
-	-- AI systems
-	DinosaurManager = require(AI.DinosaurManager)
-	BossEventManager = require(EventsFolder.BossEventManager)
-
-	-- Vehicle system
-	VehicleManager = require(Vehicles.VehicleManager)
-
-	-- Loot system
-	local Loot = script.Parent.Loot
-	LootManager = require(Loot.LootManager)
-
-	-- Combat system
-	local Combat = script.Parent.Combat
-	CombatManager = require(Combat.CombatManager)
-	HealingManager = require(Combat.HealingManager)
-
-	-- Meta-game systems
-	BattlePassManager = require(Player.BattlePassManager)
-	ShopManager = require(Player.ShopManager)
-	TutorialManager = require(Player.TutorialManager)
-	PartyManager = require(Player.PartyManager)
-	RankedManager = require(Player.RankedManager)
-	AccessibilityManager = require(Player.AccessibilityManager)
-
-	print("[Server] Modules loaded")
-end
-
---[[
-	Initialize all server systems
-]]
-local function initializeSystems()
-	print("[Server] Initializing systems...")
-
-	-- Initialize events system first (creates RemoteEvents)
-	Events.Initialize()
-
-	-- Initialize in dependency order
-	GameManager.Initialize()
-	MapManager.Initialize() -- Map must init before storm/dinos
-	WeaponManager.Initialize()
-	InventoryManager.Initialize()
-	EliminationManager.Initialize()
-	RevivalManager.Initialize()
-	RebootBeaconManager.Initialize()
-	ProgressionManager.Initialize()
-	PingManager.Initialize()
-	DinosaurManager.Initialize()
-	BossEventManager.Initialize()
-	VehicleManager.Initialize()
-	EnvironmentalEventManager.Initialize()
-	LootManager.Initialize()
-	CombatManager.Initialize()
-	HealingManager.Initialize()
-	BattlePassManager.Initialize()
-	ShopManager.Initialize()
-	TutorialManager.Initialize()
-	PartyManager.Initialize()
-	RankedManager.Initialize()
-	AccessibilityManager.Initialize()
-
-	-- Set manager references on GameManager
-	GameManager.SetStormManager(StormManager)
-	GameManager.SetDeploymentManager(DeploymentManager)
-	GameManager.SetEliminationManager(EliminationManager)
-
-	-- Set CombatManager reference on StormManager for damage dealing
-	StormManager.SetCombatManager(CombatManager)
-
-	-- Set dependencies on EliminationManager
-	EliminationManager.SetGameManager(GameManager)
-	EliminationManager.SetInventoryManager(InventoryManager)
-	EliminationManager.SetCombatManager(CombatManager)
-
-	-- Initialize StormManager with map parameters
-	local mapCenter = Vector3.new(0, 0, 0)
-	local mapRadius = 2000 -- Match BiomeData.MapSize
-	StormManager.Initialize(mapCenter, mapRadius)
-
-	-- Admin console (debug/testing)
-	AdminConsole.SetGameManager(GameManager)
-	AdminConsole.Initialize()
-
-	-- Connect systems
-	connectSystems()
-
-	print("[Server] Systems initialized")
-end
-
---[[
-	Connect systems together
-]]
-local function connectSystems()
-	-- GameManager controls match flow
-	GameManager.OnStateChanged:Connect(function(newState, oldState)
-		print(`[Server] Game state: {oldState} -> {newState}`)
-
-		if newState == "Loading" then
-			-- Reset all systems for new match
-			MapManager.Reset()
-			StormManager.Reset()
-			DinosaurManager.Reset()
-			VehicleManager.Reset()
-			EliminationManager.Reset()
-			EnvironmentalEventManager.Reset()
-			RevivalManager.Reset()
-			RebootBeaconManager.Reset()
-			PingManager.Reset()
-			LootManager.Reset()
-			CombatManager.Reset()
-			HealingManager.Reset()
-			InventoryManager.Reset()
-			DeploymentManager.Reset()
-
-		elseif newState == "Deploying" then
-			-- Start deployment phase
-			MapManager.StartMatch() -- Initialize POIs and map content
-			-- Note: DeploymentManager.StartDeployment is called by GameManager with flight path
-			-- Dinosaurs spawn during DinosaurManager.Initialize()
-			-- Vehicles spawn during VehicleManager.Initialize() via spawnInitialVehicles()
-			LootManager.SpawnPOILoot() -- Spawn loot at all POIs
-
-		elseif newState == "Playing" then
-			-- Start the storm (phase 1)
-			StormManager.StartPhase(1)
-			-- BossEventManager tracks triggers via CheckEventTriggers
-			MapManager.OnMatchPhaseChanged("Playing")
-
-		elseif newState == "Ending" then
-			-- Match ended
-			-- StormManager doesn't have Stop(), it uses Reset() for cleanup
-
-		elseif newState == "Resetting" then
-			-- Prepare for next match
-			task.delay(10, function()
-				GameManager.SetState("Lobby")
-			end)
-		end
+local function safeRequire(path, name)
+	local success, result = pcall(function()
+		return require(path)
 	end)
-
-	-- Storm manager updates (if StormManager has this signal)
-	if StormManager.OnPhaseChanged then
-		StormManager.OnPhaseChanged:Connect(function(phase, circleData)
-			-- Broadcast to clients using GameState.StormUpdate event
-			Events.FireAllClients("GameState", "StormUpdate", {
-				phase = phase,
-				center = circleData.center,
-				radius = circleData.radius,
-				nextRadius = circleData.nextRadius,
-				timeRemaining = circleData.timeRemaining,
-			})
-
-			-- Check boss spawn triggers
-			if BossEventManager.CheckEventTriggers then
-				BossEventManager.CheckEventTriggers({
-					currentPhase = phase,
-					aliveCount = EliminationManager.GetAliveCount(),
-				})
-			end
-		end)
+	if success then
+		print(`[Server] Loaded: {name}`)
+		return result
+	else
+		warn(`[Server] FAILED to load {name}: {result}`)
+		return nil
 	end
+end
 
-	-- Elimination tracking (if EliminationManager has this signal)
-	if EliminationManager.OnPlayerEliminated then
-		EliminationManager.OnPlayerEliminated:Connect(function(victim, killer, source)
-			-- Update game manager
-			GameManager.RemoveAlivePlayer(victim)
+local Core = script.Parent:FindFirstChild("Core")
+local Player = script.Parent:FindFirstChild("Player")
+local Weapons = script.Parent:FindFirstChild("Weapons")
+local AI = script.Parent:FindFirstChild("AI")
+local Vehicles = script.Parent:FindFirstChild("Vehicles")
+local EventsFolder = script.Parent:FindFirstChild("Events")
+local Map = script.Parent:FindFirstChild("Map")
+local Loot = script.Parent:FindFirstChild("Loot")
+local Combat = script.Parent:FindFirstChild("Combat")
 
-			-- Broadcast using Combat.PlayerEliminated event
-			Events.FireAllClients("Combat", "PlayerEliminated", {
-				victimId = victim.UserId,
-				killerId = killer and killer.UserId or nil,
-				weapon = source,
-				placement = GameManager.GetAlivePlayerCount() + 1,
-			})
+if Core then
+	GameManager = safeRequire(Core:FindFirstChild("GameManager"), "GameManager")
+	StormManager = safeRequire(Core:FindFirstChild("StormManager"), "StormManager")
+	DeploymentManager = safeRequire(Core:FindFirstChild("DeploymentManager"), "DeploymentManager")
+	AdminConsole = safeRequire(Core:FindFirstChild("AdminConsole"), "AdminConsole")
+end
+
+if Map then
+	MapManager = safeRequire(Map:FindFirstChild("MapManager"), "MapManager")
+	EnvironmentalEventManager = safeRequire(Map:FindFirstChild("EnvironmentalEventManager"), "EnvironmentalEventManager")
+end
+
+if Weapons then
+	WeaponManager = safeRequire(Weapons:FindFirstChild("WeaponManager"), "WeaponManager")
+end
+
+if Player then
+	InventoryManager = safeRequire(Player:FindFirstChild("InventoryManager"), "InventoryManager")
+	EliminationManager = safeRequire(Player:FindFirstChild("EliminationManager"), "EliminationManager")
+	RevivalManager = safeRequire(Player:FindFirstChild("RevivalManager"), "RevivalManager")
+	RebootBeaconManager = safeRequire(Player:FindFirstChild("RebootBeaconManager"), "RebootBeaconManager")
+	ProgressionManager = safeRequire(Player:FindFirstChild("ProgressionManager"), "ProgressionManager")
+	PingManager = safeRequire(Player:FindFirstChild("PingManager"), "PingManager")
+	BattlePassManager = safeRequire(Player:FindFirstChild("BattlePassManager"), "BattlePassManager")
+	ShopManager = safeRequire(Player:FindFirstChild("ShopManager"), "ShopManager")
+	TutorialManager = safeRequire(Player:FindFirstChild("TutorialManager"), "TutorialManager")
+	PartyManager = safeRequire(Player:FindFirstChild("PartyManager"), "PartyManager")
+	RankedManager = safeRequire(Player:FindFirstChild("RankedManager"), "RankedManager")
+	AccessibilityManager = safeRequire(Player:FindFirstChild("AccessibilityManager"), "AccessibilityManager")
+end
+
+if AI then
+	DinosaurManager = safeRequire(AI:FindFirstChild("DinosaurManager"), "DinosaurManager")
+end
+
+if EventsFolder then
+	BossEventManager = safeRequire(EventsFolder:FindFirstChild("BossEventManager"), "BossEventManager")
+end
+
+if Vehicles then
+	VehicleManager = safeRequire(Vehicles:FindFirstChild("VehicleManager"), "VehicleManager")
+end
+
+if Loot then
+	LootManager = safeRequire(Loot:FindFirstChild("LootManager"), "LootManager")
+end
+
+if Combat then
+	CombatManager = safeRequire(Combat:FindFirstChild("CombatManager"), "CombatManager")
+	HealingManager = safeRequire(Combat:FindFirstChild("HealingManager"), "HealingManager")
+end
+
+print("[Server] Module loading complete")
+
+-- STEP 10: Initialize systems safely
+print("[Server] Initializing systems...")
+
+local function safeInit(manager, name)
+	if manager and manager.Initialize then
+		local success, err = pcall(function()
+			manager.Initialize()
 		end)
+		if success then
+			print(`[Server] Initialized: {name}`)
+		else
+			warn(`[Server] FAILED to initialize {name}: {err}`)
+		end
 	end
+end
 
-	-- Player count tracking
-	Players.PlayerRemoving:Connect(function(player)
-		if EliminationManager.IsPlayerAlive and EliminationManager.IsPlayerAlive(player) then
-			if EliminationManager.HandleDisconnect then
-				EliminationManager.HandleDisconnect(player)
-			end
-		end
-	end)
+safeInit(GameManager, "GameManager")
+-- Initialize MapManager to generate terrain with biomes (Jungle, Desert, Mountains)
+-- This will replace the temporary spawn platform with proper biome-based spawning
+safeInit(MapManager, "MapManager")
+safeInit(WeaponManager, "WeaponManager")
+safeInit(InventoryManager, "InventoryManager")
+safeInit(EliminationManager, "EliminationManager")
+safeInit(RevivalManager, "RevivalManager")
+safeInit(RebootBeaconManager, "RebootBeaconManager")
+safeInit(ProgressionManager, "ProgressionManager")
+safeInit(PingManager, "PingManager")
+safeInit(DinosaurManager, "DinosaurManager")
+safeInit(BossEventManager, "BossEventManager")
+safeInit(VehicleManager, "VehicleManager")
+safeInit(EnvironmentalEventManager, "EnvironmentalEventManager")
+safeInit(LootManager, "LootManager")
+safeInit(CombatManager, "CombatManager")
+safeInit(HealingManager, "HealingManager")
+safeInit(BattlePassManager, "BattlePassManager")
+safeInit(ShopManager, "ShopManager")
+safeInit(TutorialManager, "TutorialManager")
+safeInit(PartyManager, "PartyManager")
+safeInit(RankedManager, "RankedManager")
+safeInit(AccessibilityManager, "AccessibilityManager")
 
-	-- Deployment events (jump and glider input)
-	Events.OnServerEvent("GameState", "PlayerJumped", function(player, _data)
-		-- Let GameManager handle jump tracking and forward to DeploymentManager
-		GameManager.OnPlayerJump(player)
-	end)
+-- Set up manager references
+if GameManager and StormManager then
+	pcall(function() GameManager.SetStormManager(StormManager) end)
+end
+if GameManager and DeploymentManager then
+	pcall(function() GameManager.SetDeploymentManager(DeploymentManager) end)
+end
+if GameManager and EliminationManager then
+	pcall(function() GameManager.SetEliminationManager(EliminationManager) end)
+end
+if StormManager and CombatManager then
+	pcall(function() StormManager.SetCombatManager(CombatManager) end)
+end
+if EliminationManager then
+	if GameManager then pcall(function() EliminationManager.SetGameManager(GameManager) end) end
+	if InventoryManager then pcall(function() EliminationManager.SetInventoryManager(InventoryManager) end) end
+	if CombatManager then pcall(function() EliminationManager.SetCombatManager(CombatManager) end) end
+end
 
-	Events.OnServerEvent("GameState", "GliderInput", function(player, data)
-		if DeploymentManager and DeploymentManager.IsActive() and DeploymentManager.IsPlayerGliding(player) then
-			DeploymentManager.ValidateGliderInput(player, data)
-		end
+-- Initialize StormManager with map parameters
+if StormManager and StormManager.Initialize then
+	pcall(function()
+		StormManager.Initialize(Vector3.new(0, 0, 0), 2000)
 	end)
 end
 
---[[
-	Setup player handling
-]]
-local function setupPlayerHandling()
-	-- Handle new players
-	Players.PlayerAdded:Connect(function(player)
-		print(`[Server] Player joined: {player.Name}`)
+-- Admin console
+if AdminConsole then
+	if GameManager then pcall(function() AdminConsole.SetGameManager(GameManager) end) end
+	safeInit(AdminConsole, "AdminConsole")
+end
 
-		-- Initialize player systems
-		InventoryManager.InitializePlayer(player)
-		WeaponManager.InitializePlayer(player)
+print("[Server] System initialization complete")
 
-		-- If match in progress, spectate
-		local currentState = GameManager.GetState()
-		if currentState == "Playing" then
-			-- Late joiner becomes spectator
-			Events.FireClient("GameState", "MatchStateChanged", player, {
-				newState = "Spectating",
-				isLateJoin = true,
-			})
-		elseif currentState == "Lobby" then
-			-- Add to lobby
-			Events.FireClient("GameState", "MatchStateChanged", player, {
-				newState = "Lobby",
-				playerCount = GameManager.GetAlivePlayerCount(),
-			})
-		end
-	end)
+-- STEP 11: Mark system as ready and spawn queued players
+systemReady = true
+print("[Server] System ready - spawning queued players...")
 
-	-- Handle players leaving
-	Players.PlayerRemoving:Connect(function(player)
-		print(`[Server] Player left: {player.Name}`)
-
-		-- Cleanup player
-		InventoryManager.CleanupPlayer(player)
-		WeaponManager.CleanupPlayer(player)
-		RevivalManager.CleanupPlayer(player)
-		RebootBeaconManager.CleanupPlayer(player)
-		PingManager.CleanupPlayer(player)
-		CombatManager.CleanupPlayer(player)
-		HealingManager.CleanupPlayer(player)
-		BattlePassManager.CleanupPlayer(player)
-		ShopManager.CleanupPlayer(player)
-		TutorialManager.CleanupPlayer(player)
-		PartyManager.CleanupPlayer(player)
-		RankedManager.CleanupPlayer(player)
-		AccessibilityManager.CleanupPlayer(player)
-
-		-- Handle vehicle exit
-		local vehicle = VehicleManager.GetPlayerVehicle(player)
-		if vehicle then
-			vehicle:Exit(player)
-		end
-	end)
-
-	-- Handle existing players
-	for _, player in ipairs(Players:GetPlayers()) do
+for _, player in ipairs(playersToSpawn) do
+	if player and player.Parent then  -- Make sure player is still connected
+		print(`[Server] Spawning queued player: {player.Name}`)
 		task.spawn(function()
-			InventoryManager.InitializePlayer(player)
-			WeaponManager.InitializePlayer(player)
+			-- Initialize player systems
+			if InventoryManager and InventoryManager.InitializePlayer then
+				pcall(function() InventoryManager.InitializePlayer(player) end)
+			end
+			if WeaponManager and WeaponManager.InitializePlayer then
+				pcall(function() WeaponManager.InitializePlayer(player) end)
+			end
+
+			-- Small delay then spawn
+			task.wait(0.5)
+			player:LoadCharacter()
+			print(`[Server] {player.Name} spawned!`)
 		end)
 	end
 end
 
---[[
-	Main initialization
-]]
-local function main()
-	print("==========================================")
-	print("  DINO ROYALE - Server Starting")
-	print("==========================================")
+playersToSpawn = {}
 
-	loadModules()
-	initializeSystems()
-	setupPlayerHandling()
-
-	isInitialized = true
-
-	print("[Server] Ready!")
-	print("==========================================")
-
-	-- Start in lobby state
-	GameManager.SetState("Lobby")
+-- STEP 12: Set initial game state
+if GameManager and GameManager.SetState then
+	pcall(function()
+		GameManager.SetState("Lobby")
+		print("[Server] Game state set to Lobby")
+	end)
 end
 
--- Run
-main()
+print("===========================================")
+print("  DINO ROYALE SERVER - READY!")
+print("  Terrain: Jungle, Desert, Mountains biomes")
+print("  Spawn: Jungle biome area (200, Y, 200)")
+print("===========================================")
+
+-- STEP 13: Handle respawning on death
+Players.PlayerAdded:Connect(function(player)
+	player.CharacterAdded:Connect(function(character)
+		local humanoid = character:WaitForChild("Humanoid")
+		humanoid.Died:Connect(function()
+			print(`[Server] {player.Name} died, respawning in 3 seconds...`)
+			task.wait(3)
+			if player and player.Parent then
+				player:LoadCharacter()
+			end
+		end)
+	end)
+end)

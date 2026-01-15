@@ -226,62 +226,55 @@ end
 
 --[[
 	LOBBY STATE
-	Waiting for players, countdown when enough players
+	Waiting for players - in debug mode, skip straight to Playing
 ]]
 stateHandlers.Lobby = {
 	OnEnter = function(_data)
 		-- Reset player tracking
 		alivePlayers = {}
 		totalPlayersInMatch = 0
-		stateData.countdown = nil
-		stateData.countdownStarted = false
 
-		print("[GameManager] Entered Lobby state, waiting for players...")
+		print("[GameManager] Entered Lobby state")
+
+		-- Debug: Skip straight to Playing state after short delay
+		if GameConfig.Debug.Enabled and GameConfig.Debug.SoloTestMode then
+			print("[GameManager] Debug mode - skipping to Playing state in 2 seconds...")
+			task.delay(2, function()
+				if currentState == "Lobby" then
+					-- Register players and go to Playing
+					for _, player in ipairs(Players:GetPlayers()) do
+						GameManager.RegisterAlivePlayer(player)
+					end
+					totalPlayersInMatch = #Players:GetPlayers()
+					GameManager.TransitionTo("Playing", { quickDeploy = true })
+				end
+			end)
+		end
 	end,
 
 	OnUpdate = function(_dt)
-		local playerCount = #Players:GetPlayers()
-		stateData.playerCount = playerCount
-
-		-- Debug: Solo test mode bypasses player requirements
-		local minPlayers = Constants.MATCH.MIN_PLAYERS
-		local lobbyWaitTime = Constants.MATCH.LOBBY_WAIT_TIME
+		-- In debug mode, OnEnter handles the transition
 		if GameConfig.Debug.Enabled and GameConfig.Debug.SoloTestMode then
-			minPlayers = 1
-			if GameConfig.Debug.SkipLobbyCountdown then
-				lobbyWaitTime = 3 -- Quick 3 second countdown in debug mode
-			end
+			return
 		end
 
-		-- Check if we have enough players
+		local playerCount = #Players:GetPlayers()
+		local minPlayers = Constants.MATCH.MIN_PLAYERS
+		local lobbyWaitTime = Constants.MATCH.LOBBY_WAIT_TIME
+
+		-- Normal lobby countdown logic
 		if playerCount >= minPlayers then
-			-- Start countdown if not started
 			if not stateData.countdownStarted then
 				stateData.countdownStarted = true
 				stateData.countdownStart = tick()
 				print(`[GameManager] {playerCount} players, starting {lobbyWaitTime}s countdown`)
 			end
 
-			-- Force start at max players
-			if playerCount >= Constants.MATCH.MAX_PLAYERS then
-				GameManager.TransitionTo("Loading")
-				return
-			end
-
-			-- Check countdown
 			local elapsed = tick() - stateData.countdownStart
 			local remaining = lobbyWaitTime - elapsed
-			stateData.countdown = math.ceil(remaining)
 
 			if remaining <= 0 then
 				GameManager.TransitionTo("Loading")
-			end
-		else
-			-- Cancel countdown if players dropped
-			if stateData.countdownStarted then
-				stateData.countdownStarted = false
-				stateData.countdown = nil
-				print(`[GameManager] Players dropped below {minPlayers}, countdown cancelled`)
 			end
 		end
 	end,
@@ -314,12 +307,22 @@ stateHandlers.Loading = {
 			stormManager.Initialize(mapCenter, mapRadius)
 		end
 
-		-- Short delay then transition to deploying
-		task.delay(3, function()
-			if currentState == "Loading" then
-				GameManager.TransitionTo("Deploying")
-			end
-		end)
+		-- Debug: Quick deploy mode - skip helicopter, drop directly to terrain
+		if GameConfig.Debug.Enabled and GameConfig.Debug.QuickDeploy then
+			task.delay(1, function()
+				if currentState == "Loading" then
+					-- Skip deploying, go straight to playing
+					GameManager.TransitionTo("Playing", { quickDeploy = true })
+				end
+			end)
+		else
+			-- Short delay then transition to deploying
+			task.delay(3, function()
+				if currentState == "Loading" then
+					GameManager.TransitionTo("Deploying")
+				end
+			end)
+		end
 	end,
 
 	OnUpdate = function(_dt)
@@ -409,11 +412,55 @@ stateHandlers.Deploying = {
 	Main gameplay with storm
 ]]
 stateHandlers.Playing = {
-	OnEnter = function(_data)
+	OnEnter = function(data)
 		print("[GameManager] Match started!")
 
 		stateData.matchStartTime = tick()
 		stateData.supplyDropTimer = 120 -- First supply drop after 2 minutes
+
+		-- Quick deploy mode: teleport players directly to terrain
+		if data and data.quickDeploy then
+			print("[GameManager] Quick deploy - teleporting players to terrain...")
+			for _, player in ipairs(Players:GetPlayers()) do
+				task.spawn(function()
+					-- Wait for character to exist
+					local character = player.Character or player.CharacterAdded:Wait()
+					local rootPart = character:WaitForChild("HumanoidRootPart", 5) :: BasePart?
+					if rootPart then
+						-- Spawn at random position on terrain within a specific biome area
+						-- Using jungle biome area for initial spawn (positive X, positive Z quadrant)
+						local angle = math.random() * math.pi / 2 -- 0 to 90 degrees (jungle sector)
+						local distance = math.random(100, 400)
+						local x = math.cos(angle) * distance
+						local z = math.sin(angle) * distance
+
+						-- Find terrain height at this position (use raycast)
+						local rayOrigin = Vector3.new(x, 500, z)
+						local rayDirection = Vector3.new(0, -1000, 0)
+						local rayParams = RaycastParams.new()
+						rayParams.FilterType = Enum.RaycastFilterType.Exclude
+						rayParams.FilterDescendantsInstances = {character}
+
+						local result = workspace:Raycast(rayOrigin, rayDirection, rayParams)
+						local spawnY = 30 -- Default height if raycast fails (reasonable for jungle terrain)
+						if result then
+							spawnY = result.Position.Y + 5 -- 5 studs above ground
+							print(`[GameManager] Raycast found terrain at Y={result.Position.Y}`)
+						else
+							print(`[GameManager] Warning: Raycast didn't hit terrain at ({x}, {z}), using default Y={spawnY}`)
+						end
+
+						local spawnPos = Vector3.new(x, spawnY, z)
+						rootPart.CFrame = CFrame.new(spawnPos)
+						rootPart.AssemblyLinearVelocity = Vector3.zero
+
+						print(`[GameManager] Teleported {player.Name} to {spawnPos} (Jungle biome)`)
+					else
+						warn(`[GameManager] Could not find HumanoidRootPart for {player.Name}`)
+					end
+				end)
+			end
+		end
 
 		-- Start storm if manager available
 		if stormManager then
