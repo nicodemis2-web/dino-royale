@@ -2,19 +2,70 @@
 --[[
 	WeaponBase.lua
 	==============
-	Base class for all weapons using OOP pattern
-	Handles firing, reloading, damage calculation, and serialization
+	Base class for all weapons in Dino Royale using OOP pattern.
+
+	DESIGN PATTERN:
+	Uses metatables to create weapon instances with shared methods.
+	Each weapon instance contains:
+	- Static data (definition, stats) from WeaponData
+	- Dynamic state (ammo, reload status, bloom)
+	- Methods for firing, reloading, damage calculation
+
+	SPREAD SYSTEM:
+	Weapon accuracy uses a bloom system that increases spread:
+	1. Base spread: Defined per weapon in WeaponData
+	2. Bloom: Increases with each shot, decays over time
+	3. Modifiers: Movement, crouching, ADS affect final spread
+	Final spread = baseSpread * (1 + bloom) * modifiers
+
+	DAMAGE CALCULATION:
+	Damage varies by:
+	- Base damage from weapon stats
+	- Rarity multiplier (Common 1.0x to Legendary 1.2x)
+	- Headshot multiplier (2.0x for most weapons)
+	- Distance falloff (optional, per weapon)
+
+	SERIALIZATION:
+	Weapons can be serialized for:
+	- Network transmission (client-server sync)
+	- Inventory storage
+	- Save data persistence
+
+	USAGE:
+	```lua
+	local weapon = WeaponBase.new("RangerAR", "Rare")
+	if weapon:CanFire() then
+		local result = weapon:Fire(origin, direction)
+	end
+	weapon:Reload()
+	```
+
+	@shared (used by both client and server)
 ]]
 
 local Types = require(script.Parent.Parent.Types)
 local Constants = require(script.Parent.Parent.Constants)
 local WeaponData = require(script.Parent.Parent.Config.WeaponData)
 
+--------------------------------------------------------------------------------
+-- MODULE DECLARATION
+--------------------------------------------------------------------------------
+
 local WeaponBase = {}
 WeaponBase.__index = WeaponBase
 
+--------------------------------------------------------------------------------
+-- EXPORTED TYPES
+--------------------------------------------------------------------------------
+
 --[[
-	Types
+	FireResult: Returned by Fire() method
+	- success: Whether the weapon successfully fired
+	- origin: World position the shot originated from
+	- direction: Direction vector of the shot (with spread applied)
+	- spread: The actual spread vector applied
+	- damage: Base damage of this shot
+	- reason: If failed, why (e.g., "No ammo", "Reloading")
 ]]
 export type FireResult = {
 	success: boolean,
@@ -25,6 +76,10 @@ export type FireResult = {
 	reason: string?,
 }
 
+--[[
+	SerializedWeapon: Minimal weapon data for network/storage
+	Contains only the data needed to reconstruct weapon state
+]]
 export type SerializedWeapon = {
 	id: string,
 	rarity: Types.Rarity,
@@ -32,15 +87,24 @@ export type SerializedWeapon = {
 	reserveAmmo: number,
 }
 
+--[[
+	WeaponInstance: Full weapon object with methods
+	This is the main type used throughout the codebase
+]]
 export type WeaponInstance = {
-	id: string,
-	rarity: Types.Rarity,
-	stats: Types.WeaponStats,
-	definition: WeaponData.WeaponDefinition,
-	state: Types.WeaponState,
-	owner: Player?,
+	-- Identity
+	id: string,                              -- Weapon ID (e.g., "RangerAR")
+	rarity: Types.Rarity,                    -- Rarity tier affects damage
 
-	-- Methods
+	-- Configuration (read-only after creation)
+	stats: Types.WeaponStats,                -- Calculated stats with rarity
+	definition: WeaponData.WeaponDefinition, -- Base weapon definition
+	owner: Player?,                          -- Owning player (server-side)
+
+	-- Dynamic state
+	state: Types.WeaponState,                -- Ammo, reload status, etc.
+
+	-- Public methods
 	CanFire: (self: WeaponInstance) -> boolean,
 	Fire: (self: WeaponInstance, origin: Vector3, direction: Vector3) -> FireResult,
 	Reload: (self: WeaponInstance) -> boolean,
@@ -49,23 +113,33 @@ export type WeaponInstance = {
 	AddAmmo: (self: WeaponInstance, amount: number) -> number,
 	Serialize: (self: WeaponInstance) -> SerializedWeapon,
 
-	-- Internal
-	_spreadBloom: number,
-	_lastBloomDecayTime: number,
+	-- Internal state (prefix with _ to indicate private)
+	_spreadBloom: number,        -- Current bloom accumulation (0 to MAX_BLOOM)
+	_lastBloomDecayTime: number, -- Last time bloom was updated
 }
 
--- Spread modifiers
+--------------------------------------------------------------------------------
+-- SPREAD & BLOOM CONFIGURATION
+--------------------------------------------------------------------------------
+
+--[[
+	Spread modifiers applied based on player state.
+	Multiplied together: moving while ADS = 1.5 * 0.6 = 0.9x spread
+]]
 local SPREAD_MODIFIERS = {
-	Moving = 1.5, -- +50% when moving
-	Crouching = 0.75, -- -25% when crouching
-	Prone = 0.5, -- -50% when prone
-	ADS = 0.6, -- -40% when aiming down sights
+	Moving = 1.5,    -- +50% spread when moving (walking/running)
+	Crouching = 0.75, -- -25% spread when crouching (more stable)
+	Prone = 0.5,     -- -50% spread when prone (most stable)
+	ADS = 0.6,       -- -40% spread when aiming down sights
 }
 
--- Bloom configuration
-local BLOOM_PER_SHOT = 0.1 -- +10% spread per shot
-local BLOOM_DECAY_RATE = 0.5 -- Decay per second
-local MAX_BLOOM = 1.0 -- Maximum bloom multiplier
+--[[
+	Bloom system: Accuracy decreases with rapid fire, recovers when not firing.
+	This rewards controlled bursts over spraying.
+]]
+local BLOOM_PER_SHOT = 0.1   -- +10% spread added per shot fired
+local BLOOM_DECAY_RATE = 0.5 -- Bloom decreases by 50% per second when not firing
+local MAX_BLOOM = 1.0        -- Maximum bloom (caps at +100% spread)
 
 --[[
 	Create a new weapon instance

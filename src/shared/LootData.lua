@@ -2,14 +2,67 @@
 --[[
 	LootData.lua
 	============
-	Loot tables and drop rates for Dino Royale
-	Based on GDD Section 6: Items & Loot
+	Loot tables and drop rates for Dino Royale.
+	Based on Game Design Document Section 6: Items & Loot
+
+	LOOT SYSTEM OVERVIEW:
+	The loot system uses weighted random selection:
+	1. Each item has a "weight" value (higher = more common)
+	2. Rarity also has weights that modify selection
+	3. Chest tier provides bonus to rarity rolls
+
+	RARITY DISTRIBUTION:
+	Base weights (before chest tier bonus):
+	- Common: 100 (56% chance)
+	- Uncommon: 50 (28% chance)
+	- Rare: 20 (11% chance)
+	- Epic: 5 (3% chance)
+	- Legendary: 1 (0.5% chance)
+
+	CHEST TIERS:
+	- Low: Floor loot, basic supplies (1-2 items)
+	- Medium: Standard chests (2-4 items, guaranteed weapon)
+	- High: POI chests (3-5 items, guaranteed weapon + healing)
+	- VeryHigh: Hot drop chests (4-6 items, +2 rarity bonus)
+	- Legendary: Supply drops (5-8 items, +5 rarity bonus)
+
+	DROP AMOUNTS:
+	Stackable items drop in quantities based on tier:
+	- Ammo: 30 rounds per cache (standardized)
+	- Healing: 1-2 items per drop
+	- Materials: 10-150 based on tier
+
+	USAGE:
+	```lua
+	local LootData = require(path.to.LootData)
+	local items = LootData.GetItemsByCategory("Weapon")
+	local amount = LootData.GetDropAmount(item, "High")
+	```
+
+	@shared
 ]]
 
+--------------------------------------------------------------------------------
+-- TYPE DEFINITIONS
+--------------------------------------------------------------------------------
+
+--[[
+	Rarity: Item quality tier affecting stats and visual appearance
+	Colors defined in RarityColors table for UI consistency
+]]
 export type Rarity = "Common" | "Uncommon" | "Rare" | "Epic" | "Legendary"
 
+--[[
+	LootCategory: Item classification for filtering and guaranteed drops
+]]
 export type LootCategory = "Weapon" | "Ammo" | "Equipment" | "Healing" | "Armor" | "Material"
 
+--[[
+	LootItem: Definition of a lootable item
+	- weight: Relative spawn chance (100 = common, 1 = extremely rare)
+	- stackable: Whether multiple can occupy one inventory slot
+	- maxStack: Maximum count per stack
+]]
 export type LootItem = {
 	id: string,
 	name: string,
@@ -21,8 +74,16 @@ export type LootItem = {
 	weight: number, -- Higher = more common in loot pools
 }
 
+--[[
+	LootTier: Chest quality level affecting contents
+]]
 export type LootTier = "Low" | "Medium" | "High" | "VeryHigh" | "Legendary"
 
+--[[
+	ChestConfig: Configuration for a chest spawn
+	- guaranteedCategories: These categories will always have at least one drop
+	- rarityBonus: Added to rarity roll (higher = better items)
+]]
 export type ChestConfig = {
 	tier: LootTier,
 	minItems: number,
@@ -30,6 +91,10 @@ export type ChestConfig = {
 	guaranteedCategories: { LootCategory }?,
 	rarityBonus: number, -- Increases chance of higher rarity
 }
+
+--------------------------------------------------------------------------------
+-- MODULE DECLARATION
+--------------------------------------------------------------------------------
 
 local LootData = {}
 

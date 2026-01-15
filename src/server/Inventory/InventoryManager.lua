@@ -2,65 +2,144 @@
 --[[
 	InventoryManager.lua
 	====================
-	Server-authoritative inventory management
-	Handles weapons, equipment, consumables, and ammo
+	Server-authoritative inventory management for Dino Royale.
+
+	RESPONSIBILITIES:
+	- Manages player inventories (weapons, consumables, equipment, ammo)
+	- Handles world item spawning, pickup, and despawning
+	- Validates all inventory operations server-side
+	- Synchronizes inventory state to clients
+
+	INVENTORY STRUCTURE:
+	Each player has:
+	- 5 weapon slots (switchable with number keys 1-5)
+	- 2 equipment slots (tactical and utility)
+	- Consumables (stackable items like medkits)
+	- Ammo pools (shared across weapons of same type)
+
+	WORLD ITEMS:
+	Items dropped in the world are tracked with:
+	- Unique ID for network reference
+	- Visual model with ProximityPrompt for pickup
+	- Billboard UI showing item name/rarity
+	- Highlight effect based on rarity color
+
+	AMMO LIMITS (balanced for gameplay):
+	- Light/Medium ammo: 300 max (encourages ammo management)
+	- Heavy/Shells: 60 max (limits sniper/shotgun spam)
+	- Special: 30 max (rare weapon ammunition)
+
+	SECURITY:
+	All inventory modifications happen server-side. Clients can only:
+	- Request item pickup (validated by proximity)
+	- Request item use (validated by possession)
+	- Request item drop (always allowed for owned items)
+
+	USAGE:
+	```lua
+	local InventoryManager = require(path.to.InventoryManager)
+	InventoryManager.Initialize()
+	InventoryManager.InitializePlayer(player)
+	InventoryManager.AddItem(player, { itemType = "Weapon", itemId = "RangerAR" })
+	```
+
+	@server
+	@singleton
 ]]
 
 local Players = game:GetService("Players")
+
+--------------------------------------------------------------------------------
+-- MODULE DEPENDENCIES
+--------------------------------------------------------------------------------
 
 local Events = require(game.ReplicatedStorage.Shared.Events)
 local WeaponBase = require(game.ReplicatedStorage.Shared.Weapons.WeaponBase)
 local WeaponData = require(game.ReplicatedStorage.Shared.Config.WeaponData)
 local ItemData = require(game.ReplicatedStorage.Shared.Config.ItemData)
 
--- Type imports
+--------------------------------------------------------------------------------
+-- TYPE DEFINITIONS
+--------------------------------------------------------------------------------
+
+-- Import weapon instance type for inventory storage
 type WeaponInstance = WeaponBase.WeaponInstance
 
 local InventoryManager = {}
 
+--------------------------------------------------------------------------------
+-- EXPORTED TYPES
+--------------------------------------------------------------------------------
+
 --[[
-	Types
+	EquipmentSlots: Player's equipment loadout
+	- tactical: Grenades, flashbangs, etc. (thrown items)
+	- utility: Grapple hook, motion sensor, etc. (gadgets)
 ]]
 export type EquipmentSlots = {
 	tactical: string?,
 	utility: string?,
 }
 
+--[[
+	Inventory: Complete player inventory state
+	Synchronized to client on any change via InventoryUpdate event
+]]
 export type Inventory = {
-	weapons: { [number]: WeaponInstance? }, -- 5 weapon slots
-	equipment: EquipmentSlots,
-	consumables: { [string]: number }, -- itemId -> count
-	ammo: { [string]: number }, -- ammoType -> count
-	currentWeaponSlot: number,
+	weapons: { [number]: WeaponInstance? }, -- Slots 1-5 for weapons
+	equipment: EquipmentSlots,               -- Tactical and utility items
+	consumables: { [string]: number },       -- itemId -> stack count
+	ammo: { [string]: number },              -- ammoType -> total rounds
+	currentWeaponSlot: number,               -- Currently selected slot (1-5)
 }
 
+--[[
+	WorldItem: Item dropped in the game world
+	Represents physical items that can be picked up
+]]
 export type WorldItem = {
-	id: string,
-	itemType: string, -- "Weapon", "Consumable", "Ammo", "Equipment"
-	itemId: string,
-	rarity: string?,
-	count: number,
-	position: Vector3,
-	model: Model?,
+	id: string,          -- Unique identifier (e.g., "WorldItem_123")
+	itemType: string,    -- Category: "Weapon", "Consumable", "Ammo", "Equipment"
+	itemId: string,      -- Specific item ID (e.g., "RangerAR", "MedKit")
+	rarity: string?,     -- For weapons: "Common" to "Legendary"
+	count: number,       -- Stack count (1 for weapons, varies for ammo)
+	position: Vector3,   -- World position
+	model: Model?,       -- Visual representation in workspace
 }
 
--- Player inventories stored by UserId
+--------------------------------------------------------------------------------
+-- STATE VARIABLES
+--------------------------------------------------------------------------------
+
+-- Maps UserId -> Inventory for all connected players
 local playerInventories = {} :: { [number]: Inventory }
 
--- Per-player connections for cleanup
+-- Maps UserId -> connection for cleanup on player leave
 local playerConnections = {} :: { [number]: RBXScriptConnection }
 
--- World items stored by unique ID
+-- Maps WorldItem ID -> WorldItem for all items in the world
 local worldItems = {} :: { [string]: WorldItem }
+
+-- Counter for generating unique WorldItem IDs
 local worldItemCounter = 0
 
--- Max ammo capacities (300 max for light/medium ammo)
+--------------------------------------------------------------------------------
+-- CONSTANTS
+--------------------------------------------------------------------------------
+
+--[[
+	Maximum ammo capacity per type.
+	Balanced to encourage:
+	- Looting (can't carry infinite ammo)
+	- Weapon variety (different ammo pools)
+	- Strategic decisions (save ammo or spray)
+]]
 local MAX_AMMO = {
-	LightAmmo = 300,
-	MediumAmmo = 300,
-	HeavyAmmo = 60,
-	Shells = 60,
-	SpecialAmmo = 30,
+	LightAmmo = 300,    -- SMGs, Pistols - high capacity, common
+	MediumAmmo = 300,   -- ARs, DMRs - high capacity, common
+	HeavyAmmo = 60,     -- Snipers - limited for balance
+	Shells = 60,        -- Shotguns - limited for balance
+	SpecialAmmo = 30,   -- Tranq, Flamethrower - very limited
 }
 
 --[[

@@ -2,8 +2,49 @@
 --[[
 	WeaponController.lua
 	====================
-	Client-side weapon input and visual feedback
-	Handles firing, reloading, ADS, and weapon switching
+	Client-side weapon input and visual feedback for Dino Royale.
+
+	RESPONSIBILITIES:
+	- Handles player input for firing, reloading, ADS, weapon switching
+	- Manages client-side weapon state prediction
+	- Applies visual feedback (recoil, screen shake, FOV changes)
+	- Communicates with server for authoritative validation
+
+	INPUT HANDLING:
+	- Mouse1 / RT: Fire weapon (hold for automatic)
+	- Mouse2 / LT: Aim down sights (ADS)
+	- R / X: Reload weapon
+	- 1-5: Switch weapon slots
+	- Scroll wheel: Cycle weapons
+
+	ADS (AIM DOWN SIGHTS) SYSTEM:
+	When aiming, several effects are applied:
+	- FOV reduction (zoom effect based on weapon scope)
+	- Camera offset toward weapon sights
+	- Reduced mouse sensitivity for precision
+	- Reduced recoil (more stable aim)
+
+	RECOIL SYSTEM:
+	Weapons apply recoil when fired:
+	- Vertical kick (camera moves up)
+	- Horizontal variation (slight random horizontal movement)
+	- Screen shake for impact feel
+	- All effects recover over time when not firing
+
+	CLIENT PREDICTION:
+	Fire requests are sent to server but visual feedback is immediate.
+	Server validates and may reject invalid fire attempts.
+
+	USAGE:
+	```lua
+	local WeaponController = require(path.to.WeaponController)
+	WeaponController.Initialize()
+	WeaponController.SetFireCallback(function(weapon, origin, direction)
+		-- Play muzzle flash, etc.
+	end)
+	```
+
+	@client
 ]]
 
 local Players = game:GetService("Players")
@@ -11,50 +52,110 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local ContextActionService = game:GetService("ContextActionService")
 
+--------------------------------------------------------------------------------
+-- MODULE DEPENDENCIES
+--------------------------------------------------------------------------------
+
 local Events = require(game.ReplicatedStorage.Shared.Events)
 local WeaponBase = require(game.ReplicatedStorage.Shared.Weapons.WeaponBase)
 
--- Type imports
+--------------------------------------------------------------------------------
+-- TYPE DEFINITIONS
+--------------------------------------------------------------------------------
+
 type WeaponInstance = WeaponBase.WeaponInstance
 
 local WeaponController = {}
 
--- Local player reference
+--------------------------------------------------------------------------------
+-- STATE VARIABLES
+--------------------------------------------------------------------------------
+
+-- Reference to local player (cached for performance)
 local localPlayer = Players.LocalPlayer
 
--- State
+-- Currently equipped weapon instance (nil if no weapon)
 local currentWeapon: WeaponInstance? = nil
-local weaponSlots = {} :: { [number]: WeaponInstance? } -- 1-5 weapon slots
+
+-- Weapon inventory: slots 1-5 for different weapons
+local weaponSlots = {} :: { [number]: WeaponInstance? }
+
+-- Currently selected weapon slot (1-5)
 local currentSlot = 1
+
+-- ADS state: true when right mouse / LT is held
 local isADS = false
+
+-- Firing state: true when fire button is held (for automatic weapons)
 local isFiring = false
+
+-- Controller enabled state (disabled during menus, death, etc.)
 local isEnabled = true
 
--- Connections
+-- Active event connections (cleaned up on destroy)
 local connections = {} :: { RBXScriptConnection }
 
--- Callbacks for effects
-local onFireCallback: ((WeaponInstance, Vector3, Vector3) -> ())?
-local onReloadCallback: ((WeaponInstance) -> ())?
-local onHitCallback: ((boolean, number) -> ())? -- isHeadshot, damage
+--------------------------------------------------------------------------------
+-- CALLBACK HOOKS
+--------------------------------------------------------------------------------
 
--- Camera settings
+-- Called when weapon fires successfully (for visual effects)
+local onFireCallback: ((WeaponInstance, Vector3, Vector3) -> ())?
+
+-- Called when reload starts (for reload animations/sounds)
+local onReloadCallback: ((WeaponInstance) -> ())?
+
+-- Called when hit is confirmed by server (for hit markers)
+local onHitCallback: ((boolean, number) -> ())? -- (isHeadshot, damage)
+
+--------------------------------------------------------------------------------
+-- CAMERA CONFIGURATION
+--------------------------------------------------------------------------------
+
+-- Base field of view (degrees)
 local DEFAULT_FOV = 70
+
+-- FOV multiplier when ADS (lower = more zoom)
 local ADS_FOV_MULTIPLIER = 0.7
+
+-- Speed of FOV transition (higher = faster)
 local FOV_LERP_SPEED = 15
 
--- Enhanced ADS settings
-local ADS_OFFSET = Vector3.new(0.4, -0.1, -0.3) -- Right, down, forward offset to sights
+--------------------------------------------------------------------------------
+-- ENHANCED ADS CONFIGURATION
+--------------------------------------------------------------------------------
+
+-- Camera offset when aiming (brings view to weapon sights)
+-- X: Right offset, Y: Down offset, Z: Forward offset
+local ADS_OFFSET = Vector3.new(0.4, -0.1, -0.3)
+
+-- Speed of camera offset transition
 local ADS_OFFSET_LERP_SPEED = 12
+
+-- Mouse sensitivity reduction when ADS (0.6 = 40% slower)
 local ADS_SENSITIVITY_MULTIPLIER = 0.6
 
--- Recoil settings
-local recoilOffset = Vector2.new(0, 0) -- Current recoil offset (pitch, yaw)
+--------------------------------------------------------------------------------
+-- RECOIL CONFIGURATION
+--------------------------------------------------------------------------------
+
+-- Current accumulated recoil (pitch, yaw in degrees)
+local recoilOffset = Vector2.new(0, 0)
+
+-- How fast recoil recovers (higher = faster return to center)
 local recoilRecoverySpeed = 8
+
+-- Current interpolated ADS camera offset
 local currentADSOffset = Vector3.new(0, 0, 0)
 
--- Visual feedback
+--------------------------------------------------------------------------------
+-- SCREEN SHAKE
+--------------------------------------------------------------------------------
+
+-- Current screen shake intensity (0 = none, higher = more shake)
 local screenShakeAmount = 0
+
+-- How fast screen shake decays (higher = faster decay)
 local screenShakeDecay = 10
 
 --[[

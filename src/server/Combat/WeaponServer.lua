@@ -2,33 +2,95 @@
 --[[
 	WeaponServer.lua
 	================
-	Server-authoritative weapon handling
-	Validates fire requests, performs raycasts, and applies damage
+	Server-authoritative weapon handling for Dino Royale combat system.
+
+	SECURITY MODEL:
+	All weapon actions are validated server-side. The client sends fire requests
+	with origin/direction, but the server performs authoritative validation:
+	1. Position validation: Is the player where they claim to be?
+	2. Rate limiting: Is the fire rate within weapon limits (+20% tolerance)?
+	3. Ammo tracking: Does the player have ammunition?
+	4. Raycast verification: Server performs the actual hit detection
+
+	ANTI-CHEAT MEASURES:
+	- POSITION_TOLERANCE: Maximum distance between claimed and actual position
+	- FIRE_RATE_TOLERANCE: Accounts for network latency in fire rate checks
+	- MAX_FIRE_QUEUE: Prevents burst exploits from queued requests
+	- All damage is applied server-side, never trusted from client
+
+	HIT DETECTION:
+	Server-side raycasting with RaycastParams:
+	- Ignores firing player's character
+	- Detects both players and dinosaurs
+	- Returns material for impact effects
+	- Calculates headshot multipliers
+
+	USAGE:
+	```lua
+	local WeaponServer = require(path.to.WeaponServer)
+	WeaponServer.Initialize(HealthManager, InventoryManager)
+	```
+
+	@server
+	@singleton
 ]]
 
 local Players = game:GetService("Players")
+
+--------------------------------------------------------------------------------
+-- MODULE DEPENDENCIES
+--------------------------------------------------------------------------------
 
 local Events = require(game.ReplicatedStorage.Shared.Events)
 local Constants = require(game.ReplicatedStorage.Shared.Constants)
 local WeaponData = require(game.ReplicatedStorage.Shared.Config.WeaponData)
 local WeaponBase = require(game.ReplicatedStorage.Shared.Weapons.WeaponBase)
 
--- Type imports
+--------------------------------------------------------------------------------
+-- TYPE DEFINITIONS
+--------------------------------------------------------------------------------
+
+-- Import weapon instance type from WeaponBase
 type WeaponInstance = WeaponBase.WeaponInstance
 
 local WeaponServer = {}
 
---[[
-	Configuration
-]]
-local Config = {
-	POSITION_TOLERANCE = 10, -- Studs tolerance for origin validation
-	FIRE_RATE_TOLERANCE = 1.2, -- 20% tolerance for fire rate
-	MAX_FIRE_QUEUE = 5, -- Maximum queued fire requests
-}
+--------------------------------------------------------------------------------
+-- CONFIGURATION
+--------------------------------------------------------------------------------
 
 --[[
-	Types
+	Anti-cheat and validation configuration.
+	These values balance security with acceptable network latency.
+]]
+local Config = {
+	-- Maximum studs between client-reported origin and server-verified position
+	-- Higher values reduce false positives but allow position spoofing
+	POSITION_TOLERANCE = 10,
+
+	-- Fire rate tolerance multiplier (1.2 = 20% faster than weapon allows)
+	-- Accounts for network jitter and client-server time differences
+	FIRE_RATE_TOLERANCE = 1.2,
+
+	-- Maximum pending fire requests per player
+	-- Prevents burst exploits from rapidly queued requests
+	MAX_FIRE_QUEUE = 5,
+}
+
+--------------------------------------------------------------------------------
+-- EXPORTED TYPES
+--------------------------------------------------------------------------------
+
+--[[
+	HitResult: Result of a server-side raycast for hit detection
+	- hit: Whether the raycast hit anything
+	- target: The Model that was hit (character or dinosaur)
+	- position: World position of the hit
+	- normal: Surface normal at hit point (for impact effects)
+	- material: Material hit (for effect sounds/visuals)
+	- hitPart: Name of the body part hit (e.g., "Head" for headshots)
+	- isPlayer: True if a player character was hit
+	- isDinosaur: True if a dinosaur NPC was hit
 ]]
 export type HitResult = {
 	hit: boolean,
@@ -41,16 +103,24 @@ export type HitResult = {
 	isDinosaur: boolean,
 }
 
--- Player weapon states
+--------------------------------------------------------------------------------
+-- STATE VARIABLES
+--------------------------------------------------------------------------------
+
+-- Maps UserId to their currently equipped weapon instance
+-- Used for server-side ammo tracking and fire rate validation
 local playerWeapons = {} :: { [number]: WeaponInstance? }
 
--- Fire rate tracking for anti-cheat
+-- Maps UserId to array of recent fire timestamps (epoch time)
+-- Used for fire rate anti-cheat validation
 local fireTimestamps = {} :: { [number]: { number } }
 
--- Reference to HealthManager (set during initialization)
+-- Reference to HealthManager module for applying damage
+-- Set during Initialize() to avoid circular dependency
 local HealthManager: any = nil
 
--- Reference to InventoryManager (set during initialization)
+-- Reference to InventoryManager for ammo consumption
+-- Set during Initialize() to avoid circular dependency
 local InventoryManager: any = nil
 
 --[[

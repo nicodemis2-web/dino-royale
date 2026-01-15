@@ -2,27 +2,79 @@
 --[[
 	MapManager.lua
 	==============
-	Central coordinator for all map-related systems
-	Manages biomes, POIs, and environmental events
+	Central coordinator for all map-related systems in Dino Royale.
+
+	RESPONSIBILITIES:
+	- Coordinates BiomeManager, POIManager, and EnvironmentalEventManager
+	- Provides unified API for querying map state at any position
+	- Handles match phase transitions and their effects on the map
+	- Serves map data to clients for minimap and UI display
+
+	ARCHITECTURE:
+	MapManager acts as a facade pattern, delegating to specialized managers:
+	- BiomeManager: Terrain types, danger levels, loot multipliers
+	- POIManager: Points of interest, hot drops, landmarks
+	- EnvironmentalEventManager: Dynamic events (stampedes, migrations)
+
+	USAGE:
+	```lua
+	local MapManager = require(path.to.MapManager)
+	MapManager.Initialize()
+
+	-- Query map state
+	local biome = MapManager.GetBiomeAtPosition(100, 200)
+	local danger = MapManager.GetDangerLevelAtPosition(100, 200)
+	```
+
+	@server
+	@singleton
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+--------------------------------------------------------------------------------
+-- MODULE DEPENDENCIES
+--------------------------------------------------------------------------------
+
+-- Server-side managers (handle specific subsystems)
 local BiomeManager = require(script.Parent.BiomeManager)
 local POIManager = require(script.Parent.POIManager)
 local EnvironmentalEventManager = require(script.Parent.EnvironmentalEventManager)
 
+-- Shared data modules (read-only configuration)
 local BiomeData = require(ReplicatedStorage.Shared.BiomeData)
 local POIData = require(ReplicatedStorage.Shared.POIData)
 local Events = require(ReplicatedStorage.Shared.Events)
 
+--------------------------------------------------------------------------------
+-- MODULE DECLARATION
+--------------------------------------------------------------------------------
+
 local MapManager = {}
 
--- State
+--------------------------------------------------------------------------------
+-- STATE VARIABLES
+--------------------------------------------------------------------------------
+
+-- Initialization flag to prevent double-init
 local isInitialized = false
+
+-- Current match phase affects environmental events and loot spawning
+-- Values: "Lobby", "Deploying", "Playing", "Ending"
 local currentMatchPhase = "Lobby"
 
--- Map info
+--------------------------------------------------------------------------------
+-- CONSTANTS
+--------------------------------------------------------------------------------
+
+--[[
+	MAP_INFO: Static map configuration
+	- name: Display name shown in UI
+	- size: Total map dimensions in studs
+	- center: World coordinates of map center
+	- biomeCount: Number of distinct biome regions
+	- poiCount: Number of POIs (populated during initialization)
+]]
 local MAP_INFO = {
 	name = "Isla Primordial",
 	size = BiomeData.MapSize,
