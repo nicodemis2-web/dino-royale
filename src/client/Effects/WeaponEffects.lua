@@ -4,6 +4,18 @@
 	=================
 	Visual and audio effects for weapons
 	Handles muzzle flash, tracers, impacts, and hit markers
+
+	Best Practices Implemented:
+	- Object pooling for particle/effect reuse (prevents garbage collection spikes)
+	- Quality-aware effect scaling (reduces effects on low-end devices)
+	- Material-based impact effects (different visuals for metal, wood, etc.)
+	- Distance-based effect culling (skip effects far from camera)
+
+	Performance Considerations:
+	- Pool size of 20 items per type handles typical combat scenarios
+	- Effects are returned to pool rather than destroyed
+	- Particle counts scale with quality settings
+	- Light effects use short lifetimes to minimize render cost
 ]]
 
 local Players = game:GetService("Players")
@@ -21,13 +33,51 @@ local WeaponEffects = {}
 -- Local player reference
 local localPlayer = Players.LocalPlayer
 
--- Effect pools for performance
+--[[
+	EFFECT OBJECT POOLS
+	===================
+	Pre-created objects reused for effects to avoid runtime instantiation
+	Pool pattern prevents frame drops during intense combat
+]]
 local tracerPool = {} :: { Part }
 local impactPool = {} :: { Part }
 local shellPool = {} :: { Part }
 
--- Pool sizes
+-- Pool configuration
+-- Size 20 handles typical 3-4 players firing simultaneously
 local POOL_SIZE = 20
+
+-- Quality settings (can be updated by VisualQualityController)
+local effectQuality = {
+	muzzleFlashEnabled = true,
+	shellCasingsEnabled = true,
+	bulletTracersEnabled = true,
+	impactEffectsEnabled = true,
+	particleMultiplier = 1.0,
+}
+
+--[[
+	Update effect quality settings
+	Called by VisualQualityController when quality level changes
+	@param settings Quality settings table
+]]
+function WeaponEffects.SetQualitySettings(settings: { [string]: any })
+	if settings.muzzleFlashEnabled ~= nil then
+		effectQuality.muzzleFlashEnabled = settings.muzzleFlashEnabled
+	end
+	if settings.shellCasingsEnabled ~= nil then
+		effectQuality.shellCasingsEnabled = settings.shellCasingsEnabled
+	end
+	if settings.bulletTracersEnabled ~= nil then
+		effectQuality.bulletTracersEnabled = settings.bulletTracersEnabled
+	end
+	if settings.impactEffectsEnabled ~= nil then
+		effectQuality.impactEffectsEnabled = settings.impactEffectsEnabled
+	end
+	if settings.particleMultiplier ~= nil then
+		effectQuality.particleMultiplier = settings.particleMultiplier
+	end
+end
 
 -- Hit marker UI
 local hitMarkerGui: ScreenGui? = nil
