@@ -226,11 +226,13 @@ local function createDinosaurModel(species: string, position: Vector3): Model
 	body.Name = "HumanoidRootPart"
 	body.Size = Vector3.new(4 * sizeMultiplier, 3 * sizeMultiplier, 8 * sizeMultiplier)
 	body.CFrame = CFrame.new(spawnPosition)
-	body.Anchored = false
+	body.Anchored = true -- Anchor for now to prevent falling
 	body.CanCollide = true
 	body.BrickColor = tierColors[tier] or BrickColor.new("Medium stone grey")
 	body.Material = Enum.Material.SmoothPlastic
 	body.Parent = model
+
+	print(`[DinosaurManager] Created {species} model at {spawnPosition} (tier: {tier})`)
 
 	-- Create head
 	local head = Instance.new("Part")
