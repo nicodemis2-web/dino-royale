@@ -286,51 +286,66 @@ end
 	@return DinosaurInstance or nil
 ]]
 function DinosaurManager.SpawnDinosaur(species: string, position: Vector3): any
-	loadModules()
+	local success, result = pcall(function()
+		loadModules()
 
-	if not DinosaurData.AllDinosaurs[species] then
-		warn(`[DinosaurManager] Unknown species: {species}`)
+		if not DinosaurData.AllDinosaurs[species] then
+			warn(`[DinosaurManager] Unknown species: {species}`)
+			return nil
+		end
+
+		-- Check max count
+		local activeCount = 0
+		for _ in pairs(activeDinosaurs) do
+			activeCount = activeCount + 1
+		end
+
+		if activeCount >= MAX_ACTIVE_DINOSAURS then
+			warn("[DinosaurManager] Max dinosaurs reached")
+			return nil
+		end
+
+		-- Create dinosaur instance
+		print(`[DinosaurManager] Creating {species} instance...`)
+		local dinosaur = DinosaurBase.new(species, position)
+
+		-- Create model
+		print(`[DinosaurManager] Creating model for {species}...`)
+		local model = createDinosaurModel(species, position)
+		dinosaur:SetModel(model)
+
+		-- Create behavior tree (optional - don't fail if it errors)
+		local btSuccess, behaviorTree = pcall(function()
+			return dinosaur:CreateDefaultBehaviorTree()
+		end)
+		if btSuccess and behaviorTree then
+			dinosaur:SetBehaviorTree(behaviorTree)
+		else
+			print(`[DinosaurManager] Behavior tree creation skipped for {species}`)
+		end
+
+		-- Register
+		activeDinosaurs[dinosaur.id] = dinosaur
+		addToSpatialHash(dinosaur)
+
+		-- Broadcast spawn
+		Events.FireAllClients("Dinosaur", "DinosaurSpawned", {
+			dinoId = dinosaur.id,
+			species = species,
+			position = position,
+		})
+
+		print(`[DinosaurManager] Spawned {species} at {position}`)
+
+		return dinosaur
+	end)
+
+	if not success then
+		warn(`[DinosaurManager] Failed to spawn {species}: {result}`)
 		return nil
 	end
 
-	-- Check max count
-	local activeCount = 0
-	for _ in pairs(activeDinosaurs) do
-		activeCount = activeCount + 1
-	end
-
-	if activeCount >= MAX_ACTIVE_DINOSAURS then
-		warn("[DinosaurManager] Max dinosaurs reached")
-		return nil
-	end
-
-	-- Create dinosaur
-	local dinosaur = DinosaurBase.new(species, position)
-
-	-- Create model
-	local model = createDinosaurModel(species, position)
-	dinosaur:SetModel(model)
-
-	-- Create behavior tree
-	local behaviorTree = dinosaur:CreateDefaultBehaviorTree()
-	if behaviorTree then
-		dinosaur:SetBehaviorTree(behaviorTree)
-	end
-
-	-- Register
-	activeDinosaurs[dinosaur.id] = dinosaur
-	addToSpatialHash(dinosaur)
-
-	-- Broadcast spawn
-	Events.FireAllClients("Dinosaur", "DinosaurSpawned", {
-		dinoId = dinosaur.id,
-		species = species,
-		position = position,
-	})
-
-	print(`[DinosaurManager] Spawned {species} at {position}`)
-
-	return dinosaur
+	return result
 end
 
 --[[
@@ -487,29 +502,35 @@ function DinosaurManager.Update(dt: number)
 
 	-- Update active dinosaurs
 	for id, dinosaur in pairs(activeDinosaurs) do
-		if not dinosaur.isAlive then
-			-- Cleanup dead dinosaurs
-			DinosaurManager.DespawnDinosaur(dinosaur)
-			continue
-		end
-
-		local oldPosition = dinosaur.currentPosition
-		local distance = getNearestPlayerDistance(oldPosition)
-
-		-- Sleep distant dinosaurs
-		if distance > SLEEP_RADIUS then
-			sleepDinosaur(dinosaur)
-			continue
-		end
-
-		-- Only update nearby dinosaurs
-		if distance <= UPDATE_RADIUS then
-			dinosaur:Update(dt)
-
-			-- Update spatial hash if moved
-			if (dinosaur.currentPosition - oldPosition).Magnitude > 1 then
-				updateSpatialHash(dinosaur, oldPosition)
+		local success, err = pcall(function()
+			if not dinosaur.isAlive then
+				-- Cleanup dead dinosaurs
+				DinosaurManager.DespawnDinosaur(dinosaur)
+				return
 			end
+
+			local oldPosition = dinosaur.currentPosition
+			local distance = getNearestPlayerDistance(oldPosition)
+
+			-- Sleep distant dinosaurs
+			if distance > SLEEP_RADIUS then
+				sleepDinosaur(dinosaur)
+				return
+			end
+
+			-- Only update nearby dinosaurs
+			if distance <= UPDATE_RADIUS then
+				dinosaur:Update(dt)
+
+				-- Update spatial hash if moved
+				if (dinosaur.currentPosition - oldPosition).Magnitude > 1 then
+					updateSpatialHash(dinosaur, oldPosition)
+				end
+			end
+		end)
+
+		if not success then
+			warn(`[DinosaurManager] Error updating dinosaur {id}: {err}`)
 		end
 	end
 
