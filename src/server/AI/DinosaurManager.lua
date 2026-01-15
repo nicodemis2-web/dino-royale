@@ -184,12 +184,10 @@ end
 	Create a dinosaur model (placeholder - visible colored box)
 ]]
 local function createDinosaurModel(species: string, position: Vector3): Model
-	-- Fixed spawn height above the spawn platform for testing
-	-- The spawn platform is at around Y=56, terrain varies
-	local spawnHeight = 60 -- Fixed height above spawn platform
-	local spawnPosition = Vector3.new(position.X, spawnHeight, position.Z)
+	-- Use provided position directly - caller is responsible for correct Y
+	local spawnPosition = position
 
-	print(`[DinosaurManager] Model spawn position: {spawnPosition}`)
+	print(`[DinosaurManager] Creating model for {species} at {spawnPosition}`)
 
 	-- In production, would clone from ReplicatedStorage
 	local model = Instance.new("Model")
@@ -199,72 +197,66 @@ local function createDinosaurModel(species: string, position: Vector3): Model
 	local speciesData = DinosaurData.AllDinosaurs[species]
 	local tier = speciesData and speciesData.tier or "Common"
 
-	-- Size based on tier
+	-- Size based on tier - make them BIG for visibility
 	local sizeMultiplier = ({
-		Common = 1,
-		Uncommon = 1.5,
-		Rare = 2,
-		Epic = 3,
-		Legendary = 5,
-	})[tier] or 1
+		Common = 2,
+		Uncommon = 2.5,
+		Rare = 3,
+		Epic = 4,
+		Legendary = 6,
+	})[tier] or 2
 
-	-- Color based on tier for visibility
+	-- Color based on tier for visibility - use NEON for maximum visibility
 	local tierColors = {
-		Common = BrickColor.new("Bright green"),
-		Uncommon = BrickColor.new("Bright blue"),
-		Rare = BrickColor.new("Bright violet"),
-		Epic = BrickColor.new("Bright orange"),
-		Legendary = BrickColor.new("Bright red"),
+		Common = BrickColor.new("Lime green"),
+		Uncommon = BrickColor.new("Cyan"),
+		Rare = BrickColor.new("Magenta"),
+		Epic = BrickColor.new("Deep orange"),
+		Legendary = BrickColor.new("Really red"),
 	}
 
-	-- Create body (main part)
+	-- Create body (main part) - LARGE and VISIBLE
 	local body = Instance.new("Part")
 	body.Name = "HumanoidRootPart"
-	body.Size = Vector3.new(4 * sizeMultiplier, 3 * sizeMultiplier, 8 * sizeMultiplier)
+	body.Size = Vector3.new(4 * sizeMultiplier, 4 * sizeMultiplier, 6 * sizeMultiplier)
 	body.CFrame = CFrame.new(spawnPosition)
-	body.Anchored = true -- Anchor for now to prevent falling
+	body.Anchored = true -- Anchored so they don't fall
 	body.CanCollide = true
-	body.BrickColor = tierColors[tier] or BrickColor.new("Medium stone grey")
-	body.Material = Enum.Material.SmoothPlastic
+	body.BrickColor = tierColors[tier] or BrickColor.new("Bright green")
+	body.Material = Enum.Material.Neon -- NEON for maximum visibility!
 	body.Parent = model
 
-	print(`[DinosaurManager] Created {species} model at {spawnPosition} (tier: {tier})`)
-
-	-- Create head
+	-- Create head - also anchored
 	local head = Instance.new("Part")
 	head.Name = "Head"
-	head.Size = Vector3.new(2 * sizeMultiplier, 2 * sizeMultiplier, 3 * sizeMultiplier)
-	head.CFrame = CFrame.new(spawnPosition + Vector3.new(0, 1 * sizeMultiplier, 4 * sizeMultiplier))
-	head.Anchored = false
+	head.Size = Vector3.new(2 * sizeMultiplier, 2 * sizeMultiplier, 2 * sizeMultiplier)
+	head.CFrame = CFrame.new(spawnPosition + Vector3.new(0, 2 * sizeMultiplier, 3 * sizeMultiplier))
+	head.Anchored = true -- Also anchor head
 	head.CanCollide = false
-	head.BrickColor = tierColors[tier] or BrickColor.new("Medium stone grey")
-	head.Material = Enum.Material.SmoothPlastic
+	head.BrickColor = tierColors[tier] or BrickColor.new("Bright green")
+	head.Material = Enum.Material.Neon
 	head.Parent = model
 
-	-- Weld head to body
-	local headWeld = Instance.new("WeldConstraint")
-	headWeld.Part0 = body
-	headWeld.Part1 = head
-	headWeld.Parent = head
-
-	-- Create humanoid
+	-- Create humanoid for health display
 	local humanoid = Instance.new("Humanoid")
 	humanoid.MaxHealth = speciesData and speciesData.health or 100
 	humanoid.Health = humanoid.MaxHealth
 	humanoid.WalkSpeed = speciesData and speciesData.speed or 16
 	humanoid.Parent = model
 
-	-- Add name label
+	-- Add name label - larger and more visible
 	local billboardGui = Instance.new("BillboardGui")
-	billboardGui.Size = UDim2.new(0, 100, 0, 40)
-	billboardGui.StudsOffset = Vector3.new(0, 3 * sizeMultiplier, 0)
+	billboardGui.Size = UDim2.new(0, 200, 0, 50)
+	billboardGui.StudsOffset = Vector3.new(0, 4 * sizeMultiplier, 0)
 	billboardGui.Adornee = body
-	billboardGui.Parent = model
+	billboardGui.AlwaysOnTop = true -- Always visible!
+	billboardGui.Parent = body -- Parent to body, not model
 
 	local nameLabel = Instance.new("TextLabel")
 	nameLabel.Size = UDim2.new(1, 0, 1, 0)
-	nameLabel.BackgroundTransparency = 1
-	nameLabel.Text = species
+	nameLabel.BackgroundTransparency = 0.5
+	nameLabel.BackgroundColor3 = Color3.new(0, 0, 0)
+	nameLabel.Text = `{species} ({tier})`
 	nameLabel.TextColor3 = Color3.new(1, 1, 1)
 	nameLabel.TextStrokeTransparency = 0
 	nameLabel.Font = Enum.Font.GothamBold
@@ -273,6 +265,9 @@ local function createDinosaurModel(species: string, position: Vector3): Model
 
 	model.PrimaryPart = body
 	model.Parent = workspace
+
+	print(`[DinosaurManager] SUCCESS: {species} model created at {spawnPosition}, parented to workspace`)
+	print(`[DinosaurManager] Model children: {#model:GetChildren()}, PrimaryPart: {model.PrimaryPart and model.PrimaryPart.Name or "nil"}`)
 
 	return model
 end
@@ -616,42 +611,55 @@ function DinosaurManager.Initialize()
 	loadModules()
 	findSpawnPoints()
 
-	-- Spawn initial dinosaurs around the spawn area (jungle biome)
-	-- Player spawns at (400, Y, 400), so spawn dinos VERY CLOSE for testing
-	local initialCount = math.min(10, MAX_ACTIVE_DINOSAURS) -- Fewer for testing
-	local spawnCenter = Vector3.new(400, 50, 400) -- Jungle biome spawn area
+	-- Spawn initial dinosaurs around the jungle spawn area (400, Y, 400)
+	-- This matches where MapManager creates the LobbySpawn
+	local initialCount = math.min(10, MAX_ACTIVE_DINOSAURS)
 
-	print(`[DinosaurManager] Spawning {initialCount} dinosaurs around {spawnCenter}`)
+	-- Find LobbySpawn position, or use default jungle location
+	local spawnCenter = Vector3.new(400, 0, 400) -- Jungle biome area
+	local lobbySpawn = workspace:FindFirstChild("LobbySpawn")
+	if lobbySpawn then
+		spawnCenter = Vector3.new(lobbySpawn.Position.X, 0, lobbySpawn.Position.Z)
+		print(`[DinosaurManager] Found LobbySpawn, spawning dinos around {spawnCenter}`)
+	else
+		print(`[DinosaurManager] No LobbySpawn found, using default jungle position {spawnCenter}`)
+	end
+
+	-- Get terrain height at spawn location using raycast
+	local function getTerrainHeight(x: number, z: number): number
+		local rayOrigin = Vector3.new(x, 500, z)
+		local rayResult = workspace:Raycast(rayOrigin, Vector3.new(0, -1000, 0))
+		if rayResult then
+			return rayResult.Position.Y + 8 -- 8 studs above terrain
+		end
+		return 30 -- Fallback height (spawn platform is at Y~22-25)
+	end
+
+	print(`[DinosaurManager] Spawning {initialCount} dinosaurs around jungle spawn...`)
 
 	for i = 1, initialCount do
-		-- Random position if no spawn points
-		local position: Vector3
+		-- Random position around spawn at various distances (30-80 studs out)
+		local angle = (i / initialCount) * math.pi * 2 -- Evenly distributed
+		local distance = 30 + (i * 5) -- 35, 40, 45... studs out
 
-		if #spawnPoints > 0 then
-			local point = spawnPoints[math.random(1, #spawnPoints)]
-			position = point.position
-		else
-			-- Spawn VERY CLOSE to player spawn (20-50 studs away) for testing
-			local angle = (i / initialCount) * math.pi * 2
-			local distance = 20 + math.random() * 30
-			position = spawnCenter + Vector3.new(
-				math.cos(angle) * distance,
-				50, -- Will be adjusted by raycast
-				math.sin(angle) * distance
-			)
-		end
+		local x = spawnCenter.X + math.cos(angle) * distance
+		local z = spawnCenter.Z + math.sin(angle) * distance
+		local y = getTerrainHeight(x, z)
 
-		print(`[DinosaurManager] Attempting spawn at {position}`)
+		local position = Vector3.new(x, y, z)
+
+		print(`[DinosaurManager] Spawn #{i}: position={position}`)
+
 		local species = selectRandomSpecies()
 		if species then
 			local dino = DinosaurManager.SpawnDinosaur(species, position)
 			if dino then
-				print(`[DinosaurManager] SUCCESS: Spawned {species} at {dino.currentPosition}`)
+				print(`[DinosaurManager] SUCCESS #{i}: Spawned {species} at {position}`)
 			else
-				warn(`[DinosaurManager] FAILED to spawn {species}`)
+				warn(`[DinosaurManager] FAILED #{i}: Could not spawn {species}`)
 			end
 		else
-			warn("[DinosaurManager] No species selected!")
+			warn(`[DinosaurManager] FAILED #{i}: No species selected!`)
 		end
 	end
 

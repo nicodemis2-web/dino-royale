@@ -3,7 +3,7 @@
 	Main.server.lua
 	===============
 	Server entry point for Dino Royale
-	SIMPLIFIED VERSION - Focus on getting basic spawning working
+	Proper initialization: Terrain -> Spawns -> Players -> Dinosaurs
 ]]
 
 print("===========================================")
@@ -15,123 +15,34 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
 
--- STEP 1: Disable auto-spawning FIRST
+-- STEP 1: Disable auto-spawning - we control when players spawn
 Players.CharacterAutoLoads = false
 print("[Server] CharacterAutoLoads = false")
 
--- STEP 2: Create a TEMPORARY spawn platform immediately
--- This will be replaced by MapManager once terrain is generated
-local function createTempSpawnPlatform()
-	print("[Server] Creating temporary spawn platform...")
-
-	-- Remove ALL existing spawn locations first
-	for _, obj in ipairs(Workspace:GetDescendants()) do
-		if obj:IsA("SpawnLocation") then
-			obj:Destroy()
-		end
-	end
-
-	-- Remove old platforms (use consistent naming for cleanup)
-	local oldPlatform = Workspace:FindFirstChild("TempSpawnPlatform")
-	if oldPlatform then oldPlatform:Destroy() end
-	local oldSpawn = Workspace:FindFirstChild("TempSpawn")
-	if oldSpawn then oldSpawn:Destroy() end
-
-	-- Create a large, visible platform (TEMPORARY - will be replaced by MapManager)
-	local platform = Instance.new("Part")
-	platform.Name = "TempSpawnPlatform"
-	platform.Size = Vector3.new(100, 10, 100)
-	platform.Position = Vector3.new(0, 50, 0)  -- 50 studs up
-	platform.Anchored = true
-	platform.CanCollide = true
-	platform.BrickColor = BrickColor.new("Bright green")
-	platform.Material = Enum.Material.Grass
-	platform.TopSurface = Enum.SurfaceType.Smooth
-	platform.BottomSurface = Enum.SurfaceType.Smooth
-	platform.Parent = Workspace
-
-	-- Create spawn location ON the platform
-	local spawn = Instance.new("SpawnLocation")
-	spawn.Name = "TempSpawn"
-	spawn.Size = Vector3.new(20, 1, 20)
-	spawn.Position = Vector3.new(0, 56, 0)  -- On top of platform
-	spawn.Anchored = true
-	spawn.CanCollide = false
-	spawn.Transparency = 0.5
-	spawn.BrickColor = BrickColor.new("White")
-	spawn.Neutral = true
-	spawn.Duration = 0  -- No force field
-	spawn.Parent = Workspace
-
-	print("[Server] Temporary spawn platform created at Y=50, spawn at Y=56")
-	return platform, spawn
-end
-
--- Create TEMP platform RIGHT NOW (MapManager will replace with proper biome terrain)
-local tempSpawnPlatform, tempSpawnLocation = createTempSpawnPlatform()
-
--- STEP 3: Track players waiting to spawn
+-- STEP 2: State tracking
 local playersToSpawn: {Player} = {}
-local systemReady = false
+local worldReady = false
+local spawnPosition: Vector3 = Vector3.new(400, 50, 400) -- Will be updated by MapManager
+local COUNTDOWN_SECONDS = 10
 
--- STEP 4: Handle player joining - queue them for spawning
-Players.PlayerAdded:Connect(function(player)
-	print(`[Server] Player joined: {player.Name}`)
-
-	if systemReady then
-		-- System is ready, spawn immediately
-		print(`[Server] Spawning {player.Name} immediately`)
-		task.spawn(function()
-			task.wait(0.5)  -- Small delay to ensure everything is ready
-			player:LoadCharacter()
-		end)
-	else
-		-- Queue for later
-		print(`[Server] Queueing {player.Name} for spawn`)
-		table.insert(playersToSpawn, player)
-	end
-end)
-
--- Handle players who are already connected
-for _, player in ipairs(Players:GetPlayers()) do
-	print(`[Server] Existing player found: {player.Name}`)
-	table.insert(playersToSpawn, player)
-end
-
--- STEP 5: Handle player leaving
-Players.PlayerRemoving:Connect(function(player)
-	print(`[Server] Player leaving: {player.Name}`)
-	-- Remove from queue if present
-	for i, p in ipairs(playersToSpawn) do
-		if p == player then
-			table.remove(playersToSpawn, i)
-			break
-		end
-	end
-end)
-
--- STEP 6: Wait for shared modules
+-- STEP 3: Wait for shared modules
 print("[Server] Waiting for shared modules...")
 local Shared = ReplicatedStorage:WaitForChild("Shared", 10)
 if not Shared then
-	warn("[Server] WARNING: Shared folder not found after 10 seconds!")
-else
-	print("[Server] Shared modules found")
+	error("[Server] FATAL: Shared folder not found!")
 end
+print("[Server] Shared modules found")
 
--- STEP 7: Try to load Events module
-local Events
-local eventsLoaded = pcall(function()
-	Events = require(ReplicatedStorage.Shared.Events)
-	Events.Initialize()
-	print("[Server] Events initialized")
-end)
+-- STEP 4: Load Events module FIRST
+print("[Server] Initializing Events...")
+local Events = require(ReplicatedStorage.Shared.Events)
+Events.Initialize()
+print("[Server] Events initialized")
 
-if not eventsLoaded then
-	warn("[Server] WARNING: Failed to load Events module")
-end
+-- STEP 5: Load Constants
+local Constants = require(ReplicatedStorage.Shared.Constants)
 
--- STEP 8: Declare module variables
+-- STEP 6: Declare all manager variables
 local GameManager: any = nil
 local StormManager: any = nil
 local DeploymentManager: any = nil
@@ -158,10 +69,12 @@ local RankedManager: any = nil
 local AccessibilityManager: any = nil
 local AdminConsole: any = nil
 
--- STEP 9: Load modules safely
-print("[Server] Loading modules...")
-
-local function safeRequire(path, name)
+-- STEP 7: Safe require helper
+local function safeRequire(path: any, name: string): any
+	if not path then
+		warn(`[Server] Module path not found for: {name}`)
+		return nil
+	end
 	local success, result = pcall(function()
 		return require(path)
 	end)
@@ -174,6 +87,22 @@ local function safeRequire(path, name)
 	end
 end
 
+-- STEP 8: Safe init helper
+local function safeInit(manager: any, name: string)
+	if manager and manager.Initialize then
+		local success, err = pcall(function()
+			manager.Initialize()
+		end)
+		if success then
+			print(`[Server] Initialized: {name}`)
+		else
+			warn(`[Server] FAILED to initialize {name}: {err}`)
+		end
+	end
+end
+
+-- STEP 9: Load all modules
+print("[Server] Loading modules...")
 local Core = script.Parent:FindFirstChild("Core")
 local Player = script.Parent:FindFirstChild("Player")
 local Weapons = script.Parent:FindFirstChild("Weapons")
@@ -238,26 +167,59 @@ end
 
 print("[Server] Module loading complete")
 
--- STEP 10: Initialize systems safely
-print("[Server] Initializing systems...")
+-- ============================================
+-- STEP 10: INITIALIZE WORLD (TERRAIN FIRST!)
+-- ============================================
+print("[Server] GENERATING 4KM x 4KM WORLD...")
 
-local function safeInit(manager, name)
-	if manager and manager.Initialize then
-		local success, err = pcall(function()
-			manager.Initialize()
-		end)
-		if success then
-			print(`[Server] Initialized: {name}`)
-		else
-			warn(`[Server] FAILED to initialize {name}: {err}`)
-		end
-	end
+-- Initialize MapManager FIRST - this generates terrain
+safeInit(MapManager, "MapManager")
+
+-- Find the spawn location created by MapManager
+local lobbySpawn = Workspace:FindFirstChild("LobbySpawn")
+if lobbySpawn and lobbySpawn:IsA("SpawnLocation") then
+	spawnPosition = lobbySpawn.Position
+	print(`[Server] Found LobbySpawn at {spawnPosition}`)
+else
+	-- FALLBACK: Create a guaranteed spawn area if MapManager failed
+	warn("[Server] LobbySpawn not found! Creating fallback spawn...")
+
+	-- Create a large, visible spawn platform
+	local fallbackPlatform = Instance.new("Part")
+	fallbackPlatform.Name = "FallbackSpawnPlatform"
+	fallbackPlatform.Size = Vector3.new(100, 10, 100)
+	fallbackPlatform.Position = Vector3.new(400, 25, 400)
+	fallbackPlatform.Anchored = true
+	fallbackPlatform.CanCollide = true
+	fallbackPlatform.BrickColor = BrickColor.new("Bright green")
+	fallbackPlatform.Material = Enum.Material.Grass
+	fallbackPlatform.Parent = Workspace
+	print("[Server] Created fallback platform at (400, 25, 400)")
+
+	-- Create spawn location on top
+	local fallbackSpawn = Instance.new("SpawnLocation")
+	fallbackSpawn.Name = "LobbySpawn"
+	fallbackSpawn.Size = Vector3.new(50, 1, 50)
+	fallbackSpawn.Position = Vector3.new(400, 32, 400)
+	fallbackSpawn.Anchored = true
+	fallbackSpawn.Transparency = 0.5
+	fallbackSpawn.CanCollide = false
+	fallbackSpawn.Neutral = true
+	fallbackSpawn.Duration = 0
+	fallbackSpawn.Parent = Workspace
+
+	spawnPosition = fallbackSpawn.Position
+	print(`[Server] Created fallback spawn at {spawnPosition}`)
 end
 
+print("[Server] World generation complete!")
+
+-- ============================================
+-- STEP 11: INITIALIZE OTHER SYSTEMS
+-- ============================================
+print("[Server] Initializing game systems...")
+
 safeInit(GameManager, "GameManager")
--- Initialize MapManager to generate terrain with biomes (Jungle, Desert, Mountains)
--- This will replace the temporary spawn platform with proper biome-based spawning
-safeInit(MapManager, "MapManager")
 safeInit(WeaponManager, "WeaponManager")
 safeInit(InventoryManager, "InventoryManager")
 safeInit(EliminationManager, "EliminationManager")
@@ -265,7 +227,6 @@ safeInit(RevivalManager, "RevivalManager")
 safeInit(RebootBeaconManager, "RebootBeaconManager")
 safeInit(ProgressionManager, "ProgressionManager")
 safeInit(PingManager, "PingManager")
-safeInit(DinosaurManager, "DinosaurManager")
 safeInit(BossEventManager, "BossEventManager")
 safeInit(VehicleManager, "VehicleManager")
 safeInit(EnvironmentalEventManager, "EnvironmentalEventManager")
@@ -298,10 +259,10 @@ if EliminationManager then
 	if CombatManager then pcall(function() EliminationManager.SetCombatManager(CombatManager) end) end
 end
 
--- Initialize StormManager with map parameters (4km map = 2000 stud radius)
+-- Initialize StormManager with map parameters
 if StormManager and StormManager.Initialize then
 	pcall(function()
-		StormManager.Initialize(Vector3.new(0, 0, 0), 2000) -- 4km map radius
+		StormManager.Initialize(Vector3.new(0, 0, 0), 2000) -- 4km map = 2000 stud radius
 	end)
 end
 
@@ -311,35 +272,173 @@ if AdminConsole then
 	safeInit(AdminConsole, "AdminConsole")
 end
 
-print("[Server] System initialization complete")
+print("[Server] Game systems initialized")
 
--- STEP 11: Mark system as ready and spawn queued players
-systemReady = true
-print("[Server] System ready - spawning queued players...")
+-- ============================================
+-- STEP 12: INITIALIZE DINOSAURS (AFTER TERRAIN!)
+-- ============================================
+print("[Server] Initializing dinosaur system...")
+safeInit(DinosaurManager, "DinosaurManager")
+print("[Server] Dinosaur system ready")
+
+-- ============================================
+-- STEP 13: MARK WORLD READY
+-- ============================================
+worldReady = true
+print("[Server] WORLD IS READY!")
+
+-- ============================================
+-- STEP 14: PLAYER SPAWNING WITH COUNTDOWN
+-- ============================================
+
+-- Configure character when spawned
+local function configureCharacter(player: Player, character: Model, freezeMovement: boolean)
+	local humanoid = character:WaitForChild("Humanoid", 5) :: Humanoid?
+	if not humanoid then
+		warn(`[Server] Could not find Humanoid for {player.Name}`)
+		return
+	end
+
+	-- Configure per GDD Appendix A
+	humanoid.MaxHealth = Constants.PLAYER.MAX_HEALTH
+	humanoid.Health = humanoid.MaxHealth
+	humanoid.JumpPower = Constants.PLAYER.JUMP_POWER
+
+	if freezeMovement then
+		humanoid.WalkSpeed = 0 -- Frozen during countdown
+		humanoid.JumpPower = 0
+	else
+		humanoid.WalkSpeed = Constants.PLAYER.WALK_SPEED
+		humanoid.JumpPower = Constants.PLAYER.JUMP_POWER
+	end
+
+	print(`[Server] Configured {player.Name}: WalkSpeed={humanoid.WalkSpeed}`)
+end
+
+-- Unfreeze player after countdown
+local function unfreezePlayer(player: Player)
+	local character = player.Character
+	if not character then return end
+
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid.WalkSpeed = Constants.PLAYER.WALK_SPEED
+		humanoid.JumpPower = Constants.PLAYER.JUMP_POWER
+		print(`[Server] {player.Name} can now move!`)
+	end
+end
+
+-- Spawn a player with countdown
+local function spawnPlayerWithCountdown(player: Player)
+	print(`[Server] Spawning {player.Name} with {COUNTDOWN_SECONDS}s countdown...`)
+
+	-- Initialize player systems
+	if InventoryManager and InventoryManager.InitializePlayer then
+		pcall(function() InventoryManager.InitializePlayer(player) end)
+	end
+	if WeaponManager and WeaponManager.InitializePlayer then
+		pcall(function() WeaponManager.InitializePlayer(player) end)
+	end
+
+	-- Load character
+	player:LoadCharacter()
+
+	-- Wait for character to load
+	local character = player.Character or player.CharacterAdded:Wait()
+
+	-- Configure with frozen movement
+	configureCharacter(player, character, true)
+
+	-- Send countdown to client (they can show UI)
+	for i = COUNTDOWN_SECONDS, 1, -1 do
+		print(`[Server] {player.Name} countdown: {i}`)
+		-- Could fire event to client here for UI
+		task.wait(1)
+	end
+
+	-- Unfreeze after countdown
+	unfreezePlayer(player)
+	print(`[Server] {player.Name} GO!`)
+end
+
+-- Handle death/respawn
+local function setupRespawnHandler(player: Player)
+	player.CharacterAdded:Connect(function(character)
+		-- Only freeze on initial spawn, not respawns
+		local humanoid = character:WaitForChild("Humanoid", 5) :: Humanoid?
+		if humanoid then
+			humanoid.WalkSpeed = Constants.PLAYER.WALK_SPEED
+			humanoid.JumpPower = Constants.PLAYER.JUMP_POWER
+			humanoid.MaxHealth = Constants.PLAYER.MAX_HEALTH
+			humanoid.Health = humanoid.MaxHealth
+
+			-- Handle death
+			humanoid.Died:Connect(function()
+				print(`[Server] {player.Name} died, respawning in 3 seconds...`)
+				task.wait(3)
+				if player and player.Parent then
+					player:LoadCharacter()
+				end
+			end)
+		end
+	end)
+end
+
+-- ============================================
+-- STEP 15: HANDLE PLAYER CONNECTIONS
+-- ============================================
+
+-- Queue existing players
+for _, player in ipairs(Players:GetPlayers()) do
+	table.insert(playersToSpawn, player)
+	setupRespawnHandler(player)
+end
+
+-- Handle new players
+Players.PlayerAdded:Connect(function(player)
+	print(`[Server] Player joined: {player.Name}`)
+	setupRespawnHandler(player)
+
+	if worldReady then
+		-- World ready, spawn immediately with countdown
+		task.spawn(function()
+			spawnPlayerWithCountdown(player)
+		end)
+	else
+		-- Queue for later
+		table.insert(playersToSpawn, player)
+	end
+end)
+
+-- Handle player leaving
+Players.PlayerRemoving:Connect(function(player)
+	print(`[Server] Player leaving: {player.Name}`)
+	for i, p in ipairs(playersToSpawn) do
+		if p == player then
+			table.remove(playersToSpawn, i)
+			break
+		end
+	end
+end)
+
+-- ============================================
+-- STEP 16: SPAWN QUEUED PLAYERS
+-- ============================================
+print(`[Server] Spawning {#playersToSpawn} queued players...`)
 
 for _, player in ipairs(playersToSpawn) do
-	if player and player.Parent then  -- Make sure player is still connected
-		print(`[Server] Spawning queued player: {player.Name}`)
+	if player and player.Parent then
 		task.spawn(function()
-			-- Initialize player systems
-			if InventoryManager and InventoryManager.InitializePlayer then
-				pcall(function() InventoryManager.InitializePlayer(player) end)
-			end
-			if WeaponManager and WeaponManager.InitializePlayer then
-				pcall(function() WeaponManager.InitializePlayer(player) end)
-			end
-
-			-- Small delay then spawn
-			task.wait(0.5)
-			player:LoadCharacter()
-			print(`[Server] {player.Name} spawned!`)
+			spawnPlayerWithCountdown(player)
 		end)
 	end
 end
 
 playersToSpawn = {}
 
--- STEP 12: Set initial game state
+-- ============================================
+-- STEP 17: SET GAME STATE
+-- ============================================
 if GameManager and GameManager.SetState then
 	pcall(function()
 		GameManager.SetState("Lobby")
@@ -350,56 +449,6 @@ end
 print("===========================================")
 print("  DINO ROYALE SERVER - READY!")
 print("  Map: Isla Primordial (4km x 4km)")
-print("  Terrain: Jungle, Desert, Mountains biomes")
-print("  Spawn: Jungle biome area (400, Y, 400)")
+print("  Terrain: Jungle, Desert, Mountains")
+print(`  Spawn: Jungle biome at {spawnPosition}`)
 print("===========================================")
-
--- STEP 13: Configure character stats and handle death/respawn
--- Per GDD Appendix A: WalkSpeed=16, JumpPower=50 (7 stud jump), Health=100
-local Constants = require(ReplicatedStorage.Shared.Constants)
-
-local function configureCharacter(player: Player, character: Model)
-	local humanoid = character:WaitForChild("Humanoid", 5) :: Humanoid?
-	if not humanoid then
-		warn(`[Server] Could not find Humanoid for {player.Name}`)
-		return
-	end
-
-	-- Configure movement per GDD Appendix A
-	humanoid.WalkSpeed = Constants.PLAYER.WALK_SPEED -- 16 studs/sec
-	humanoid.JumpPower = Constants.PLAYER.JUMP_POWER -- 50 (gives ~7 stud jump)
-	humanoid.MaxHealth = Constants.PLAYER.MAX_HEALTH -- 100 HP
-	humanoid.Health = humanoid.MaxHealth
-
-	print(`[Server] Configured {player.Name}: WalkSpeed={humanoid.WalkSpeed}, JumpPower={humanoid.JumpPower}`)
-
-	-- Handle death
-	humanoid.Died:Connect(function()
-		print(`[Server] {player.Name} died, respawning in 3 seconds...`)
-		task.wait(3)
-		if player and player.Parent then
-			player:LoadCharacter()
-		end
-	end)
-end
-
--- Connect CharacterAdded for all players (existing and new)
-local function setupPlayer(player: Player)
-	-- Configure character when it spawns
-	player.CharacterAdded:Connect(function(character)
-		configureCharacter(player, character)
-	end)
-
-	-- Configure existing character if any
-	if player.Character then
-		configureCharacter(player, player.Character)
-	end
-end
-
--- Setup existing players
-for _, player in ipairs(Players:GetPlayers()) do
-	setupPlayer(player)
-end
-
--- Setup new players
-Players.PlayerAdded:Connect(setupPlayer)

@@ -283,139 +283,101 @@ end
 	Create the multi-biome terrain
 ]]
 local function createBaseTerrain()
-	local workspace = game:GetService("Workspace")
 	local terrain = workspace.Terrain
 
-	print("[MapManager] Generating terrain (Jungle, Desert, Mountains)...")
+	print("[MapManager] Generating 4km x 4km terrain...")
 
-	local mapSize = TERRAIN_CONFIG.mapSize
-	local resolution = TERRAIN_CONFIG.resolution
-	local halfSize = mapSize / 2
-
-	-- Clean up any temporary spawns from Main.server.lua FIRST
-	-- Handle both old and new naming conventions for compatibility
-	local tempNames = {"TempSpawnPlatform", "SpawnPlatform"}
-	for _, name in ipairs(tempNames) do
-		local tempPlatform = workspace:FindFirstChild(name)
-		if tempPlatform then
-			tempPlatform:Destroy()
+	-- Clean up any existing spawns first
+	for _, name in ipairs({"TempSpawnPlatform", "SpawnPlatform", "TempSpawn", "MainSpawn", "LobbySpawn", "LobbyPlatform", "TempLobbyPlatform"}) do
+		local obj = workspace:FindFirstChild(name)
+		if obj then
+			obj:Destroy()
 			print(`[MapManager] Removed {name}`)
 		end
-	end
-
-	local spawnNames = {"TempSpawn", "MainSpawn"}
-	for _, name in ipairs(spawnNames) do
-		local tempSpawn = workspace:FindFirstChild(name)
-		if tempSpawn then
-			tempSpawn:Destroy()
-			print(`[MapManager] Removed {name}`)
-		end
-	end
-
-	-- Clean up any existing spawns
-	local existingSpawn = workspace:FindFirstChild("LobbySpawn")
-	if existingSpawn then
-		existingSpawn:Destroy()
-	end
-	local existingPlatform = workspace:FindFirstChild("LobbyPlatform")
-	if existingPlatform then
-		existingPlatform:Destroy()
-	end
-	local tempLobbyPlatform = workspace:FindFirstChild("TempLobbyPlatform")
-	if tempLobbyPlatform then
-		tempLobbyPlatform:Destroy()
 	end
 
 	-- Clear any existing terrain
 	terrain:Clear()
 
-	-- Generate terrain in chunks
-	local totalCells = 0
-	for x = -halfSize, halfSize, resolution do
-		for z = -halfSize, halfSize, resolution do
-			local biome = getBiomeAtPosition(x, z)
-			local height = getHeightAtPosition(x, z, biome)
-			local material = getMaterialAtPosition(biome, height)
+	-- SPAWN AREA CONFIG - Jungle biome at (400, Y, 400)
+	local spawnX, spawnZ = 400, 400
+	local spawnAreaSize = 200 -- Large flat area around spawn
+	local baseTerrainHeight = 20 -- Fixed base height for reliable spawning
 
-			-- Fill terrain column
-			local cellHeight = math.max(resolution, height + 10)
-			terrain:FillBlock(
-				CFrame.new(x, height / 2 - 5, z),
-				Vector3.new(resolution, cellHeight, resolution),
-				material
-			)
-			totalCells = totalCells + 1
-		end
-
-		-- Yield occasionally to prevent timeout
-		if totalCells % 1000 == 0 then
-			task.wait()
-		end
-	end
-
-	-- Add water in low areas
+	-- STEP 1: Create a guaranteed flat spawn area FIRST
+	print("[MapManager] Creating spawn area...")
 	terrain:FillBlock(
-		CFrame.new(0, -8, 0),
-		Vector3.new(mapSize, 6, mapSize),
-		Enum.Material.Water
+		CFrame.new(spawnX, baseTerrainHeight / 2, spawnZ),
+		Vector3.new(spawnAreaSize, baseTerrainHeight, spawnAreaSize),
+		Enum.Material.Grass
 	)
 
-	print("[MapManager] Terrain generated!")
-	print("  Jungle: North-East sector (LeafyGrass, rolling hills)")
-	print("  Desert: South sector (Sand, dunes)")
-	print("  Mountains: North-West sector (Snow peaks, rock cliffs)")
-
-	-- Wait a frame for terrain to settle before raycasting
-	task.wait(0.1)
-
-	-- Create spawn location directly on terrain (jungle biome area)
-	-- For 4km map, spawn in jungle quadrant (NE sector per GDD)
-	local spawnX, spawnZ = 400, 400 -- Jungle biome area (scaled for 4km map)
-
-	-- Calculate expected terrain height using same formula as generation
-	local biome = getBiomeAtPosition(spawnX, spawnZ)
-	local calculatedHeight = getHeightAtPosition(spawnX, spawnZ, biome)
-	print(`[MapManager] Calculated terrain height at spawn: {calculatedHeight} (biome: {biome})`)
-
-	-- Also try raycast as backup verification
-	local rayOrigin = Vector3.new(spawnX, 500, spawnZ)
-	local rayDirection = Vector3.new(0, -1000, 0)
-	local rayResult = workspace:Raycast(rayOrigin, rayDirection)
-
-	local terrainHeight = calculatedHeight -- Use calculated height as primary
-	if rayResult then
-		print(`[MapManager] Raycast hit at Y={rayResult.Position.Y}`)
-		-- Use raycast if it found something reasonable
-		if math.abs(rayResult.Position.Y - calculatedHeight) < 50 then
-			terrainHeight = rayResult.Position.Y
-		end
-	else
-		print("[MapManager] Raycast didn't hit terrain, using calculated height")
-	end
-
-	-- Create a visible spawn platform so players have something solid to stand on
+	-- STEP 2: Create spawn platform on top of terrain
 	local spawnPlatform = Instance.new("Part")
 	spawnPlatform.Name = "LobbyPlatform"
-	spawnPlatform.Size = Vector3.new(30, 2, 30)
-	spawnPlatform.Position = Vector3.new(spawnX, terrainHeight + 1, spawnZ)
+	spawnPlatform.Size = Vector3.new(50, 3, 50)
+	spawnPlatform.Position = Vector3.new(spawnX, baseTerrainHeight + 2, spawnZ)
 	spawnPlatform.Anchored = true
 	spawnPlatform.BrickColor = BrickColor.new("Bright green")
 	spawnPlatform.Material = Enum.Material.Grass
 	spawnPlatform.Parent = workspace
-	print(`[MapManager] Created spawn platform at Y={terrainHeight + 1}`)
+	print(`[MapManager] Spawn platform at ({spawnX}, {baseTerrainHeight + 2}, {spawnZ})`)
 
-	-- Create spawn location on top of platform
+	-- STEP 3: Create spawn location
 	local spawnLocation = Instance.new("SpawnLocation")
 	spawnLocation.Name = "LobbySpawn"
-	spawnLocation.Size = Vector3.new(20, 1, 20)
-	spawnLocation.Position = Vector3.new(spawnX, terrainHeight + 4, spawnZ)
+	spawnLocation.Size = Vector3.new(30, 1, 30)
+	spawnLocation.Position = Vector3.new(spawnX, baseTerrainHeight + 5, spawnZ)
 	spawnLocation.Anchored = true
-	spawnLocation.Transparency = 1 -- Invisible
+	spawnLocation.Transparency = 0.5 -- Semi-visible for debugging
 	spawnLocation.CanCollide = false
 	spawnLocation.Neutral = true
+	spawnLocation.Duration = 0
 	spawnLocation.Parent = workspace
+	print(`[MapManager] Spawn location at ({spawnX}, {baseTerrainHeight + 5}, {spawnZ})`)
 
-	print(`[MapManager] Spawn created at ({spawnX}, {terrainHeight + 4}, {spawnZ})`)
+	-- STEP 4: Generate terrain chunks around spawn (simplified for performance)
+	print("[MapManager] Generating surrounding terrain...")
+	local mapSize = TERRAIN_CONFIG.mapSize
+	local resolution = 64 -- Larger chunks for faster generation
+	local halfSize = mapSize / 2
+	local totalCells = 0
+
+	for x = -halfSize, halfSize, resolution do
+		for z = -halfSize, halfSize, resolution do
+			-- Skip the spawn area (already created)
+			local distFromSpawn = math.sqrt((x - spawnX)^2 + (z - spawnZ)^2)
+			if distFromSpawn > spawnAreaSize then
+				local biome = getBiomeAtPosition(x, z)
+				local height = getHeightAtPosition(x, z, biome)
+				local material = getMaterialAtPosition(biome, height)
+
+				-- Fill terrain column from below ground to surface
+				terrain:FillBlock(
+					CFrame.new(x, height / 2, z),
+					Vector3.new(resolution, height + 20, resolution),
+					material
+				)
+				totalCells = totalCells + 1
+			end
+		end
+
+		-- Yield to prevent timeout
+		if totalCells % 500 == 0 then
+			task.wait()
+		end
+	end
+
+	-- STEP 5: Add water in low areas
+	terrain:FillBlock(
+		CFrame.new(0, -5, 0),
+		Vector3.new(mapSize, 10, mapSize),
+		Enum.Material.Water
+	)
+
+	print("[MapManager] Terrain generation complete!")
+	print(`  Total cells: {totalCells}`)
+	print(`  Spawn area: ({spawnX}, {baseTerrainHeight + 5}, {spawnZ})`)
 end
 
 --[[

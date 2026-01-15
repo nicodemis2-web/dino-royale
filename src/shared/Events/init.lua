@@ -76,6 +76,7 @@ Events.GameState = {
 Events.Dinosaur = {
 	"DinosaurSpawned", -- Server -> Nearby: {dinoId, species, position}
 	"DinosaurAlert", -- Server -> Nearby: {dinoId, alertLevel, targetId}
+	"DinosaurAttacked", -- Server -> Nearby: {dinoId, targetId, damage}
 	"DinosaurDamaged", -- Server -> Client: {dinoId, damage, newHealth}
 	"DinosaurKilled", -- Server -> All: {dinoId, killerId, species}
 	"BossSpawned", -- Server -> All: {bossId, species, position}
