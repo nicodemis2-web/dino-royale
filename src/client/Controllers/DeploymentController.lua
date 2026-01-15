@@ -10,8 +10,12 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local ContextActionService = game:GetService("ContextActionService")
+local TweenService = game:GetService("TweenService")
 
 local Events = require(game.ReplicatedStorage.Shared.Events)
+
+-- Toast notification (loaded lazily)
+local ToastNotification: any = nil
 
 local DeploymentController = {}
 
@@ -96,25 +100,84 @@ local function createDeploymentUI()
 	dotCorner.CornerRadius = UDim.new(1, 0)
 	dotCorner.Parent = playerDot
 
-	-- Jump button (center bottom)
+	-- Jump button container (center bottom)
+	local jumpContainer = Instance.new("Frame")
+	jumpContainer.Name = "JumpContainer"
+	jumpContainer.AnchorPoint = Vector2.new(0.5, 1)
+	jumpContainer.Position = UDim2.new(0.5, 0, 1, -80)
+	jumpContainer.Size = UDim2.fromOffset(250, 90)
+	jumpContainer.BackgroundTransparency = 1
+	jumpContainer.Parent = deploymentGui
+
 	jumpButton = Instance.new("TextButton")
 	jumpButton.Name = "JumpButton"
-	jumpButton.AnchorPoint = Vector2.new(0.5, 1)
-	jumpButton.Position = UDim2.new(0.5, 0, 1, -100)
-	jumpButton.Size = UDim2.fromOffset(200, 60)
+	jumpButton.AnchorPoint = Vector2.new(0.5, 0)
+	jumpButton.Position = UDim2.new(0.5, 0, 0, 0)
+	jumpButton.Size = UDim2.fromOffset(220, 55)
 	jumpButton.BackgroundColor3 = Color3.fromRGB(50, 150, 255)
 	jumpButton.Text = "PRESS SPACE TO JUMP"
 	jumpButton.TextColor3 = Color3.new(1, 1, 1)
-	jumpButton.TextSize = 18
+	jumpButton.TextScaled = true
 	jumpButton.Font = Enum.Font.GothamBold
-	jumpButton.Parent = deploymentGui
+	jumpButton.AutoButtonColor = true
+	jumpButton.Parent = jumpContainer
+
+	-- Text size constraint for jump button
+	local jumpTextConstraint = Instance.new("UITextSizeConstraint")
+	jumpTextConstraint.MinTextSize = 12
+	jumpTextConstraint.MaxTextSize = 20
+	jumpTextConstraint.Parent = jumpButton
 
 	local jumpCorner = Instance.new("UICorner")
 	jumpCorner.CornerRadius = UDim.new(0, 8)
 	jumpCorner.Parent = jumpButton
 
+	-- Subtle glow/pulse animation on button
+	local jumpStroke = Instance.new("UIStroke")
+	jumpStroke.Color = Color3.fromRGB(100, 180, 255)
+	jumpStroke.Thickness = 2
+	jumpStroke.Transparency = 0.5
+	jumpStroke.Parent = jumpButton
+
+	-- Skip hint label below button
+	local skipHint = Instance.new("TextLabel")
+	skipHint.Name = "SkipHint"
+	skipHint.AnchorPoint = Vector2.new(0.5, 0)
+	skipHint.Position = UDim2.new(0.5, 0, 0, 62)
+	skipHint.Size = UDim2.fromOffset(250, 25)
+	skipHint.BackgroundTransparency = 1
+	skipHint.Text = "or click anywhere on the map to jump"
+	skipHint.TextColor3 = Color3.fromRGB(180, 180, 180)
+	skipHint.TextScaled = true
+	skipHint.Font = Enum.Font.Gotham
+	skipHint.Parent = jumpContainer
+
+	local skipHintConstraint = Instance.new("UITextSizeConstraint")
+	skipHintConstraint.MinTextSize = 10
+	skipHintConstraint.MaxTextSize = 14
+	skipHintConstraint.Parent = skipHint
+
 	jumpButton.MouseButton1Click:Connect(function()
 		DeploymentController.RequestJump()
+	end)
+
+	-- Pulse animation for jump button
+	task.spawn(function()
+		while jumpButton and jumpButton.Parent do
+			local pulseIn = TweenService:Create(jumpStroke, TweenInfo.new(0.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
+				Transparency = 0,
+				Thickness = 3,
+			})
+			pulseIn:Play()
+			pulseIn.Completed:Wait()
+
+			local pulseOut = TweenService:Create(jumpStroke, TweenInfo.new(0.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), {
+				Transparency = 0.5,
+				Thickness = 2,
+			})
+			pulseOut:Play()
+			pulseOut.Completed:Wait()
+		end
 	end)
 
 	-- Altitude display (during glide)
@@ -335,10 +398,37 @@ local function onGliderDisabled()
 end
 
 --[[
-	Handle jump denied
+	Handle jump denied - show toast feedback
 ]]
 local function onJumpDenied(data: { reason: string })
-	-- Could show UI feedback
+	-- Load toast if not loaded
+	if not ToastNotification then
+		local success, result = pcall(function()
+			return require(game.Players.LocalPlayer.PlayerGui:WaitForChild("ToastNotificationGui", 1))
+		end)
+		if not success then
+			-- Try loading from components
+			local playerScripts = game.Players.LocalPlayer:WaitForChild("PlayerScripts", 1)
+			if playerScripts then
+				local UI = playerScripts:FindFirstChild("UI")
+				if UI then
+					local Components = UI:FindFirstChild("Components")
+					if Components then
+						local toastModule = Components:FindFirstChild("ToastNotification")
+						if toastModule then
+							ToastNotification = require(toastModule)
+						end
+					end
+				end
+			end
+		end
+	end
+
+	-- Show toast notification
+	if ToastNotification then
+		ToastNotification.Warning(`Can't jump: {data.reason}`, 2)
+	end
+
 	warn(`[DeploymentController] Jump denied: {data.reason}`)
 end
 
@@ -408,6 +498,25 @@ function DeploymentController.Initialize()
 	table.insert(connections, heartbeatConn)
 
 	print("[DeploymentController] Initialized")
+end
+
+--[[
+	Enable deployment mode
+]]
+function DeploymentController.Enable()
+	isDeploymentActive = true
+	print("[DeploymentController] Enabled")
+end
+
+--[[
+	Disable deployment mode
+]]
+function DeploymentController.Disable()
+	isDeploymentActive = false
+	isGliding = false
+	hasJumped = false
+	hideDeploymentUI()
+	print("[DeploymentController] Disabled")
 end
 
 --[[

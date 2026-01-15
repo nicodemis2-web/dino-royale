@@ -147,7 +147,7 @@ function DeploymentManager.OnPlayerJump(player: Player): boolean
 	-- Check if over land
 	if not isOverLand(helicopterPos) then
 		-- Notify player they can't jump here
-		Events.FireClient(player, "GameState", "JumpDenied", {
+		Events.FireClient("GameState", "JumpDenied", player, {
 			reason = "Not over land",
 		})
 		return false
@@ -155,7 +155,7 @@ function DeploymentManager.OnPlayerJump(player: Player): boolean
 
 	-- Check altitude
 	if helicopterPos.Y < MIN_JUMP_ALTITUDE then
-		Events.FireClient(player, "GameState", "JumpDenied", {
+		Events.FireClient("GameState", "JumpDenied", player, {
 			reason = "Too low to jump",
 		})
 		return false
@@ -185,7 +185,7 @@ function DeploymentManager.OnPlayerJump(player: Player): boolean
 	end
 
 	-- Notify client to enable glider controls
-	Events.FireClient(player, "GameState", "GliderEnabled", {
+	Events.FireClient("GameState", "GliderEnabled", player, {
 		position = helicopterPos,
 	})
 
@@ -224,7 +224,7 @@ function DeploymentManager.OnPlayerLanded(player: Player)
 	end
 
 	-- Notify client
-	Events.FireClient(player, "GameState", "GliderDisabled", {})
+	Events.FireClient("GameState", "GliderDisabled", player, {})
 
 	print(`[DeploymentManager] {player.Name} landed`)
 end
@@ -259,7 +259,7 @@ function DeploymentManager.ForceEjectAll()
 					end
 				end
 
-				Events.FireClient(player, "GameState", "GliderEnabled", {
+				Events.FireClient("GameState", "GliderEnabled", player, {
 					position = helicopterPos,
 					forced = true,
 				})

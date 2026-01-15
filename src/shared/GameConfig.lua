@@ -221,11 +221,19 @@ GameConfig.UI = {
 
 -- Debug settings
 GameConfig.Debug = {
-	Enabled = false,
+	Enabled = true, -- Set to true for development testing
 	ShowHitboxes = false,
 	ShowAIDebug = false,
 	GodMode = false,
 	InfiniteAmmo = false,
+
+	-- Solo testing mode - bypasses player count requirements
+	SoloTestMode = true,
+	SkipLobbyCountdown = true,
+	QuickDeploy = true, -- Shorter deployment phase for testing
+
+	-- Admin user IDs who can use debug commands (add your Roblox UserId)
+	AdminUserIds = {},
 }
 
 return GameConfig

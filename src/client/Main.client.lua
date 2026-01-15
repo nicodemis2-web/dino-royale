@@ -24,6 +24,7 @@ local WeaponController: any = nil
 local InventoryController: any = nil
 local VehicleController: any = nil
 local DeploymentController: any = nil
+local MovementController: any = nil
 local HUDController: any = nil
 local AudioController: any = nil
 local MinimapController: any = nil
@@ -60,6 +61,7 @@ local function loadModules()
 	InventoryController = require(Controllers.InventoryController)
 	VehicleController = require(Controllers.VehicleController)
 	DeploymentController = require(Controllers.DeploymentController)
+	MovementController = require(Controllers.MovementController)
 	SpectatorController = require(Controllers.SpectatorController)
 	StormController = require(Controllers.StormController)
 
@@ -109,6 +111,7 @@ local function initializeSystems()
 	InventoryController.Initialize()
 	VehicleController.Initialize()
 	DeploymentController.Initialize()
+	MovementController.Initialize()
 	SpectatorController.Initialize()
 	StormController.Initialize()
 	BattlePassUI.Initialize()
@@ -142,11 +145,13 @@ local function handleStateChange(newState: string)
 		-- Full gameplay
 		HUDController.OnGameStateChanged("Playing")
 		DeploymentController.Disable()
+		MovementController.Enable()
 		WeaponController.Enable()
 
 	elseif newState == "Ending" then
 		-- Match results
 		HUDController.OnGameStateChanged("Ending")
+		MovementController.Disable()
 		WeaponController.Disable()
 
 	elseif newState == "Spectating" then
@@ -184,7 +189,7 @@ end
 ]]
 local function setupEventHandlers()
 	-- Game state changes
-	Events.OnClientEvent("GameState", "StateChanged", function(data)
+	Events.OnClientEvent("GameState", "MatchStateChanged", function(data)
 		local newState = data.newState
 		print(`[Client] Game state: {currentGameState} -> {newState}`)
 		currentGameState = newState
@@ -192,31 +197,8 @@ local function setupEventHandlers()
 		handleStateChange(newState)
 	end)
 
-	-- Join lobby
-	Events.OnClientEvent("GameState", "JoinLobby", function()
-		handleStateChange("Lobby")
-	end)
-
-	-- Spectate mode
-	Events.OnClientEvent("GameState", "Spectate", function()
-		handleStateChange("Spectating")
-	end)
-
-	-- Match countdown
-	Events.OnClientEvent("GameState", "Countdown", function(data)
-		-- UI handles countdown display
-	end)
-
-	-- Player death
-	Events.OnClientEvent("Player", "Died", function(data)
-		-- Switch to spectate
-		handleDeath(data)
-	end)
-
-	-- Player respawn (if reboot system used)
-	Events.OnClientEvent("Player", "Respawned", function()
-		handleRespawn()
-	end)
+	-- Note: Removed broken event listeners for non-existent events
+	-- MatchStateChanged above handles all state transitions
 end
 
 --[[
@@ -228,9 +210,9 @@ local function waitForCharacter()
 	-- Setup character-specific things
 	local humanoid = character:WaitForChild("Humanoid")
 
-	-- Track death
+	-- Track death (handled by server EliminationManager)
 	humanoid.Died:Connect(function()
-		Events.FireServer("Player", "Died", {})
+		print("[Client] Player died")
 	end)
 
 	return character
@@ -263,9 +245,6 @@ local function main()
 
 	print("[Client] Ready!")
 	print("==========================================")
-
-	-- Request initial state from server
-	Events.FireServer("GameState", "RequestState", {})
 end
 
 -- Run

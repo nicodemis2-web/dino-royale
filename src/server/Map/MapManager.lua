@@ -179,12 +179,183 @@ local function setupEventHandlers()
 end
 
 --[[
+	Terrain configuration
+]]
+local TERRAIN_CONFIG = {
+	mapSize = 2000, -- Total map size (2000x2000 studs)
+	resolution = 8, -- Terrain cell size
+	baseHeight = 0,
+
+	-- Biome regions (angles in radians, map divided into 3 sectors)
+	biomes = {
+		jungle = { startAngle = 0, endAngle = math.pi * 2/3 },
+		desert = { startAngle = math.pi * 2/3, endAngle = math.pi * 4/3 },
+		mountains = { startAngle = math.pi * 4/3, endAngle = math.pi * 2 },
+	}
+}
+
+--[[
+	Get biome at world position
+]]
+local function getBiomeAtPosition(x: number, z: number): string
+	local angle = math.atan2(z, x) + math.pi -- Convert to 0-2π range
+
+	if angle >= TERRAIN_CONFIG.biomes.jungle.startAngle and angle < TERRAIN_CONFIG.biomes.jungle.endAngle then
+		return "jungle"
+	elseif angle >= TERRAIN_CONFIG.biomes.desert.startAngle and angle < TERRAIN_CONFIG.biomes.desert.endAngle then
+		return "desert"
+	else
+		return "mountains"
+	end
+end
+
+--[[
+	Get terrain height at position based on biome
+]]
+local function getHeightAtPosition(x: number, z: number, biome: string): number
+	local distance = math.sqrt(x * x + z * z)
+	local normalizedDist = distance / TERRAIN_CONFIG.mapSize
+
+	-- Base noise for variation
+	local noise1 = math.noise(x / 200, z / 200) * 15
+	local noise2 = math.noise(x / 50, z / 50) * 5
+
+	if biome == "jungle" then
+		-- Jungle: Rolling hills, medium height
+		local jungleNoise = math.noise(x / 100, z / 100) * 25
+		return TERRAIN_CONFIG.baseHeight + noise1 + noise2 + jungleNoise + 5
+
+	elseif biome == "desert" then
+		-- Desert: Flat with gentle dunes
+		local duneNoise = math.noise(x / 150, z / 150) * 10
+		local smallDunes = math.noise(x / 30, z / 30) * 3
+		return TERRAIN_CONFIG.baseHeight + duneNoise + smallDunes
+
+	else -- mountains
+		-- Mountains: High peaks, dramatic elevation
+		local mountainNoise = math.noise(x / 80, z / 80) * 60
+		local peakNoise = math.max(0, math.noise(x / 40, z / 40)) * 40
+		local ridges = math.abs(math.noise(x / 60, z / 60)) * 30
+		return TERRAIN_CONFIG.baseHeight + mountainNoise + peakNoise + ridges + 20
+	end
+end
+
+--[[
+	Get terrain material based on biome and height
+]]
+local function getMaterialAtPosition(biome: string, height: number): Enum.Material
+	if biome == "jungle" then
+		if height > 30 then
+			return Enum.Material.Rock
+		elseif height > 10 then
+			return Enum.Material.LeafyGrass
+		else
+			return Enum.Material.Grass
+		end
+
+	elseif biome == "desert" then
+		if height > 15 then
+			return Enum.Material.Sandstone
+		else
+			return Enum.Material.Sand
+		end
+
+	else -- mountains
+		if height > 80 then
+			return Enum.Material.Snow
+		elseif height > 50 then
+			return Enum.Material.Glacier
+		elseif height > 30 then
+			return Enum.Material.Slate
+		else
+			return Enum.Material.Rock
+		end
+	end
+end
+
+--[[
+	Create the multi-biome terrain
+]]
+local function createBaseTerrain()
+	local workspace = game:GetService("Workspace")
+	local terrain = workspace.Terrain
+
+	print("[MapManager] Generating terrain (Jungle, Desert, Mountains)...")
+
+	local mapSize = TERRAIN_CONFIG.mapSize
+	local resolution = TERRAIN_CONFIG.resolution
+	local halfSize = mapSize / 2
+
+	-- Clear any existing terrain
+	terrain:Clear()
+
+	-- Generate terrain in chunks
+	local totalCells = 0
+	for x = -halfSize, halfSize, resolution do
+		for z = -halfSize, halfSize, resolution do
+			local biome = getBiomeAtPosition(x, z)
+			local height = getHeightAtPosition(x, z, biome)
+			local material = getMaterialAtPosition(biome, height)
+
+			-- Fill terrain column
+			local cellHeight = math.max(resolution, height + 10)
+			terrain:FillBlock(
+				CFrame.new(x, height / 2 - 5, z),
+				Vector3.new(resolution, cellHeight, resolution),
+				material
+			)
+			totalCells = totalCells + 1
+		end
+
+		-- Yield occasionally to prevent timeout
+		if totalCells % 1000 == 0 then
+			task.wait()
+		end
+	end
+
+	-- Add water in low areas
+	terrain:FillBlock(
+		CFrame.new(0, -8, 0),
+		Vector3.new(mapSize, 6, mapSize),
+		Enum.Material.Water
+	)
+
+	-- Create spawn location for lobby (center of map, elevated platform)
+	local spawnPlatform = Instance.new("Part")
+	spawnPlatform.Name = "LobbyPlatform"
+	spawnPlatform.Size = Vector3.new(50, 5, 50)
+	spawnPlatform.Position = Vector3.new(0, 25, 0)
+	spawnPlatform.Anchored = true
+	spawnPlatform.Material = Enum.Material.Concrete
+	spawnPlatform.Color = Color3.fromRGB(120, 120, 120)
+	spawnPlatform.Parent = workspace
+
+	local spawnLocation = Instance.new("SpawnLocation")
+	spawnLocation.Name = "LobbySpawn"
+	spawnLocation.Size = Vector3.new(20, 1, 20)
+	spawnLocation.Position = Vector3.new(0, 28, 0)
+	spawnLocation.Anchored = true
+	spawnLocation.Material = Enum.Material.SmoothPlastic
+	spawnLocation.Color = Color3.fromRGB(80, 80, 80)
+	spawnLocation.Neutral = true
+	spawnLocation.Parent = workspace
+
+	print("[MapManager] Terrain generated!")
+	print("  Jungle: North-East sector (LeafyGrass, rolling hills)")
+	print("  Desert: South sector (Sand, dunes)")
+	print("  Mountains: North-West sector (Snow peaks, rock cliffs)")
+end
+
+--[[
 	Initialize the map manager
 ]]
 function MapManager.Initialize()
 	if isInitialized then return end
 
 	print("[MapManager] Initializing Isla Primordial...")
+
+	-- Create base terrain first
+	createBaseTerrain()
 
 	-- Initialize sub-managers
 	BiomeManager.Initialize()

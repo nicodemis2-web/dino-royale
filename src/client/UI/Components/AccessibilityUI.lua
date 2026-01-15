@@ -12,6 +12,9 @@ local TweenService = game:GetService("TweenService")
 
 local AccessibilityData = require(ReplicatedStorage.Shared.AccessibilityData)
 
+-- Confirm dialog (loaded lazily)
+local ConfirmDialog: any = nil
+
 local AccessibilityUI = {}
 
 -- Forward declarations
@@ -194,8 +197,35 @@ function AccessibilityUI.CreateUI()
 	resetCorner.Parent = resetButton
 
 	resetButton.MouseButton1Click:Connect(function()
-		AccessibilityController.ResetToDefaults()
-		AccessibilityUI.RefreshContent()
+		-- Load confirm dialog if needed
+		if not ConfirmDialog then
+			local success, result = pcall(function()
+				return require(script.Parent.ConfirmDialog)
+			end)
+			if success then
+				ConfirmDialog = result
+				ConfirmDialog.Initialize()
+			end
+		end
+
+		-- Show confirmation dialog
+		if ConfirmDialog then
+			ConfirmDialog.Show({
+				title = "Reset Settings",
+				message = "Are you sure you want to reset all accessibility settings to their defaults? This cannot be undone.",
+				confirmText = "Reset",
+				cancelText = "Cancel",
+				confirmColor = Color3.fromRGB(180, 80, 80),
+				onConfirm = function()
+					AccessibilityController.ResetToDefaults()
+					AccessibilityUI.RefreshContent()
+				end,
+			})
+		else
+			-- Fallback if dialog fails to load
+			AccessibilityController.ResetToDefaults()
+			AccessibilityUI.RefreshContent()
+		end
 	end)
 
 	-- Load first category

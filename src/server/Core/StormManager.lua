@@ -10,8 +10,8 @@ local Players = game:GetService("Players")
 
 local Events = require(game.ReplicatedStorage.Shared.Events)
 
--- Forward declarations for HealthManager (to avoid circular dependency)
-local HealthManager: any = nil
+-- Forward declarations for CombatManager (to avoid circular dependency)
+local CombatManager: any = nil
 
 local StormManager = {}
 
@@ -124,10 +124,10 @@ function StormManager.Initialize(center: Vector3, radius: number)
 end
 
 --[[
-	Set the health manager reference (dependency injection)
+	Set the combat manager reference (dependency injection)
 ]]
-function StormManager.SetHealthManager(manager: any)
-	HealthManager = manager
+function StormManager.SetCombatManager(manager: any)
+	CombatManager = manager
 end
 
 --[[
@@ -279,7 +279,7 @@ end
 	Apply storm damage to players outside safe zone
 ]]
 function StormManager.ApplyStormDamage(damage: number)
-	if not HealthManager then
+	if not CombatManager then
 		return
 	end
 
@@ -296,8 +296,8 @@ function StormManager.ApplyStormDamage(damage: number)
 
 		local position = rootPart.Position
 		if not StormManager.IsInSafeZone(position) then
-			-- Apply damage (bypasses shield)
-			HealthManager.ApplyDamage(player, damage, "Storm", nil)
+			-- Apply storm damage through CombatManager
+			CombatManager.DealStormDamage(player, damage)
 		end
 	end
 end

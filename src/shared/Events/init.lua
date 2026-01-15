@@ -17,9 +17,23 @@ local Events = {}
 Events.Combat = {
 	"WeaponFire", -- Client -> Server: {weaponId, origin, direction}
 	"WeaponReload", -- Client -> Server: {weaponId}
+	"RequestHit", -- Client -> Server: {targetId, weaponId, hitPosition, hitPart}
+	"RequestMelee", -- Client -> Server: {targetId}
 	"DamageDealt", -- Server -> Client: {targetId, damage, hitPart, isCritical}
+	"DamageTaken", -- Server -> Client: {amount, armorDamage, health, armor, sourceId, sourceType, isHeadshot, isCritical}
 	"PlayerEliminated", -- Server -> All: {victimId, killerId, weapon, placement}
+	"YouWereEliminated", -- Server -> Client: {placement, eliminator, weapon}
 	"HitConfirm", -- Server -> Client: {isHeadshot}
+	"ArmorBroken", -- Server -> Client: {}
+	"Healed", -- Server -> Client: {amount, health, source}
+	"ArmorAdded", -- Server -> Client: {amount, armor, armorType}
+	"ArmorUpdated", -- Server -> Client: {armor}
+	"HealthUpdate", -- Server -> Client: {health, maxHealth, armor, maxArmor}
+	"Kill", -- Server -> Client: {victimId, victimName, killStreak, weaponId}
+	"Assist", -- Server -> Client: {victimId, victimName}
+	"StatusEffect", -- Server -> Client: {effect, duration}
+	"EcholocationDetected", -- Server -> Client: {}
+	"RevealPosition", -- Server -> Client: {position}
 }
 
 --[[
@@ -44,6 +58,12 @@ Events.GameState = {
 	"PlayerCountUpdate", -- Server -> All: {alivePlayers, totalPlayers}
 	"DeployReady", -- Server -> All: {flightPath}
 	"PlayerJumped", -- Client -> Server: {}
+	"GliderInput", -- Client -> Server: {pitch, yaw}
+	"GliderEnabled", -- Server -> Client: {position, forced?}
+	"GliderDisabled", -- Server -> Client: {}
+	"GliderLanded", -- Server -> Client: {position}
+	"JumpDenied", -- Server -> Client: {reason}
+	"PlayerJumpedFromHelicopter", -- Server -> All: {playerId, position}
 }
 
 --[[

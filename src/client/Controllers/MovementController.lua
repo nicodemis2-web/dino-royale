@@ -365,6 +365,15 @@ function MovementController.SetEnabled(enabled: boolean)
 	end
 end
 
+-- Convenience aliases
+function MovementController.Enable()
+	MovementController.SetEnabled(true)
+end
+
+function MovementController.Disable()
+	MovementController.SetEnabled(false)
+end
+
 --[[
 	Force a specific state (for external control like vehicles)
 	@param state The state to force
