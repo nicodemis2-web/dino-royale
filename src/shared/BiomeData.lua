@@ -51,7 +51,7 @@ BiomeData.MapSize = {
 }
 BiomeData.MapCenter = Vector3.new(0, 0, 0)
 
-BiomeData.Biomes: { [BiomeType]: BiomeConfig } = {
+BiomeData.Biomes = {
 	Jungle = {
 		name = "Jungle",
 		displayName = "Jungle Zone",

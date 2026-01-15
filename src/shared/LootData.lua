@@ -34,7 +34,7 @@ export type ChestConfig = {
 local LootData = {}
 
 -- Rarity colors for UI
-LootData.RarityColors: { [Rarity]: Color3 } = {
+LootData.RarityColors = {
 	Common = Color3.fromRGB(180, 180, 180),
 	Uncommon = Color3.fromRGB(100, 200, 100),
 	Rare = Color3.fromRGB(80, 150, 255),
@@ -43,7 +43,7 @@ LootData.RarityColors: { [Rarity]: Color3 } = {
 }
 
 -- Rarity drop weights (base chances)
-LootData.RarityWeights: { [Rarity]: number } = {
+LootData.RarityWeights = {
 	Common = 100,
 	Uncommon = 50,
 	Rare = 20,
@@ -53,7 +53,7 @@ LootData.RarityWeights: { [Rarity]: number } = {
 
 -- All loot items
 -- Note: Weapon IDs must match WeaponData.lua definitions
-LootData.Items: { [string]: LootItem } = {
+LootData.Items = {
 	-- PISTOLS (from WeaponData.Pistols)
 	RangerSidearm = { id = "RangerSidearm", name = "RangerSidearm", displayName = "Ranger Sidearm", category = "Weapon", rarity = "Common", stackable = false, maxStack = 1, weight = 100 },
 	SurvivorsFriend = { id = "SurvivorsFriend", name = "SurvivorsFriend", displayName = "Survivor's Friend", category = "Weapon", rarity = "Uncommon", stackable = false, maxStack = 1, weight = 60 },
@@ -125,7 +125,7 @@ LootData.Items: { [string]: LootItem } = {
 }
 
 -- Chest configurations by tier
-LootData.ChestConfigs: { [LootTier]: ChestConfig } = {
+LootData.ChestConfigs = {
 	Low = {
 		tier = "Low",
 		minItems = 1,
@@ -163,7 +163,7 @@ LootData.ChestConfigs: { [LootTier]: ChestConfig } = {
 }
 
 -- Floor loot spawn rates by category
-LootData.FloorLootWeights: { [LootCategory]: number } = {
+LootData.FloorLootWeights = {
 	Weapon = 20,
 	Ammo = 40,
 	Equipment = 15,

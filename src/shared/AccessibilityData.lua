@@ -44,7 +44,7 @@ export type AccessibilitySettings = {
 local AccessibilityData = {}
 
 -- Default settings
-AccessibilityData.Defaults: AccessibilitySettings = {
+AccessibilityData.Defaults = {
 	-- Visual
 	colorblindMode = "None",
 	highContrastUI = false,

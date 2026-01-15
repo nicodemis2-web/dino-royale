@@ -40,7 +40,7 @@ export type SeasonInfo = {
 local RankedData = {}
 
 -- Rank tiers from lowest to highest
-RankedData.Tiers: { RankTier } = {
+RankedData.Tiers = {
 	{
 		id = "Bronze",
 		name = "Bronze",

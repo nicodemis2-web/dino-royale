@@ -21,7 +21,7 @@ export type PingConfig = {
 
 local PingData = {}
 
-PingData.Pings: { [PingType]: PingConfig } = {
+PingData.Pings = {
 	Generic = {
 		name = "Generic",
 		displayName = "Ping",

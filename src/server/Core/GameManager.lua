@@ -154,18 +154,37 @@ function GameManager.CheckWinCondition()
 
 	local aliveCount = GameManager.GetAlivePlayerCount()
 
-	if aliveCount <= 1 then
-		-- Find winner
-		local winner: Player? = nil
-		for _, player in pairs(alivePlayers) do
-			winner = player
-			break
-		end
+	-- In solo debug mode, don't end game with 1 player (that's the only player!)
+	-- Only trigger win when a player is eliminated and 1 remains
+	if GameConfig.Debug.Enabled and GameConfig.Debug.SoloTestMode then
+		-- Solo mode: Only end if totalPlayersInMatch > 1 and aliveCount <= 1
+		-- This prevents auto-win when solo testing
+		if totalPlayersInMatch > 1 and aliveCount <= 1 then
+			local winner: Player? = nil
+			for _, player in pairs(alivePlayers) do
+				winner = player
+				break
+			end
 
-		GameManager.TransitionTo("Ending", {
-			winner = winner,
-			placement = 1,
-		})
+			GameManager.TransitionTo("Ending", {
+				winner = winner,
+				placement = 1,
+			})
+		end
+	else
+		-- Normal multiplayer: End when 1 or fewer remain
+		if aliveCount <= 1 then
+			local winner: Player? = nil
+			for _, player in pairs(alivePlayers) do
+				winner = player
+				break
+			end
+
+			GameManager.TransitionTo("Ending", {
+				winner = winner,
+				placement = 1,
+			})
+		end
 	end
 
 	isCheckingWinCondition = false

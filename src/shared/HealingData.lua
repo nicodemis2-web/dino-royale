@@ -42,7 +42,7 @@ export type HealingItem = {
 
 local HealingData = {}
 
-HealingData.Items: { [string]: HealingItem } = {
+HealingData.Items = {
 	Bandage = {
 		id = "Bandage",
 		name = "Bandage",

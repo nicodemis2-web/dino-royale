@@ -481,6 +481,11 @@ function DinosaurBase:TakeDamage(amount: number, source: Player?)
 
 	self.stats.health = math.max(0, self.stats.health - actualDamage)
 
+	-- Update model attribute for client-side health bar
+	if self.model then
+		self.model:SetAttribute("Health", self.stats.health)
+	end
+
 	-- Set source as target (aggro)
 	if source and self.stats.health > 0 then
 		self.target = source
@@ -719,6 +724,17 @@ function DinosaurBase:SetModel(model: Model)
 			part.Anchored = false
 		end
 	end
+
+	-- Set attributes for client-side targeting UI
+	local speciesData = DinosaurData.AllDinosaurs[self.species]
+	model:SetAttribute("Species", self.species)
+	model:SetAttribute("Health", self.stats.health)
+	model:SetAttribute("MaxHealth", self.stats.maxHealth)
+	model:SetAttribute("Tier", speciesData and speciesData.tier or "Common")
+	model:SetAttribute("DinosaurId", self.id)
+
+	-- Add dinosaur tag for CollectionService queries
+	model:AddTag("Dinosaur")
 end
 
 --[[

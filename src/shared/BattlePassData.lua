@@ -38,7 +38,7 @@ export type SeasonInfo = {
 local BattlePassData = {}
 
 -- Current season info
-BattlePassData.CurrentSeason: SeasonInfo = {
+BattlePassData.CurrentSeason = {
 	seasonNumber = 1,
 	seasonName = "Welcome to the Park",
 	theme = "Jurassic",
@@ -254,7 +254,7 @@ local Rewards: { [string]: BattlePassReward } = {
 }
 
 -- Battle Pass tiers (100 total)
-BattlePassData.Tiers: { BattlePassTier } = {}
+BattlePassData.Tiers = {}
 
 -- Generate all 100 tiers
 local freeRewardSchedule = {

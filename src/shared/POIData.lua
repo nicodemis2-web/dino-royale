@@ -47,7 +47,7 @@ export type POIConfig = {
 
 local POIData = {}
 
-POIData.POIs: { [string]: POIConfig } = {
+POIData.POIs = {
 	-- JUNGLE ZONE POIs
 	VisitorCenter = {
 		name = "VisitorCenter",

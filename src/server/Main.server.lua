@@ -23,7 +23,7 @@ print("[Server] CharacterAutoLoads = false")
 -- This removes legacy spawn locations that may have been saved in the place file
 local cleanupList = {
 	"LobbySpawn", "LobbyPlatform", "SpawnPlatform", "TempSpawnPlatform",
-	"TempLobbyPlatform", "FallbackSpawnPlatform", "MainSpawn", "TempSpawn"
+	"TempLobbyPlatform", "FallbackSpawnPlatform", "TempSpawn", "OldMainSpawn"
 }
 for _, name in ipairs(cleanupList) do
 	local obj = Workspace:FindFirstChild(name)
@@ -32,11 +32,12 @@ for _, name in ipairs(cleanupList) do
 		print(`[Server] Removed legacy spawn object: {name}`)
 	end
 end
--- Also remove ALL SpawnLocation objects in workspace root
+-- Remove only OLD SpawnLocation objects (not ones we create)
+-- We'll create our own MainSpawn after terrain generation
 for _, child in ipairs(Workspace:GetChildren()) do
 	if child:IsA("SpawnLocation") then
 		child:Destroy()
-		print(`[Server] Removed SpawnLocation: {child.Name}`)
+		print(`[Server] Removed old SpawnLocation: {child.Name}`)
 	end
 end
 print("[Server] Legacy spawn cleanup complete")
@@ -133,6 +134,7 @@ local EventsFolder = script.Parent:FindFirstChild("Events")
 local Map = script.Parent:FindFirstChild("Map")
 local Loot = script.Parent:FindFirstChild("Loot")
 local Combat = script.Parent:FindFirstChild("Combat")
+local Inventory = script.Parent:FindFirstChild("Inventory")
 
 if Core then
 	GameManager = safeRequire(Core:FindFirstChild("GameManager"), "GameManager")
@@ -150,8 +152,11 @@ if Weapons then
 	WeaponManager = safeRequire(Weapons:FindFirstChild("WeaponManager"), "WeaponManager")
 end
 
+if Inventory then
+	InventoryManager = safeRequire(Inventory:FindFirstChild("InventoryManager"), "InventoryManager")
+end
+
 if Player then
-	InventoryManager = safeRequire(Player:FindFirstChild("InventoryManager"), "InventoryManager")
 	EliminationManager = safeRequire(Player:FindFirstChild("EliminationManager"), "EliminationManager")
 	RevivalManager = safeRequire(Player:FindFirstChild("RevivalManager"), "RevivalManager")
 	RebootBeaconManager = safeRequire(Player:FindFirstChild("RebootBeaconManager"), "RebootBeaconManager")
@@ -196,20 +201,41 @@ print("[Server] GENERATING 4KM x 4KM WORLD...")
 -- Initialize MapManager FIRST - this generates terrain
 safeInit(MapManager, "MapManager")
 
+-- Wait briefly for terrain to fully register
+task.wait(0.1)
+
 -- Find terrain height at spawn location using raycast
 local function getTerrainSpawnHeight(x: number, z: number): number
 	local rayOrigin = Vector3.new(x, 500, z)
 	local rayResult = Workspace:Raycast(rayOrigin, Vector3.new(0, -1000, 0))
 	if rayResult then
+		print(`[Server] Raycast hit at Y={rayResult.Position.Y}, material={rayResult.Material}`)
 		return rayResult.Position.Y + 5 -- 5 studs above terrain
 	end
-	return 50 -- Fallback height
+	print("[Server] WARNING: Raycast missed terrain! Using fallback height.")
+	return 30 -- Fallback height (terrain is at ~25)
 end
 
--- Set spawn position on terrain (no platform needed)
+-- Set spawn position on terrain
 local spawnY = getTerrainSpawnHeight(200, 200)
 spawnPosition = Vector3.new(200, spawnY, 200)
 print(`[Server] Spawn position set to terrain at {spawnPosition}`)
+
+-- CRITICAL: Create a SpawnLocation so LoadCharacter() doesn't spawn players at void
+-- This ensures players spawn at the correct position from the start
+local mainSpawnLocation = Instance.new("SpawnLocation")
+mainSpawnLocation.Name = "MainSpawn"
+mainSpawnLocation.Size = Vector3.new(20, 1, 20)
+mainSpawnLocation.Position = spawnPosition
+mainSpawnLocation.Anchored = true
+mainSpawnLocation.CanCollide = true -- Players can stand on it
+mainSpawnLocation.Transparency = 0.8 -- Slightly visible for debugging
+mainSpawnLocation.BrickColor = BrickColor.new("Bright green")
+mainSpawnLocation.Material = Enum.Material.Neon
+mainSpawnLocation.Neutral = true -- All teams can spawn here
+mainSpawnLocation.Duration = 0 -- No spawn protection delay
+mainSpawnLocation.Parent = Workspace
+print(`[Server] Created SpawnLocation at {spawnPosition}`)
 
 print("[Server] World generation complete!")
 
@@ -307,6 +333,9 @@ local function configureCharacter(player: Player, character: Model)
 	print(`[Server] Configured {player.Name}: Ready to play!`)
 end
 
+-- Load GameConfig for debug settings
+local GameConfig = require(ReplicatedStorage.Shared.GameConfig)
+
 -- Spawn a player directly on terrain (no countdown)
 local function spawnPlayer(player: Player)
 	print(`[Server] Spawning {player.Name} on terrain...`)
@@ -319,37 +348,102 @@ local function spawnPlayer(player: Player)
 		pcall(function() WeaponManager.InitializePlayer(player) end)
 	end
 
-	-- Load character
+	-- Load character - SpawnLocation "MainSpawn" should position them correctly
 	player:LoadCharacter()
 
 	-- Wait for character to load
 	local character = player.Character or player.CharacterAdded:Wait()
 
-	-- Find actual terrain height at spawn location using raycast
-	local spawnX, spawnZ = 200, 200
-	local rayOrigin = Vector3.new(spawnX, 500, spawnZ)
-	local rayResult = Workspace:Raycast(rayOrigin, Vector3.new(0, -1000, 0))
-	local actualSpawnY = 30 -- Default fallback
-	if rayResult then
-		actualSpawnY = rayResult.Position.Y + 5 -- 5 studs above terrain
-		print(`[Server] Raycast found terrain at Y={rayResult.Position.Y}, spawning at Y={actualSpawnY}`)
-	else
-		print(`[Server] WARNING: Raycast missed terrain, using fallback Y={actualSpawnY}`)
+	-- Wait for HumanoidRootPart
+	local rootPart = character:WaitForChild("HumanoidRootPart", 5) :: BasePart?
+	if not rootPart then
+		warn(`[Server] Could not find HumanoidRootPart for {player.Name}`)
+		return
 	end
 
-	-- Move to spawn position on terrain
-	local rootPart = character:WaitForChild("HumanoidRootPart", 5)
-	if rootPart then
-		-- Small delay to ensure character is fully loaded
-		task.wait(0.1)
-		local finalSpawnPos = Vector3.new(spawnX, actualSpawnY, spawnZ)
-		rootPart.CFrame = CFrame.new(finalSpawnPos)
-		print(`[Server] Teleported {player.Name} to {finalSpawnPos}`)
+	-- Small delay to let physics settle
+	task.wait(0.2)
+
+	-- Safety check: Ensure player is at valid position
+	-- If they somehow spawned in void or wrong location, teleport them
+	local currentPos = rootPart.Position
+	print(`[Server] {player.Name} spawned at position: {currentPos}`)
+
+	-- Check if position is invalid (falling in void or too high)
+	local needsTeleport = currentPos.Y < 0 or currentPos.Y > 500 or
+		(math.abs(currentPos.X - 200) > 100 and math.abs(currentPos.Z - 200) > 100)
+
+	if needsTeleport then
+		print(`[Server] {player.Name} at invalid position, teleporting to spawn...`)
+		-- Raycast to find terrain
+		local rayOrigin = Vector3.new(200, 500, 200)
+		local rayResult = Workspace:Raycast(rayOrigin, Vector3.new(0, -1000, 0))
+		local safeY = rayResult and (rayResult.Position.Y + 5) or 30
+		local safePos = Vector3.new(200, safeY, 200)
+		rootPart.CFrame = CFrame.new(safePos)
+		rootPart.AssemblyLinearVelocity = Vector3.zero -- Stop any falling
+		print(`[Server] Teleported {player.Name} to {safePos}`)
+	else
+		-- Just make sure they're not falling
+		rootPart.AssemblyLinearVelocity = Vector3.zero
 	end
 
 	-- Configure character (ready to move immediately)
 	configureCharacter(player, character)
+
+	-- Debug mode: Give starting weapons and ammo
+	if GameConfig.Debug.Enabled and GameConfig.Debug.SoloTestMode then
+		task.defer(function()
+			task.wait(0.5) -- Wait for inventory to be fully initialized
+
+			if InventoryManager then
+				-- Give starter pistol
+				pcall(function()
+					InventoryManager.AddWeapon(player, "Pistol", "Common")
+					print(`[Server] Gave {player.Name} starting Pistol`)
+				end)
+
+				-- Give starter assault rifle
+				pcall(function()
+					InventoryManager.AddWeapon(player, "AssaultRifle", "Common")
+					print(`[Server] Gave {player.Name} starting AssaultRifle`)
+				end)
+
+				-- Give starting ammo
+				pcall(function()
+					InventoryManager.AddAmmo(player, "LightAmmo", 120)
+					InventoryManager.AddAmmo(player, "MediumAmmo", 90)
+					print(`[Server] Gave {player.Name} starting ammo`)
+				end)
+
+				-- Give some healing items
+				pcall(function()
+					InventoryManager.AddConsumable(player, "Bandage", 5)
+					InventoryManager.AddConsumable(player, "MiniShield", 3)
+					print(`[Server] Gave {player.Name} starting consumables`)
+				end)
+			end
+		end)
+	end
+
 	print(`[Server] {player.Name} spawned and ready!`)
+
+	-- Send welcome notification to client
+	task.defer(function()
+		task.wait(1) -- Wait for client to be ready
+		Events.FireClient("GameState", "WelcomeMessage", player, {
+			title = "WELCOME TO DINO ROYALE",
+			message = "Explore the island, find weapons, and watch out for dinosaurs!",
+			controls = {
+				{ key = "WASD", action = "Move" },
+				{ key = "Shift", action = "Sprint" },
+				{ key = "C", action = "Crouch" },
+				{ key = "1-5", action = "Switch Weapons" },
+				{ key = "R", action = "Reload" },
+				{ key = "E", action = "Interact" },
+			},
+		})
+	end)
 end
 
 -- Handle death/respawn

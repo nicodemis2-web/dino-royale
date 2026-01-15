@@ -58,6 +58,7 @@ Events.GameState = {
 	"PlayerCountUpdate", -- Server -> All: {alivePlayers, totalPlayers}
 	"CountdownStarted", -- Server -> All: {duration}
 	"CountdownUpdate", -- Server -> All: {remaining}
+	"CountdownCancelled", -- Server -> All: {}
 	"DeployReady", -- Server -> All: {flightPath}
 	"PlayerJumped", -- Client -> Server: {}
 	"GliderInput", -- Client -> Server: {pitch, yaw}
@@ -67,6 +68,8 @@ Events.GameState = {
 	"JumpDenied", -- Server -> Client: {reason}
 	"PlayerJumpedFromHelicopter", -- Server -> All: {playerId, position}
 	"SupplyDropIncoming", -- Server -> All: {position}
+	"WelcomeMessage", -- Server -> Client: {title, message, controls}
+	"LobbyUpdate", -- Server -> All: {players}
 }
 
 --[[
@@ -83,6 +86,16 @@ Events.Dinosaur = {
 }
 
 --[[
+	BOSS EVENTS
+	Boss encounters and special events
+]]
+Events.Boss = {
+	"Spawned", -- Server -> All: {bossId, bossType, position}
+	"Damaged", -- Server -> All: {bossId, damage, health}
+	"Defeated", -- Server -> All: {bossId, killerId, rewards}
+}
+
+--[[
 	VEHICLE EVENTS
 	Vehicle entry, exit, and control
 ]]
@@ -92,6 +105,9 @@ Events.Vehicle = {
 	"VehicleInput", -- Client -> Server: {throttle, steer, brake}
 	"VehicleDamaged", -- Server -> Nearby: {vehicleId, newHealth}
 	"VehicleDestroyed", -- Server -> All: {vehicleId, position}
+	"VehicleSpawned", -- Server -> Nearby: {vehicleId, vehicleType, position}
+	"BoatEnterWater", -- Server -> All: {vehicleId}
+	"BoatExitWater", -- Server -> All: {vehicleId}
 }
 
 --[[
@@ -115,6 +131,7 @@ Events.Map = {
 	"MapData", -- Server -> Client: {mapData}
 	"RequestPOIInfo", -- Client -> Server: {poiName}
 	"POIInfo", -- Server -> Client: {name, config, state}
+	"BiomeChanged", -- Server -> Client: {biome, config}
 }
 
 --[[
@@ -262,6 +279,16 @@ Events.Loot = {
 	"RequestPickup", -- Client -> Server: {lootId}
 	"LootSpawned", -- Server -> Nearby: {lootId, position, itemType}
 	"LootPickedUp", -- Server -> All: {lootId, playerId}
+}
+
+--[[
+	ADMIN CONSOLE EVENTS
+	Admin commands and server management
+]]
+Events.AdminConsole = {
+	"ExecuteCommand", -- Client -> Server: {command, args}
+	"CommandResult", -- Server -> Client: {success, message}
+	"LogMessage", -- Server -> Client: {level, message, timestamp}
 }
 
 -- Cache for created events folder

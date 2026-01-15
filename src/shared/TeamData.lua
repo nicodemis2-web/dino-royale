@@ -35,7 +35,7 @@ export type TeamModeConfig = {
 
 local TeamData = {}
 
-TeamData.Modes: { [TeamMode]: TeamModeConfig } = {
+TeamData.Modes = {
 	Solos = {
 		name = "Solos",
 		displayName = "Solo",

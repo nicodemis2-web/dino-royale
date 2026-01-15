@@ -42,6 +42,12 @@ function LobbyScreen.Initialize()
 	LobbyScreen.CreateUI()
 	LobbyScreen.SetupEventListeners()
 
+	-- Auto-show lobby on initialization
+	task.defer(function()
+		task.wait(0.5) -- Brief delay for character to load
+		LobbyScreen.Show()
+	end)
+
 	print("[LobbyScreen] Initialized")
 end
 
@@ -239,23 +245,31 @@ end
 	Setup event listeners
 ]]
 function LobbyScreen.SetupEventListeners()
-	-- Lobby updates
-	Events.OnClientEvent("GameState", function(action, data)
-		if action == "JoinLobby" then
+	-- Listen for match state changes (new format from Main.client.lua)
+	Events.OnClientEvent("GameState", "MatchStateChanged", function(data)
+		if data.newState == "Deploying" or data.newState == "Playing" then
+			LobbyScreen.Hide()
+		elseif data.newState == "Lobby" then
 			LobbyScreen.Show()
-		elseif action == "LobbyUpdate" then
-			LobbyScreen.UpdatePlayerList(data.players)
-		elseif action == "Countdown" then
-			LobbyScreen.StartCountdown(data.time)
-		elseif action == "CountdownCancelled" then
-			LobbyScreen.CancelCountdown()
-		elseif action == "StateChanged" then
-			if data.newState == "Deploying" or data.newState == "Playing" then
-				LobbyScreen.Hide()
-			elseif data.newState == "Lobby" then
-				LobbyScreen.Show()
-			end
 		end
+	end)
+
+	-- Legacy format lobby updates (for backwards compatibility)
+	Events.OnClientEvent("GameState", "LobbyUpdate", function(data)
+		if data and data.players then
+			LobbyScreen.UpdatePlayerList(data.players)
+		end
+	end)
+
+	-- Countdown events
+	Events.OnClientEvent("GameState", "CountdownStarted", function(data)
+		if data and data.duration then
+			LobbyScreen.StartCountdown(data.duration)
+		end
+	end)
+
+	Events.OnClientEvent("GameState", "CountdownCancelled", function()
+		LobbyScreen.CancelCountdown()
 	end)
 
 	-- Player added/removed

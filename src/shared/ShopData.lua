@@ -33,7 +33,7 @@ export type ShopRotation = {
 local ShopData = {}
 
 -- All available shop items
-ShopData.Catalog: { [string]: ShopItem } = {
+ShopData.Catalog = {
 	-- LEGENDARY SKINS (1500-2000 Robux)
 	Skin_RexHunter = {
 		id = "Skin_RexHunter",
@@ -311,7 +311,7 @@ ShopData.Catalog: { [string]: ShopItem } = {
 }
 
 -- Current shop rotation (would be managed by server in production)
-ShopData.CurrentRotation: ShopRotation = {
+ShopData.CurrentRotation = {
 	featured = {},
 	daily = {},
 	special = {},

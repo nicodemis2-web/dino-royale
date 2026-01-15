@@ -41,6 +41,7 @@ local TutorialUI: any = nil
 local PartyUI: any = nil
 local RankedUI: any = nil
 local AccessibilityUI: any = nil
+local DinosaurTargeting: any = nil
 
 -- State
 local isInitialized = false
@@ -79,6 +80,7 @@ local function loadModules()
 	PartyUI = require(UI.Components.PartyUI)
 	RankedUI = require(UI.Components.RankedUI)
 	AccessibilityUI = require(UI.Components.AccessibilityUI)
+	DinosaurTargeting = require(UI.Components.DinosaurTargeting)
 
 	-- Audio
 	AudioController = require(Audio.AudioController)
@@ -120,6 +122,7 @@ local function initializeSystems()
 	PartyUI.Initialize()
 	RankedUI.Initialize()
 	AccessibilityUI.Initialize()
+	DinosaurTargeting.Initialize()
 
 	print("[Client] Systems initialized")
 end
@@ -269,10 +272,150 @@ local function hideCountdown()
 	end
 end
 
+-- Welcome screen GUI reference
+local welcomeGui: ScreenGui? = nil
+
+--[[
+	Create and show welcome message
+]]
+local function showWelcomeMessage(data: any)
+	if not data then return end
+
+	local playerGui = localPlayer:WaitForChild("PlayerGui") :: PlayerGui
+
+	-- Remove existing welcome if any
+	if welcomeGui then
+		welcomeGui:Destroy()
+	end
+
+	welcomeGui = Instance.new("ScreenGui")
+	welcomeGui.Name = "WelcomeGui"
+	welcomeGui.ResetOnSpawn = false
+	welcomeGui.DisplayOrder = 100
+	welcomeGui.Parent = playerGui
+
+	-- Main frame with semi-transparent background
+	local frame = Instance.new("Frame")
+	frame.Name = "WelcomeFrame"
+	frame.Size = UDim2.new(0, 500, 0, 400)
+	frame.Position = UDim2.new(0.5, -250, 0.5, -200)
+	frame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+	frame.BackgroundTransparency = 0.1
+	frame.BorderSizePixel = 0
+	frame.Parent = welcomeGui
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 16)
+	corner.Parent = frame
+
+	-- Title
+	local title = Instance.new("TextLabel")
+	title.Name = "Title"
+	title.Size = UDim2.new(1, 0, 0, 60)
+	title.Position = UDim2.new(0, 0, 0, 20)
+	title.BackgroundTransparency = 1
+	title.Text = data.title or "WELCOME"
+	title.TextColor3 = Color3.fromRGB(255, 150, 50)
+	title.TextSize = 36
+	title.Font = Enum.Font.GothamBlack
+	title.Parent = frame
+
+	-- Message
+	local message = Instance.new("TextLabel")
+	message.Name = "Message"
+	message.Size = UDim2.new(1, -40, 0, 50)
+	message.Position = UDim2.new(0, 20, 0, 80)
+	message.BackgroundTransparency = 1
+	message.Text = data.message or ""
+	message.TextColor3 = Color3.fromRGB(200, 200, 200)
+	message.TextSize = 16
+	message.Font = Enum.Font.Gotham
+	message.TextWrapped = true
+	message.Parent = frame
+
+	-- Controls section
+	local controlsLabel = Instance.new("TextLabel")
+	controlsLabel.Name = "ControlsLabel"
+	controlsLabel.Size = UDim2.new(1, 0, 0, 30)
+	controlsLabel.Position = UDim2.new(0, 0, 0, 140)
+	controlsLabel.BackgroundTransparency = 1
+	controlsLabel.Text = "CONTROLS"
+	controlsLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
+	controlsLabel.TextSize = 20
+	controlsLabel.Font = Enum.Font.GothamBold
+	controlsLabel.Parent = frame
+
+	-- Controls list
+	local controlsFrame = Instance.new("Frame")
+	controlsFrame.Name = "Controls"
+	controlsFrame.Size = UDim2.new(1, -60, 0, 150)
+	controlsFrame.Position = UDim2.new(0, 30, 0, 175)
+	controlsFrame.BackgroundTransparency = 1
+	controlsFrame.Parent = frame
+
+	local listLayout = Instance.new("UIGridLayout")
+	listLayout.CellSize = UDim2.new(0.5, -10, 0, 25)
+	listLayout.CellPadding = UDim2.new(0, 10, 0, 5)
+	listLayout.Parent = controlsFrame
+
+	if data.controls then
+		for _, ctrl in ipairs(data.controls) do
+			local ctrlLabel = Instance.new("TextLabel")
+			ctrlLabel.Size = UDim2.new(0, 200, 0, 25)
+			ctrlLabel.BackgroundTransparency = 1
+			ctrlLabel.Text = `[{ctrl.key}] {ctrl.action}`
+			ctrlLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+			ctrlLabel.TextSize = 14
+			ctrlLabel.Font = Enum.Font.Gotham
+			ctrlLabel.TextXAlignment = Enum.TextXAlignment.Left
+			ctrlLabel.Parent = controlsFrame
+		end
+	end
+
+	-- Close button
+	local closeButton = Instance.new("TextButton")
+	closeButton.Name = "CloseButton"
+	closeButton.Size = UDim2.new(0, 200, 0, 50)
+	closeButton.Position = UDim2.new(0.5, -100, 1, -70)
+	closeButton.BackgroundColor3 = Color3.fromRGB(80, 180, 80)
+	closeButton.BorderSizePixel = 0
+	closeButton.Text = "LET'S GO!"
+	closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+	closeButton.TextSize = 20
+	closeButton.Font = Enum.Font.GothamBold
+	closeButton.Parent = frame
+
+	local btnCorner = Instance.new("UICorner")
+	btnCorner.CornerRadius = UDim.new(0, 8)
+	btnCorner.Parent = closeButton
+
+	closeButton.MouseButton1Click:Connect(function()
+		if welcomeGui then
+			welcomeGui:Destroy()
+			welcomeGui = nil
+		end
+	end)
+
+	-- Auto-dismiss after 10 seconds
+	task.delay(10, function()
+		if welcomeGui then
+			welcomeGui:Destroy()
+			welcomeGui = nil
+		end
+	end)
+
+	print("[Client] Welcome message displayed")
+end
+
 --[[
 	Setup event handlers
 ]]
 local function setupEventHandlers()
+	-- Welcome message from server
+	Events.OnClientEvent("GameState", "WelcomeMessage", function(data)
+		showWelcomeMessage(data)
+	end)
+
 	-- Game state changes
 	Events.OnClientEvent("GameState", "MatchStateChanged", function(data)
 		local newState = data.newState
@@ -282,6 +425,12 @@ local function setupEventHandlers()
 		-- Hide countdown when leaving lobby
 		if newState ~= "Lobby" then
 			hideCountdown()
+		end
+
+		-- Hide welcome message when game starts
+		if newState == "Playing" and welcomeGui then
+			welcomeGui:Destroy()
+			welcomeGui = nil
 		end
 
 		handleStateChange(newState)

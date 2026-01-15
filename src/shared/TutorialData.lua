@@ -26,7 +26,7 @@ export type ContextTip = {
 local TutorialData = {}
 
 -- Tutorial stages for new players
-TutorialData.Stages: { TutorialStage } = {
+TutorialData.Stages = {
 	{
 		id = "Movement",
 		name = "Movement Basics",
@@ -122,7 +122,7 @@ TutorialData.Stages: { TutorialStage } = {
 }
 
 -- Context-sensitive tips shown during first matches
-TutorialData.ContextTips: { ContextTip } = {
+TutorialData.ContextTips = {
 	{
 		id = "FirstLanding",
 		trigger = "PlayerLanded",

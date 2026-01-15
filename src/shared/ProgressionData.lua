@@ -45,7 +45,7 @@ export type Challenge = {
 local ProgressionData = {}
 
 -- XP values for different actions
-ProgressionData.XPValues: { [XPSource]: number } = {
+ProgressionData.XPValues = {
 	Kill = 100,
 	DinoKill = 25,
 	Assist = 50,
@@ -93,7 +93,7 @@ for level = 1, 100 do
 end
 
 -- Level rewards
-ProgressionData.LevelRewards: { LevelReward } = {
+ProgressionData.LevelRewards = {
 	-- Early levels
 	{ level = 2, rewardType = "Currency", rewardId = "coins_100", rewardName = "100 Coins", description = "Starter coins" },
 	{ level = 5, rewardType = "Spray", rewardId = "spray_dino_print", rewardName = "Dino Footprint", description = "Basic spray" },
@@ -118,7 +118,7 @@ ProgressionData.LevelRewards: { LevelReward } = {
 }
 
 -- Default challenges
-ProgressionData.DailyChallenges: { Challenge } = {
+ProgressionData.DailyChallenges = {
 	{
 		id = "daily_kills_5",
 		name = "Hunter",
@@ -166,7 +166,7 @@ ProgressionData.DailyChallenges: { Challenge } = {
 	},
 }
 
-ProgressionData.WeeklyChallenges: { Challenge } = {
+ProgressionData.WeeklyChallenges = {
 	{
 		id = "weekly_wins_3",
 		name = "Champion",
@@ -215,7 +215,7 @@ ProgressionData.WeeklyChallenges: { Challenge } = {
 }
 
 -- Lifetime achievements
-ProgressionData.LifetimeChallenges: { Challenge } = {
+ProgressionData.LifetimeChallenges = {
 	{
 		id = "lifetime_wins_100",
 		name = "Century Champion",
