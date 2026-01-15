@@ -122,6 +122,12 @@ function DinosaurBase.new(species: string, position: Vector3): DinosaurInstance
 	self._lastPathUpdate = 0
 	self._moveTarget = nil
 
+	-- Patrol state (simple movement system)
+	self._patrolTarget = nil
+	self._lastPatrolTime = 0
+	self._patrolInterval = 3 + math.random() * 4 -- 3-7 seconds between movements
+	self._patrolRadius = 30 -- How far to wander from home
+
 	return self
 end
 
@@ -211,6 +217,9 @@ function DinosaurBase:Update(dt: number)
 		end
 	end
 
+	-- Simple patrol system (always runs, doesn't depend on behavior tree)
+	self:UpdatePatrol(dt)
+
 	-- Update behavior tree (wrapped in pcall for safety)
 	if self.behaviorTree then
 		local success, err = pcall(function()
@@ -220,6 +229,55 @@ function DinosaurBase:Update(dt: number)
 			-- Disable behavior tree if it keeps erroring
 			warn(`[DinosaurBase] Behavior tree error for {self.species}: {err}`)
 			self.behaviorTree = nil
+		end
+	end
+end
+
+--[[
+	Simple patrol system - makes dinosaurs wander around their home position
+	This runs independently of the behavior tree for reliability
+]]
+function DinosaurBase:UpdatePatrol(dt: number)
+	if not self.model then
+		return
+	end
+
+	local humanoid = self.model:FindFirstChildOfClass("Humanoid")
+	if not humanoid then
+		return
+	end
+
+	local now = tick()
+
+	-- Check if it's time to pick a new patrol target
+	if now - self._lastPatrolTime >= self._patrolInterval then
+		self._lastPatrolTime = now
+		self._patrolInterval = 3 + math.random() * 4 -- Randomize next interval
+
+		-- Pick a random point within patrol radius of home
+		local angle = math.random() * math.pi * 2
+		local distance = math.random() * self._patrolRadius
+		local offsetX = math.cos(angle) * distance
+		local offsetZ = math.sin(angle) * distance
+
+		self._patrolTarget = Vector3.new(
+			self.homePosition.X + offsetX,
+			self.currentPosition.Y,
+			self.homePosition.Z + offsetZ
+		)
+	end
+
+	-- Move toward patrol target if we have one
+	if self._patrolTarget then
+		local distanceToTarget = (Vector3.new(self.currentPosition.X, 0, self.currentPosition.Z) -
+			Vector3.new(self._patrolTarget.X, 0, self._patrolTarget.Z)).Magnitude
+
+		if distanceToTarget > 3 then
+			-- Still moving to target
+			humanoid:MoveTo(self._patrolTarget)
+		else
+			-- Reached target, clear it
+			self._patrolTarget = nil
 		end
 	end
 end
@@ -651,6 +709,15 @@ function DinosaurBase:SetModel(model: Model)
 	-- Position model
 	if model.PrimaryPart then
 		model:SetPrimaryPartCFrame(CFrame.new(self.currentPosition))
+		-- IMPORTANT: Unanchor the root part so the dinosaur can move!
+		model.PrimaryPart.Anchored = false
+	end
+
+	-- Unanchor all parts so physics/movement works
+	for _, part in ipairs(model:GetDescendants()) do
+		if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+			part.Anchored = false
+		end
 	end
 end
 
