@@ -42,6 +42,7 @@ export type PlayerCombatState = {
 
 -- State
 local playerStates: { [Player]: PlayerCombatState } = {}
+local playerConnections: { [Player]: { RBXScriptConnection } } = {} -- Per-player connections for cleanup
 local isInitialized = false
 
 -- Constants
@@ -120,11 +121,13 @@ function CombatManager.InitializePlayer(player: Player)
 	}
 
 	playerStates[player] = state
+	playerConnections[player] = {}
 
 	-- Sync with character humanoid
-	player.CharacterAdded:Connect(function(character)
+	local charAddedConn = player.CharacterAdded:Connect(function(character)
 		CombatManager.SyncWithCharacter(player, character)
 	end)
+	table.insert(playerConnections[player], charAddedConn)
 
 	if player.Character then
 		CombatManager.SyncWithCharacter(player, player.Character)
@@ -145,25 +148,43 @@ function CombatManager.SyncWithCharacter(player: Player, character: Model)
 	humanoid.MaxHealth = state.maxHealth
 	humanoid.Health = state.health
 
+	-- Get or create connections table for this player
+	local connections = playerConnections[player]
+	if not connections then
+		connections = {}
+		playerConnections[player] = connections
+	end
+
 	-- Listen for humanoid health changes (from other sources)
-	humanoid.HealthChanged:Connect(function(newHealth)
+	local healthConn = humanoid.HealthChanged:Connect(function(newHealth)
 		-- Only update if changed externally
 		if math.abs(newHealth - state.health) > 0.1 then
 			state.health = newHealth
 			CombatManager.BroadcastHealthUpdate(player)
 		end
 	end)
+	table.insert(connections, healthConn)
 
 	-- Listen for death
-	humanoid.Died:Connect(function()
+	local diedConn = humanoid.Died:Connect(function()
 		CombatManager.HandlePlayerDeath(player)
 	end)
+	table.insert(connections, diedConn)
 end
 
 --[[
 	Cleanup player state
 ]]
 function CombatManager.CleanupPlayer(player: Player)
+	-- Disconnect all connections for this player
+	local connections = playerConnections[player]
+	if connections then
+		for _, conn in ipairs(connections) do
+			conn:Disconnect()
+		end
+		playerConnections[player] = nil
+	end
+
 	playerStates[player] = nil
 end
 

@@ -70,12 +70,18 @@ function RevivalManager.Initialize()
 	print("[RevivalManager] Initializing...")
 
 	-- Setup client events
-	Events.OnServerEvent("Revival", function(player, action, data)
-		if action == "StartRevive" then
+	Events.OnServerEvent("Revival", "StartRevive", function(player, data)
+		if typeof(data) == "table" and typeof(data.targetId) == "number" then
 			RevivalManager.StartRevive(player, data.targetId)
-		elseif action == "CancelRevive" then
-			RevivalManager.CancelRevive(player)
-		elseif action == "CrawlMove" then
+		end
+	end)
+
+	Events.OnServerEvent("Revival", "CancelRevive", function(player)
+		RevivalManager.CancelRevive(player)
+	end)
+
+	Events.OnServerEvent("Revival", "CrawlMove", function(player, data)
+		if typeof(data) == "table" and typeof(data.position) == "Vector3" then
 			RevivalManager.UpdateCrawlPosition(player, data.position)
 		end
 	end)

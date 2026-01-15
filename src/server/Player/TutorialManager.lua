@@ -47,20 +47,18 @@ function TutorialManager.Initialize()
 	print("[TutorialManager] Initializing...")
 
 	-- Setup client events
-	Events.OnServerEvent("Tutorial", function(player, action, data)
-		if action == "CompleteStage" then
-			TutorialManager.CompleteStage(player, data.stageId)
-		elseif action == "SkipTutorial" then
-			TutorialManager.SkipTutorial(player)
-		elseif action == "RequestProgress" then
-			TutorialManager.SendProgress(player)
-		elseif action == "StartTutorial" then
-			TutorialManager.StartTutorial(player)
-		elseif action == "EnterTraining" then
-			TutorialManager.EnterTrainingGrounds(player, data.mode)
-		elseif action == "AcknowledgeTip" then
-			TutorialManager.AcknowledgeTip(player, data.tipId)
+	Events.OnServerEvent("Tutorial", "Complete", function(player, data)
+		if typeof(data) == "table" and typeof(data.tutorialId) == "string" then
+			TutorialManager.CompleteStage(player, data.tutorialId)
 		end
+	end)
+
+	Events.OnServerEvent("Tutorial", "Skip", function(player)
+		TutorialManager.SkipTutorial(player)
+	end)
+
+	Events.OnServerEvent("Tutorial", "GetStatus", function(player)
+		TutorialManager.SendProgress(player)
 	end)
 
 	-- Setup player tracking

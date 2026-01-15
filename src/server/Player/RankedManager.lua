@@ -42,12 +42,8 @@ function RankedManager.Initialize()
 	RankedManager.InitializeSeason()
 
 	-- Setup client events
-	Events.OnServerEvent("Ranked", function(player, action, data)
-		if action == "RequestData" then
-			RankedManager.SendRankData(player)
-		elseif action == "RequestLeaderboard" then
-			RankedManager.SendLeaderboard(player)
-		end
+	Events.OnServerEvent("Ranked", "GetStats", function(player)
+		RankedManager.SendRankData(player)
 	end)
 
 	-- Setup player tracking

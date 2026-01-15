@@ -65,6 +65,10 @@ local isInitialized = false
 -- DataStore
 local progressDataStore = DataStoreService:GetDataStore("PlayerProgression_v1")
 
+-- DataStore retry constants
+local MAX_RETRIES = 3
+local RETRY_DELAY = 1
+
 -- Signals
 local onXPGained = Instance.new("BindableEvent")
 local onLevelUp = Instance.new("BindableEvent")
@@ -130,12 +134,14 @@ function ProgressionManager.Initialize()
 	print("[ProgressionManager] Initializing...")
 
 	-- Setup client events
-	Events.OnServerEvent("Progression", function(player, action, data)
-		if action == "ClaimReward" then
+	Events.OnServerEvent("Progression", "ClaimReward", function(player, data)
+		if typeof(data) == "table" and typeof(data.level) == "number" then
 			ProgressionManager.ClaimReward(player, data.level)
-		elseif action == "GetProgress" then
-			ProgressionManager.SendProgressToClient(player)
 		end
+	end)
+
+	Events.OnServerEvent("Progression", "GetProgress", function(player)
+		ProgressionManager.SendProgressToClient(player)
 	end)
 
 	-- Handle player join/leave
@@ -156,12 +162,26 @@ function ProgressionManager.Initialize()
 end
 
 --[[
-	Load player progress from DataStore
+	Load player progress from DataStore with retry logic
 ]]
 function ProgressionManager.LoadPlayerProgress(player: Player)
-	local success, data = pcall(function()
-		return progressDataStore:GetAsync(`player_{player.UserId}`)
-	end)
+	local data = nil
+	local success = false
+
+	for attempt = 1, MAX_RETRIES do
+		success, data = pcall(function()
+			return progressDataStore:GetAsync(`player_{player.UserId}`)
+		end)
+
+		if success then
+			break
+		end
+
+		if attempt < MAX_RETRIES then
+			warn(`[ProgressionManager] GetAsync failed for {player.Name}, retry {attempt}/{MAX_RETRIES}`)
+			task.wait(RETRY_DELAY * attempt) -- Exponential backoff
+		end
+	end
 
 	local progress: PlayerProgress
 	if success and data then
@@ -207,20 +227,33 @@ function ProgressionManager.LoadPlayerProgress(player: Player)
 end
 
 --[[
-	Save player progress to DataStore
+	Save player progress to DataStore with retry logic
 ]]
 function ProgressionManager.SavePlayerProgress(player: Player)
 	local progress = playerProgress[player]
 	if not progress then return end
 
-	local success, err = pcall(function()
-		progressDataStore:SetAsync(`player_{player.UserId}`, progress)
-	end)
+	local playerKey = `player_{player.UserId}`
+	local playerName = player.Name
+	local saved = false
 
-	if not success then
-		warn(`[ProgressionManager] Failed to save progress for {player.Name}: {err}`)
-	else
-		print(`[ProgressionManager] Saved progress for {player.Name}`)
+	for attempt = 1, MAX_RETRIES do
+		local success, err = pcall(function()
+			progressDataStore:SetAsync(playerKey, progress)
+		end)
+
+		if success then
+			print(`[ProgressionManager] Saved progress for {playerName}`)
+			saved = true
+			break
+		end
+
+		if attempt < MAX_RETRIES then
+			warn(`[ProgressionManager] SetAsync failed for {playerName}, retry {attempt}/{MAX_RETRIES}: {err}`)
+			task.wait(RETRY_DELAY * attempt) -- Exponential backoff
+		else
+			warn(`[ProgressionManager] Failed to save progress for {playerName} after {MAX_RETRIES} attempts: {err}`)
+		end
 	end
 
 	playerProgress[player] = nil

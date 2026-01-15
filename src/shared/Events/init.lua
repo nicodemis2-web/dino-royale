@@ -56,6 +56,8 @@ Events.GameState = {
 	"MatchStateChanged", -- Server -> All: {newState, data}
 	"StormUpdate", -- Server -> All: {phase, center, radius, nextRadius, timeRemaining}
 	"PlayerCountUpdate", -- Server -> All: {alivePlayers, totalPlayers}
+	"CountdownStarted", -- Server -> All: {duration}
+	"CountdownUpdate", -- Server -> All: {remaining}
 	"DeployReady", -- Server -> All: {flightPath}
 	"PlayerJumped", -- Client -> Server: {}
 	"GliderInput", -- Client -> Server: {pitch, yaw}
@@ -64,6 +66,7 @@ Events.GameState = {
 	"GliderLanded", -- Server -> Client: {position}
 	"JumpDenied", -- Server -> Client: {reason}
 	"PlayerJumpedFromHelicopter", -- Server -> All: {playerId, position}
+	"SupplyDropIncoming", -- Server -> All: {position}
 }
 
 --[[
@@ -100,6 +103,164 @@ Events.Team = {
 	"ReviveComplete", -- Server -> Team: {reviverId, revivedId}
 	"RebootCardDropped", -- Server -> Team: {playerId, position}
 	"RebootInitiated", -- Server -> Team: {beaconId}
+}
+
+--[[
+	MAP EVENTS
+	Map data and POI information
+]]
+Events.Map = {
+	"RequestMapData", -- Client -> Server: {}
+	"MapData", -- Server -> Client: {mapData}
+	"RequestPOIInfo", -- Client -> Server: {poiName}
+	"POIInfo", -- Server -> Client: {name, config, state}
+}
+
+--[[
+	PROGRESSION EVENTS
+	XP, levels, challenges, and rewards
+]]
+Events.Progression = {
+	"ClaimReward", -- Client -> Server: {level}
+	"GetProgress", -- Client -> Server: {}
+	"ProgressUpdate", -- Server -> Client: {totalXP, level, stats, challenges, etc.}
+	"XPGained", -- Server -> Client: {amount, source, totalXP, level, levelProgress}
+	"LevelUp", -- Server -> Client: {level, rewards}
+	"RewardClaimed", -- Server -> Client: {level, rewards}
+	"ChallengeCompleted", -- Server -> Client: {challenge}
+	"MatchSummary", -- Server -> Client: {placement, stats, xpEarned}
+}
+
+--[[
+	REVIVAL EVENTS
+	Downed state and teammate revival
+]]
+Events.Revival = {
+	"StartRevive", -- Client -> Server: {targetId}
+	"CancelRevive", -- Client -> Server: {}
+	"CrawlMove", -- Client -> Server: {position}
+	"PlayerDowned", -- Server -> All: {playerId, playerName, teamId, bleedOutTime, position}
+	"ReviveStarted", -- Server -> All: {reviverId, targetId, reviveTime}
+	"ReviveCancelled", -- Server -> All: {reviverId, targetId}
+	"PlayerRevived", -- Server -> All: {reviverId, targetId, reviverName, targetName}
+	"PlayerBledOut", -- Server -> All: {playerId, playerName}
+	"ReviveProgress", -- Server -> Client: {progress, targetId}
+	"BeingRevived", -- Server -> Client: {progress, reviverId}
+}
+
+--[[
+	HEALING EVENTS
+	Health items and buff management
+]]
+Events.Healing = {
+	"StartUse", -- Client -> Server: {itemId}
+	"CancelUse", -- Client -> Server: {}
+	"UseStarted", -- Server -> Client: {itemId, useTime, canMove}
+	"UseCancelled", -- Server -> Client: {}
+	"UseCompleted", -- Server -> Client: {itemId, healAmount, armorAmount}
+	"BuffApplied", -- Server -> Client: {buffType, value, duration}
+	"BuffExpired", -- Server -> Client: {buffType}
+}
+
+--[[
+	BATTLE PASS EVENTS
+	Season pass progression
+]]
+Events.BattlePass = {
+	"GetProgress", -- Client -> Server: {}
+	"ClaimReward", -- Client -> Server: {tier}
+	"ProgressUpdate", -- Server -> Client: {tier, xp, rewards}
+	"RewardClaimed", -- Server -> Client: {tier, reward}
+}
+
+--[[
+	TUTORIAL EVENTS
+	Player tutorials and onboarding
+]]
+Events.Tutorial = {
+	"GetStatus", -- Client -> Server: {}
+	"Complete", -- Client -> Server: {tutorialId}
+	"Skip", -- Client -> Server: {}
+	"StatusUpdate", -- Server -> Client: {completedTutorials}
+}
+
+--[[
+	ACCESSIBILITY EVENTS
+	Accessibility settings
+]]
+Events.Accessibility = {
+	"GetSettings", -- Client -> Server: {}
+	"UpdateSettings", -- Client -> Server: {settings}
+	"SettingsUpdate", -- Server -> Client: {settings}
+}
+
+--[[
+	PING EVENTS
+	Player ping/marker system
+]]
+Events.Ping = {
+	"CreatePing", -- Client -> Server: {position, pingType}
+	"RemovePing", -- Client -> Server: {pingId}
+	"PingCreated", -- Server -> All: {pingId, position, pingType, playerId}
+	"PingRemoved", -- Server -> All: {pingId}
+}
+
+--[[
+	RANKED EVENTS
+	Competitive mode
+]]
+Events.Ranked = {
+	"GetStats", -- Client -> Server: {}
+	"QueueMatch", -- Client -> Server: {}
+	"LeaveQueue", -- Client -> Server: {}
+	"StatsUpdate", -- Server -> Client: {rank, points, wins}
+}
+
+--[[
+	PARTY EVENTS
+	Party/squad system
+]]
+Events.Party = {
+	"Create", -- Client -> Server: {}
+	"Invite", -- Client -> Server: {playerId}
+	"Join", -- Client -> Server: {partyId}
+	"Leave", -- Client -> Server: {}
+	"Kick", -- Client -> Server: {playerId}
+	"PartyUpdate", -- Server -> Client: {members, leader}
+	"InviteReceived", -- Server -> Client: {partyId, leaderName}
+}
+
+--[[
+	REBOOT EVENTS
+	Reboot beacon system
+]]
+Events.Reboot = {
+	"RequestReboot", -- Client -> Server: {beaconId, cardPlayerId}
+	"CancelReboot", -- Client -> Server: {}
+	"RebootStarted", -- Server -> All: {beaconId, userId}
+	"RebootComplete", -- Server -> All: {beaconId, rebootedPlayers}
+	"RebootCancelled", -- Server -> All: {beaconId}
+}
+
+--[[
+	SHOP EVENTS
+	In-game shop
+]]
+Events.Shop = {
+	"GetItems", -- Client -> Server: {}
+	"Purchase", -- Client -> Server: {itemId}
+	"ItemsUpdate", -- Server -> Client: {items}
+	"PurchaseResult", -- Server -> Client: {success, itemId, error?}
+}
+
+--[[
+	LOOT EVENTS
+	Loot spawning and interaction
+]]
+Events.Loot = {
+	"RequestPickup", -- Client -> Server: {lootId}
+	"LootSpawned", -- Server -> Nearby: {lootId, position, itemType}
+	"LootPickedUp", -- Server -> All: {lootId, playerId}
 }
 
 -- Cache for created events folder

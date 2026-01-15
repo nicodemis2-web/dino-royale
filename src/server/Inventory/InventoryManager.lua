@@ -47,6 +47,9 @@ export type WorldItem = {
 -- Player inventories stored by UserId
 local playerInventories = {} :: { [number]: Inventory }
 
+-- Per-player connections for cleanup
+local playerConnections = {} :: { [number]: RBXScriptConnection }
+
 -- World items stored by unique ID
 local worldItems = {} :: { [string]: WorldItem }
 local worldItemCounter = 0
@@ -88,11 +91,12 @@ function InventoryManager.Initialize(player: Player)
 	-- These are connected per-player in the main server init
 
 	-- Cleanup on player leaving
-	player.AncestryChanged:Connect(function(_, parent)
+	local ancestryConn = player.AncestryChanged:Connect(function(_, parent)
 		if not parent then
-			playerInventories[userId] = nil
+			InventoryManager.CleanupPlayer(player)
 		end
 	end)
+	playerConnections[userId] = ancestryConn
 end
 
 --[[
@@ -766,6 +770,14 @@ end
 ]]
 function InventoryManager.CleanupPlayer(player: Player)
 	local userId = player.UserId
+
+	-- Disconnect the ancestry connection
+	local conn = playerConnections[userId]
+	if conn then
+		conn:Disconnect()
+		playerConnections[userId] = nil
+	end
+
 	playerInventories[userId] = nil
 end
 

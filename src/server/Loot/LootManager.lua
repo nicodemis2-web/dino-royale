@@ -66,13 +66,9 @@ function LootManager.Initialize()
 	print("[LootManager] Initializing...")
 
 	-- Setup client events
-	Events.OnServerEvent("Loot", function(player, action, data)
-		if action == "PickupLoot" then
+	Events.OnServerEvent("Loot", "RequestPickup", function(player, data)
+		if typeof(data) == "table" and typeof(data.lootId) == "string" then
 			LootManager.PickupLoot(player, data.lootId)
-		elseif action == "OpenChest" then
-			LootManager.OpenChest(player, data.chestId)
-		elseif action == "DropItem" then
-			LootManager.DropItem(player, data.itemId, data.amount)
 		end
 	end)
 

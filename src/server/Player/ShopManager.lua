@@ -61,14 +61,14 @@ function ShopManager.Initialize()
 	print("[ShopManager] Initializing...")
 
 	-- Setup client events
-	Events.OnServerEvent("Shop", function(player, action, data)
-		if action == "Purchase" then
+	Events.OnServerEvent("Shop", "Purchase", function(player, data)
+		if typeof(data) == "table" and typeof(data.itemId) == "string" then
 			ShopManager.PurchaseItem(player, data.itemId)
-		elseif action == "RequestData" then
-			ShopManager.SendShopData(player)
-		elseif action == "RequestInventory" then
-			ShopManager.SendInventory(player)
 		end
+	end)
+
+	Events.OnServerEvent("Shop", "GetItems", function(player)
+		ShopManager.SendShopData(player)
 	end)
 
 	-- Setup player tracking

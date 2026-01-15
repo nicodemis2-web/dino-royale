@@ -184,6 +184,91 @@ local function handleRespawn()
 	AudioController.PlayUISound("Heal")
 end
 
+-- Countdown UI reference
+local countdownGui: ScreenGui? = nil
+local countdownLabel: TextLabel? = nil
+
+--[[
+	Create countdown UI
+]]
+local function createCountdownUI()
+	if countdownGui then return end
+
+	countdownGui = Instance.new("ScreenGui")
+	countdownGui.Name = "CountdownGui"
+	countdownGui.ResetOnSpawn = false
+	countdownGui.Parent = localPlayer:WaitForChild("PlayerGui")
+
+	local frame = Instance.new("Frame")
+	frame.Name = "CountdownFrame"
+	frame.Size = UDim2.new(0, 300, 0, 150)
+	frame.Position = UDim2.new(0.5, -150, 0.3, 0)
+	frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+	frame.BackgroundTransparency = 0.5
+	frame.BorderSizePixel = 0
+	frame.Parent = countdownGui
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 12)
+	corner.Parent = frame
+
+	local title = Instance.new("TextLabel")
+	title.Name = "Title"
+	title.Size = UDim2.new(1, 0, 0.4, 0)
+	title.Position = UDim2.new(0, 0, 0, 0)
+	title.BackgroundTransparency = 1
+	title.Text = "MATCH STARTING IN"
+	title.TextColor3 = Color3.fromRGB(255, 200, 50)
+	title.TextSize = 24
+	title.Font = Enum.Font.GothamBold
+	title.Parent = frame
+
+	countdownLabel = Instance.new("TextLabel")
+	countdownLabel.Name = "Countdown"
+	countdownLabel.Size = UDim2.new(1, 0, 0.6, 0)
+	countdownLabel.Position = UDim2.new(0, 0, 0.4, 0)
+	countdownLabel.BackgroundTransparency = 1
+	countdownLabel.Text = "10"
+	countdownLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+	countdownLabel.TextSize = 72
+	countdownLabel.Font = Enum.Font.GothamBold
+	countdownLabel.Parent = frame
+
+	print("[Client] Countdown UI created")
+end
+
+--[[
+	Update countdown display
+]]
+local function updateCountdown(remaining: number)
+	if not countdownLabel then
+		createCountdownUI()
+	end
+
+	if countdownLabel and countdownGui then
+		countdownLabel.Text = tostring(remaining)
+		countdownGui.Enabled = true
+
+		-- Flash effect on low numbers
+		if remaining <= 3 then
+			countdownLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
+			countdownLabel.TextSize = 84
+		else
+			countdownLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+			countdownLabel.TextSize = 72
+		end
+	end
+end
+
+--[[
+	Hide countdown UI
+]]
+local function hideCountdown()
+	if countdownGui then
+		countdownGui.Enabled = false
+	end
+end
+
 --[[
 	Setup event handlers
 ]]
@@ -194,7 +279,24 @@ local function setupEventHandlers()
 		print(`[Client] Game state: {currentGameState} -> {newState}`)
 		currentGameState = newState
 
+		-- Hide countdown when leaving lobby
+		if newState ~= "Lobby" then
+			hideCountdown()
+		end
+
 		handleStateChange(newState)
+	end)
+
+	-- Countdown started
+	Events.OnClientEvent("GameState", "CountdownStarted", function(data)
+		print(`[Client] Countdown started: {data.duration} seconds`)
+		createCountdownUI()
+		updateCountdown(data.duration)
+	end)
+
+	-- Countdown update
+	Events.OnClientEvent("GameState", "CountdownUpdate", function(data)
+		updateCountdown(data.remaining)
 	end)
 
 	-- Note: Removed broken event listeners for non-existent events

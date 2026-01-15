@@ -116,7 +116,7 @@ function WeaponController.BindActions()
 	end
 
 	-- Scroll wheel weapon switch
-	UserInputService.InputChanged:Connect(function(input)
+	local scrollConnection = UserInputService.InputChanged:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseWheel then
 			local delta = input.Position.Z
 			if delta > 0 then
@@ -126,6 +126,7 @@ function WeaponController.BindActions()
 			end
 		end
 	end)
+	table.insert(connections, scrollConnection)
 end
 
 --[[

@@ -67,12 +67,14 @@ function HealingManager.Initialize()
 	CombatManager = require(Combat.CombatManager)
 
 	-- Setup client events
-	Events.OnServerEvent("Healing", function(player, action, data)
-		if action == "StartUse" then
+	Events.OnServerEvent("Healing", "StartUse", function(player, data)
+		if typeof(data) == "table" and typeof(data.itemId) == "string" then
 			HealingManager.StartUsingItem(player, data.itemId)
-		elseif action == "CancelUse" then
-			HealingManager.CancelUsingItem(player)
 		end
+	end)
+
+	Events.OnServerEvent("Healing", "CancelUse", function(player)
+		HealingManager.CancelUsingItem(player)
 	end)
 
 	-- Start update loop

@@ -53,10 +53,14 @@ function PingManager.Initialize()
 	print("[PingManager] Initializing...")
 
 	-- Setup client events
-	Events.OnServerEvent("Ping", function(player, action, data)
-		if action == "CreatePing" then
+	Events.OnServerEvent("Ping", "CreatePing", function(player, data)
+		if typeof(data) == "table" and typeof(data.position) == "Vector3" then
 			PingManager.CreatePing(player, data.pingType, data.position, data.targetEntity)
-		elseif action == "RemovePing" then
+		end
+	end)
+
+	Events.OnServerEvent("Ping", "RemovePing", function(player, data)
+		if typeof(data) == "table" and typeof(data.pingId) == "string" then
 			PingManager.RemovePing(data.pingId, player)
 		end
 	end)

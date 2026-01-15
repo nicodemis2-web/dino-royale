@@ -47,16 +47,14 @@ function BattlePassManager.Initialize()
 	print("[BattlePassManager] Initializing...")
 
 	-- Setup client events
-	Events.OnServerEvent("BattlePass", function(player, action, data)
-		if action == "ClaimReward" then
+	Events.OnServerEvent("BattlePass", "ClaimReward", function(player, data)
+		if typeof(data) == "table" then
 			BattlePassManager.ClaimReward(player, data.tier, data.isPremium)
-		elseif action == "PurchasePremium" then
-			BattlePassManager.PurchasePremium(player)
-		elseif action == "PurchaseTiers" then
-			BattlePassManager.PurchaseTiers(player, data.amount)
-		elseif action == "RequestData" then
-			BattlePassManager.SendBattlePassData(player)
 		end
+	end)
+
+	Events.OnServerEvent("BattlePass", "GetProgress", function(player)
+		BattlePassManager.SendBattlePassData(player)
 	end)
 
 	-- Setup player tracking

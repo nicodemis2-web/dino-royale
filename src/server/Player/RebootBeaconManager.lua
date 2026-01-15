@@ -82,14 +82,14 @@ function RebootBeaconManager.Initialize()
 	print("[RebootBeaconManager] Initializing...")
 
 	-- Setup client events
-	Events.OnServerEvent("Reboot", function(player, action, data)
-		if action == "CollectCard" then
-			RebootBeaconManager.TryCollectCard(player, data.playerId)
-		elseif action == "StartReboot" then
+	Events.OnServerEvent("Reboot", "RequestReboot", function(player, data)
+		if typeof(data) == "table" and typeof(data.beaconId) == "string" then
 			RebootBeaconManager.StartReboot(player, data.beaconId, data.cardPlayerId)
-		elseif action == "CancelReboot" then
-			RebootBeaconManager.CancelReboot(player)
 		end
+	end)
+
+	Events.OnServerEvent("Reboot", "CancelReboot", function(player)
+		RebootBeaconManager.CancelReboot(player)
 	end)
 
 	-- Start update loop

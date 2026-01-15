@@ -47,27 +47,30 @@ function PartyManager.Initialize()
 	print("[PartyManager] Initializing...")
 
 	-- Setup client events
-	Events.OnServerEvent("Party", function(player, action, data)
-		if action == "Create" then
-			PartyManager.CreateParty(player, data.gameMode)
-		elseif action == "Leave" then
-			PartyManager.LeaveParty(player)
-		elseif action == "Invite" then
-			PartyManager.InvitePlayer(player, data.targetUserId)
-		elseif action == "AcceptInvite" then
-			PartyManager.AcceptInvite(player, data.inviteId)
-		elseif action == "DeclineInvite" then
-			PartyManager.DeclineInvite(player, data.inviteId)
-		elseif action == "Kick" then
-			PartyManager.KickPlayer(player, data.targetUserId)
-		elseif action == "PromoteLeader" then
-			PartyManager.PromoteLeader(player, data.targetUserId)
-		elseif action == "SetReady" then
-			PartyManager.SetReady(player, data.isReady)
-		elseif action == "SetGameMode" then
-			PartyManager.SetGameMode(player, data.gameMode)
-		elseif action == "RequestData" then
-			PartyManager.SendPartyData(player)
+	Events.OnServerEvent("Party", "Create", function(player, data)
+		local gameMode = typeof(data) == "table" and data.gameMode or nil
+		PartyManager.CreateParty(player, gameMode)
+	end)
+
+	Events.OnServerEvent("Party", "Leave", function(player)
+		PartyManager.LeaveParty(player)
+	end)
+
+	Events.OnServerEvent("Party", "Invite", function(player, data)
+		if typeof(data) == "table" and typeof(data.playerId) == "number" then
+			PartyManager.InvitePlayer(player, data.playerId)
+		end
+	end)
+
+	Events.OnServerEvent("Party", "Join", function(player, data)
+		if typeof(data) == "table" and typeof(data.partyId) == "string" then
+			PartyManager.AcceptInvite(player, data.partyId)
+		end
+	end)
+
+	Events.OnServerEvent("Party", "Kick", function(player, data)
+		if typeof(data) == "table" and typeof(data.playerId) == "number" then
+			PartyManager.KickPlayer(player, data.playerId)
 		end
 	end)
 

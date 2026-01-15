@@ -28,10 +28,12 @@ function AccessibilityManager.Initialize()
 	print("[AccessibilityManager] Initializing...")
 
 	-- Setup client events
-	Events.OnServerEvent("Accessibility", function(player, action, data)
-		if action == "RequestSettings" then
-			AccessibilityManager.SendSettings(player)
-		elseif action == "SaveSettings" then
+	Events.OnServerEvent("Accessibility", "GetSettings", function(player)
+		AccessibilityManager.SendSettings(player)
+	end)
+
+	Events.OnServerEvent("Accessibility", "UpdateSettings", function(player, data)
+		if typeof(data) == "table" and typeof(data.settings) == "table" then
 			AccessibilityManager.SaveSettings(player, data.settings)
 		end
 	end)
