@@ -881,10 +881,17 @@ local function createJungleTree(position: Vector3, height: number): Model
 	for i = 1, 4 do
 		local root = Instance.new("Part")
 		root.Name = "Root" .. i
-		root.Size = Vector3.new(height * 0.08, height * 0.2, height * 0.3)
+		local rootLength = height * 0.25
+		root.Size = Vector3.new(height * 0.1, rootLength, height * 0.08)
 		local angle = (i / 4) * math.pi * 2
-		root.Position = groundPos + Vector3.new(math.cos(angle) * height * 0.15, height * 0.1, math.sin(angle) * height * 0.15)
-		root.Rotation = Vector3.new(0, math.deg(angle), 30)
+
+		-- Use CFrame to properly position and angle roots outward from trunk base
+		local rootCF = CFrame.new(groundPos)
+			* CFrame.Angles(0, angle, 0) -- Rotate around Y to face outward
+			* CFrame.new(0, rootLength * 0.3, height * 0.12) -- Offset outward from trunk
+			* CFrame.Angles(math.rad(-30), 0, 0) -- Tilt outward
+
+		root.CFrame = rootCF
 		root.Anchored = true
 		root.BrickColor = BrickColor.new("Reddish brown")
 		root.Material = Enum.Material.Wood
@@ -902,17 +909,20 @@ local function createJungleTree(position: Vector3, height: number): Model
 	mainCanopy.Material = Enum.Material.Grass
 	mainCanopy.Parent = tree
 
-	-- Hanging vines
+	-- Hanging vines (positioned to hang from canopy edge)
 	for i = 1, 6 do
 		local vine = Instance.new("Part")
 		vine.Name = "Vine" .. i
-		vine.Size = Vector3.new(0.3, height * 0.4, 0.3)
+		local vineLength = height * 0.35
+		vine.Size = Vector3.new(0.4, vineLength, 0.4)
 		local angle = (i / 6) * math.pi * 2
-		vine.Position = groundPos + Vector3.new(
+		-- Position vine so it hangs from the bottom edge of canopy
+		local vineTop = groundPos + Vector3.new(
 			math.cos(angle) * canopySize * 0.35,
-			trunkHeight + canopySize * 0.1,
+			trunkHeight + canopySize * 0.05, -- At bottom of canopy
 			math.sin(angle) * canopySize * 0.35
 		)
+		vine.Position = vineTop - Vector3.new(0, vineLength * 0.5, 0) -- Hang downward from that point
 		vine.Anchored = true
 		vine.BrickColor = BrickColor.new("Bright green")
 		vine.Material = Enum.Material.Grass
@@ -950,17 +960,25 @@ local function createPalmTree(position: Vector3, height: number): Model
 	end
 
 	-- Palm fronds (8 radiating leaves)
+	local frondLength = height * 0.4
 	for i = 1, 8 do
 		local frond = Instance.new("Part")
 		frond.Name = "Frond" .. i
-		frond.Size = Vector3.new(height * 0.08, height * 0.5, height * 0.02)
+		frond.Size = Vector3.new(frondLength * 0.15, frondLength, frondLength * 0.05)
 		local angle = (i / 8) * math.pi * 2
-		frond.Position = groundPos + Vector3.new(
-			math.cos(angle) * height * 0.15,
-			trunkHeight + height * 0.05,
-			math.sin(angle) * height * 0.15
-		)
-		frond.Rotation = Vector3.new(45, math.deg(angle), 0)
+
+		-- Use CFrame to properly position and rotate fronds radiating outward
+		local basePos = groundPos + Vector3.new(0, trunkHeight, 0)
+		local outwardDir = Vector3.new(math.cos(angle), 0, math.sin(angle))
+		local tiltAngle = math.rad(50) -- Tilt outward from vertical
+
+		-- Position frond so it originates from trunk top and extends outward/downward
+		local frondCF = CFrame.new(basePos)
+			* CFrame.Angles(0, angle, 0) -- Rotate around Y to face outward
+			* CFrame.Angles(tiltAngle, 0, 0) -- Tilt outward
+			* CFrame.new(0, frondLength * 0.5, 0) -- Offset so base is at trunk top
+
+		frond.CFrame = frondCF
 		frond.Anchored = true
 		frond.BrickColor = BrickColor.new("Bright green")
 		frond.Material = Enum.Material.Grass
@@ -990,29 +1008,37 @@ local function createDeadTree(position: Vector3, height: number): Model
 	-- Raycast to find actual ground level
 	local groundPos = placeAtGroundLevel(position, 0)
 
-	-- Gnarled trunk
+	-- Gnarled trunk (slight random tilt using CFrame)
 	local trunk = Instance.new("Part")
 	trunk.Name = "Trunk"
 	trunk.Size = Vector3.new(height * 0.12, height * 0.6, height * 0.12)
-	trunk.Position = groundPos + Vector3.new(0, height * 0.3, 0)
-	trunk.Rotation = Vector3.new(math.random(-5, 5), 0, math.random(-5, 5))
+	local trunkTiltX = math.rad(math.random(-5, 5))
+	local trunkTiltZ = math.rad(math.random(-5, 5))
+	trunk.CFrame = CFrame.new(groundPos + Vector3.new(0, height * 0.3, 0))
+		* CFrame.Angles(trunkTiltX, 0, trunkTiltZ)
 	trunk.Anchored = true
 	trunk.BrickColor = BrickColor.new("Dark taupe")
 	trunk.Material = Enum.Material.Wood
 	trunk.Parent = tree
 
-	-- Dead branches (no leaves)
-	for i = 1, math.random(3, 5) do
+	-- Dead branches (no leaves) - properly attached to trunk using CFrame
+	local branchCount = math.random(3, 5)
+	for i = 1, branchCount do
 		local branch = Instance.new("Part")
 		branch.Name = "Branch" .. i
-		branch.Size = Vector3.new(height * 0.04, height * (0.2 + math.random() * 0.2), height * 0.04)
-		local angle = (i / 5) * math.pi * 2
-		branch.Position = groundPos + Vector3.new(
-			math.cos(angle) * height * 0.08,
-			height * (0.4 + i * 0.1),
-			math.sin(angle) * height * 0.08
-		)
-		branch.Rotation = Vector3.new(math.random(20, 60), math.deg(angle), math.random(-20, 20))
+		local branchLength = height * (0.2 + math.random() * 0.2)
+		branch.Size = Vector3.new(height * 0.04, branchLength, height * 0.04)
+		local angle = (i / branchCount) * math.pi * 2
+		local branchHeight = height * (0.35 + i * 0.08)
+		local tiltOut = math.rad(math.random(40, 70)) -- Tilt outward from trunk
+
+		-- Use CFrame to attach branch to trunk and angle it outward
+		local branchCF = CFrame.new(groundPos + Vector3.new(0, branchHeight, 0))
+			* CFrame.Angles(0, angle, 0) -- Face outward direction
+			* CFrame.Angles(tiltOut, 0, math.rad(math.random(-15, 15))) -- Tilt out and slight twist
+			* CFrame.new(0, branchLength * 0.5, 0) -- Offset so base is at trunk
+
+		branch.CFrame = branchCF
 		branch.Anchored = true
 		branch.BrickColor = BrickColor.new("Dark taupe")
 		branch.Material = Enum.Material.Wood
