@@ -11,11 +11,16 @@ local RunService = game:GetService("RunService")
 
 local Constants = require(game.ReplicatedStorage.Shared.Constants)
 local Events = require(game.ReplicatedStorage.Shared.Events)
+local GameConfig = require(game.ReplicatedStorage.Shared.GameConfig)
 
 -- Type imports
 type MatchState = "Lobby" | "Loading" | "Deploying" | "Playing" | "Ending" | "Resetting"
 
 local GameManager = {}
+
+-- Create state changed signal (BindableEvent for internal use)
+local stateChangedEvent = Instance.new("BindableEvent")
+GameManager.OnStateChanged = stateChangedEvent.Event
 
 -- Current state
 local currentState: MatchState = "Lobby"
@@ -51,6 +56,16 @@ local stateHandlers = {} :: {
 ]]
 function GameManager.GetCurrentState(): MatchState
 	return currentState
+end
+
+-- Alias for GetCurrentState (used by Main.server.lua)
+function GameManager.GetState(): MatchState
+	return currentState
+end
+
+-- Alias for TransitionTo (used by Main.server.lua)
+function GameManager.SetState(newState: MatchState, data: { [string]: any }?)
+	GameManager.TransitionTo(newState, data)
 end
 
 --[[
@@ -178,6 +193,9 @@ function GameManager.TransitionTo(newState: MatchState, data: { [string]: any }?
 		data = stateData,
 	})
 
+	-- Fire internal state changed event
+	stateChangedEvent:Fire(newState, previousState)
+
 	print(`[GameManager] State transition: {previousState} → {newState}`)
 end
 
@@ -214,13 +232,23 @@ stateHandlers.Lobby = {
 		local playerCount = #Players:GetPlayers()
 		stateData.playerCount = playerCount
 
+		-- Debug: Solo test mode bypasses player requirements
+		local minPlayers = Constants.MATCH.MIN_PLAYERS
+		local lobbyWaitTime = Constants.MATCH.LOBBY_WAIT_TIME
+		if GameConfig.Debug.Enabled and GameConfig.Debug.SoloTestMode then
+			minPlayers = 1
+			if GameConfig.Debug.SkipLobbyCountdown then
+				lobbyWaitTime = 3 -- Quick 3 second countdown in debug mode
+			end
+		end
+
 		-- Check if we have enough players
-		if playerCount >= Constants.MATCH.MIN_PLAYERS then
+		if playerCount >= minPlayers then
 			-- Start countdown if not started
 			if not stateData.countdownStarted then
 				stateData.countdownStarted = true
 				stateData.countdownStart = tick()
-				print(`[GameManager] {playerCount} players, starting {Constants.MATCH.LOBBY_WAIT_TIME}s countdown`)
+				print(`[GameManager] {playerCount} players, starting {lobbyWaitTime}s countdown`)
 			end
 
 			-- Force start at max players
@@ -231,7 +259,7 @@ stateHandlers.Lobby = {
 
 			-- Check countdown
 			local elapsed = tick() - stateData.countdownStart
-			local remaining = Constants.MATCH.LOBBY_WAIT_TIME - elapsed
+			local remaining = lobbyWaitTime - elapsed
 			stateData.countdown = math.ceil(remaining)
 
 			if remaining <= 0 then
@@ -242,7 +270,7 @@ stateHandlers.Lobby = {
 			if stateData.countdownStarted then
 				stateData.countdownStarted = false
 				stateData.countdown = nil
-				print(`[GameManager] Players dropped below {Constants.MATCH.MIN_PLAYERS}, countdown cancelled`)
+				print(`[GameManager] Players dropped below {minPlayers}, countdown cancelled`)
 			end
 		end
 	end,
@@ -300,16 +328,37 @@ stateHandlers.Deploying = {
 	OnEnter = function(_data)
 		print("[GameManager] Deployment phase started")
 
+		-- Debug: Use shorter deploy time for quick testing
+		local deployTime = Constants.MATCH.DEPLOY_TIME
+		if GameConfig.Debug.Enabled and GameConfig.Debug.QuickDeploy then
+			deployTime = 15 -- 15 seconds for testing
+		end
+
 		-- Generate flight path
 		local flightPath = {
 			startPoint = Vector3.new(-2000, 500, 0),
 			endPoint = Vector3.new(2000, 500, 0),
-			duration = Constants.MATCH.DEPLOY_TIME,
+			duration = deployTime,
 		}
 
 		stateData.flightPath = flightPath
 		stateData.deployStartTime = tick()
 		stateData.jumpedPlayers = {} :: { [number]: boolean }
+
+		-- Teleport all players to helicopter starting position
+		for _, player in ipairs(Players:GetPlayers()) do
+			local character = player.Character
+			if character then
+				local rootPart = character:FindFirstChild("HumanoidRootPart") :: BasePart?
+				if rootPart then
+					-- Position player at helicopter start (slightly offset per player)
+					local offset = Vector3.new(math.random(-5, 5), 0, math.random(-5, 5))
+					rootPart.CFrame = CFrame.new(flightPath.startPoint + offset)
+					rootPart.AssemblyLinearVelocity = Vector3.zero -- Stop any falling
+					print(`[GameManager] Positioned {player.Name} on helicopter`)
+				end
+			end
+		end
 
 		-- Broadcast flight path to clients
 		Events.FireAllClients("GameState", "DeployReady", {
@@ -562,11 +611,7 @@ function GameManager.Initialize()
 		GameManager.Update(dt)
 	end))
 
-	-- Listen for player jump events
-	local jumpConnection = Events.OnServerEvent("GameState", "PlayerJumped", function(player, _data)
-		GameManager.OnPlayerJump(player)
-	end)
-	table.insert(connections, jumpConnection)
+	-- Note: PlayerJumped event is handled in Main.server.lua to avoid duplicate handlers
 
 	-- Handle existing players
 	for _, player in ipairs(Players:GetPlayers()) do
@@ -576,7 +621,41 @@ function GameManager.Initialize()
 	isInitialized = true
 	stateStartTime = tick()
 
+	-- Manually trigger Lobby OnEnter since we start in Lobby state
+	local lobbyHandler = stateHandlers.Lobby
+	if lobbyHandler and lobbyHandler.OnEnter then
+		lobbyHandler.OnEnter({})
+	end
+
 	print("[GameManager] Initialized, starting in Lobby state")
+end
+
+--[[
+	Reset for new match (keeps connections, resets state)
+]]
+function GameManager.Reset()
+	-- Reset state to Lobby
+	currentState = "Lobby"
+	stateData = {}
+	stateStartTime = tick()
+
+	-- Clear player tracking
+	alivePlayers = {}
+	totalPlayersInMatch = 0
+
+	-- Trigger Lobby OnEnter
+	local lobbyHandler = stateHandlers.Lobby
+	if lobbyHandler and lobbyHandler.OnEnter then
+		lobbyHandler.OnEnter({})
+	end
+
+	-- Notify clients of state change
+	Events.FireAllClients("GameState", "StateChanged", {
+		newState = "Lobby",
+		previousState = "Resetting",
+	})
+
+	print("[GameManager] Reset to Lobby state")
 end
 
 --[[

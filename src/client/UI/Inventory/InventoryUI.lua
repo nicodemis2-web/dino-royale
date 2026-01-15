@@ -8,7 +8,7 @@
 
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
-local UserInputService = game:GetService("UserInputService")
+local ContextActionService = game:GetService("ContextActionService")
 
 local Events = require(game.ReplicatedStorage.Shared.Events)
 local WeaponData = require(game.ReplicatedStorage.Shared.Config.WeaponData)
@@ -31,6 +31,9 @@ local isInventoryOpen = false
 local currentInventory: any = nil
 local weaponSlotButtons = {} :: { [number]: Frame }
 local currentSlot = 1
+
+-- Connections for cleanup
+local connections: { RBXScriptConnection } = {}
 
 -- Rarity colors
 local RARITY_COLORS = {
@@ -60,19 +63,18 @@ function InventoryUI.Initialize()
 	InventoryUI.CreateTooltip()
 
 	-- Listen for inventory updates
-	Events.OnClientEvent("Inventory", "InventoryUpdate", function(data)
+	local eventConn = Events.OnClientEvent("Inventory", "InventoryUpdate", function(data)
 		InventoryUI.OnInventoryUpdate(data)
 	end)
+	table.insert(connections, eventConn)
 
-	-- Bind toggle key
-	UserInputService.InputBegan:Connect(function(input, processed)
-		if processed then
-			return
-		end
-		if input.KeyCode == Enum.KeyCode.Tab or input.KeyCode == Enum.KeyCode.I then
+	-- Bind toggle key using ContextActionService
+	ContextActionService:BindAction("ToggleInventory", function(_, inputState)
+		if inputState == Enum.UserInputState.Begin then
 			InventoryUI.ToggleFullInventory()
 		end
-	end)
+		return Enum.ContextActionResult.Pass
+	end, false, Enum.KeyCode.Tab, Enum.KeyCode.I)
 end
 
 --[[
@@ -715,6 +717,16 @@ end
 	Cleanup the UI
 ]]
 function InventoryUI.Cleanup()
+	-- Disconnect all connections
+	for _, conn in ipairs(connections) do
+		conn:Disconnect()
+	end
+	connections = {}
+
+	-- Unbind context actions
+	ContextActionService:UnbindAction("ToggleInventory")
+
+	-- Destroy GUI
 	if mainGui then
 		mainGui:Destroy()
 	end

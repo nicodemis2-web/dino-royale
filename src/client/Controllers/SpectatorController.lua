@@ -9,6 +9,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
+local ContextActionService = game:GetService("ContextActionService")
 local RunService = game:GetService("RunService")
 
 local Events = require(ReplicatedStorage.Shared.Events)
@@ -25,6 +26,9 @@ local currentTargetIndex = 1
 local currentTarget: Player? = nil
 local spectatorCamera: Camera? = nil
 local originalCamera: Camera? = nil
+
+-- Connections for cleanup
+local connections: { RBXScriptConnection } = {}
 
 -- Camera settings
 local CAMERA_DISTANCE = 15
@@ -158,30 +162,43 @@ function SpectatorController.SetupEventListeners()
 end
 
 --[[
-	Setup input handling
+	Setup input handling using ContextActionService
 ]]
 function SpectatorController.SetupInputHandling()
-	UserInputService.InputBegan:Connect(function(input, gameProcessed)
-		if gameProcessed then return end
-		if not isSpectating then return end
-
-		if input.KeyCode == NEXT_TARGET_KEY then
+	-- Bind spectator controls (only active when spectating)
+	ContextActionService:BindAction("SpectatorNextTarget", function(_, inputState)
+		if inputState == Enum.UserInputState.Begin and isSpectating then
 			SpectatorController.NextTarget()
-		elseif input.KeyCode == PREV_TARGET_KEY then
+		end
+		return Enum.ContextActionResult.Pass
+	end, false, NEXT_TARGET_KEY)
+
+	ContextActionService:BindAction("SpectatorPrevTarget", function(_, inputState)
+		if inputState == Enum.UserInputState.Begin and isSpectating then
 			SpectatorController.PreviousTarget()
-		elseif input.KeyCode == FREE_CAM_KEY then
+		end
+		return Enum.ContextActionResult.Pass
+	end, false, PREV_TARGET_KEY)
+
+	ContextActionService:BindAction("SpectatorFreeCam", function(_, inputState)
+		if inputState == Enum.UserInputState.Begin and isSpectating then
 			SpectatorController.ToggleFreeCam()
 		end
-	end)
+		return Enum.ContextActionResult.Pass
+	end, false, FREE_CAM_KEY)
 
-	-- Free cam movement
-	UserInputService.InputChanged:Connect(function(input, gameProcessed)
+	-- Free cam mouse look (still use UserInputService for continuous mouse movement)
+	local mouseConn = UserInputService.InputChanged:Connect(function(input, gameProcessed)
 		if not isSpectating or not isFreeCam then return end
 
 		if input.UserInputType == Enum.UserInputType.MouseMovement then
 			-- Handle mouse look in free cam
+			local delta = input.Delta
+			local sensitivity = 0.002
+			freeCamRotation = freeCamRotation * CFrame.Angles(-delta.Y * sensitivity, -delta.X * sensitivity, 0)
 		end
 	end)
+	table.insert(connections, mouseConn)
 end
 
 --[[
@@ -448,6 +465,29 @@ end
 ]]
 function SpectatorController.GetCurrentTarget(): Player?
 	return currentTarget
+end
+
+--[[
+	Cleanup connections and unbind actions
+]]
+function SpectatorController.Cleanup()
+	-- Disconnect all connections
+	for _, conn in ipairs(connections) do
+		conn:Disconnect()
+	end
+	connections = {}
+
+	-- Unbind context actions
+	ContextActionService:UnbindAction("SpectatorNextTarget")
+	ContextActionService:UnbindAction("SpectatorPrevTarget")
+	ContextActionService:UnbindAction("SpectatorFreeCam")
+
+	-- Stop spectating if active
+	if isSpectating then
+		SpectatorController.StopSpectating()
+	end
+
+	print("[SpectatorController] Cleaned up")
 end
 
 return SpectatorController

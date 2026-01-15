@@ -731,4 +731,75 @@ function InventoryManager.RemoveWorldItem(id: string)
 	end
 end
 
+--[[
+	Clear a player's entire inventory
+	@param player The player whose inventory to clear
+]]
+function InventoryManager.ClearInventory(player: Player)
+	local userId = player.UserId
+	local inventory = playerInventories[userId]
+	if not inventory then return end
+
+	-- Clear all slots
+	inventory.weapons = { nil, nil, nil, nil, nil }
+	inventory.equipment = {
+		tactical = nil,
+		utility = nil,
+	}
+	inventory.consumables = {}
+	inventory.ammo = {
+		LightAmmo = 0,
+		MediumAmmo = 0,
+		HeavyAmmo = 0,
+		Shells = 0,
+		SpecialAmmo = 0,
+	}
+	inventory.currentWeaponSlot = 1
+
+	-- Notify client of cleared inventory
+	InventoryManager.SendInventoryUpdate(player)
+end
+
+--[[
+	Cleanup player data when they leave
+	@param player The player to cleanup
+]]
+function InventoryManager.CleanupPlayer(player: Player)
+	local userId = player.UserId
+	playerInventories[userId] = nil
+end
+
+--[[
+	Initialize a player's inventory (alias for Initialize)
+	@param player The player to initialize
+]]
+function InventoryManager.InitializePlayer(player: Player)
+	InventoryManager.Initialize(player)
+end
+
+--[[
+	Reset all inventory state for new match
+	Clears world items, resets counter, and clears all player inventories
+]]
+function InventoryManager.Reset()
+	-- Destroy all world item models
+	for _, worldItem in pairs(worldItems) do
+		if worldItem.model then
+			worldItem.model:Destroy()
+		end
+	end
+	worldItems = {}
+	worldItemCounter = 0
+
+	-- Clear all player inventories (they'll be re-initialized when match starts)
+	for userId, _ in pairs(playerInventories) do
+		local player = game:GetService("Players"):GetPlayerByUserId(userId)
+		if player then
+			InventoryManager.ClearInventory(player)
+		end
+	end
+
+	print("[InventoryManager] Reset")
+end
+
 return InventoryManager

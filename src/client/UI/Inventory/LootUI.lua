@@ -7,7 +7,7 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local UserInputService = game:GetService("UserInputService")
+local ContextActionService = game:GetService("ContextActionService")
 local RunService = game:GetService("RunService")
 
 local Events = require(ReplicatedStorage.Shared.Events)
@@ -35,6 +35,9 @@ local nearbyLoot: { [string]: LootDisplay } = {}
 local closestLoot: LootDisplay? = nil
 local isInitialized = false
 
+-- Connections for cleanup
+local connections: { RBXScriptConnection } = {}
+
 -- Constants
 local PICKUP_RANGE = 8
 local PICKUP_KEY = Enum.KeyCode.E
@@ -52,9 +55,10 @@ function LootUI.Initialize()
 	LootUI.SetupEventListeners()
 	LootUI.SetupInputHandling()
 
-	RunService.RenderStepped:Connect(function()
+	local renderConn = RunService.RenderStepped:Connect(function()
 		LootUI.Update()
 	end)
+	table.insert(connections, renderConn)
 
 	print("[LootUI] Initialized")
 end
@@ -167,13 +171,12 @@ end
 	Setup input handling
 ]]
 function LootUI.SetupInputHandling()
-	UserInputService.InputBegan:Connect(function(input, gameProcessed)
-		if gameProcessed then return end
-
-		if input.KeyCode == PICKUP_KEY then
+	ContextActionService:BindAction("LootPickup", function(_, inputState)
+		if inputState == Enum.UserInputState.Begin then
 			LootUI.TryPickup()
 		end
-	end)
+		return Enum.ContextActionResult.Pass
+	end, false, PICKUP_KEY)
 end
 
 --[[
@@ -375,6 +378,16 @@ end
 	Cleanup
 ]]
 function LootUI.Cleanup()
+	-- Disconnect all connections
+	for _, conn in ipairs(connections) do
+		conn:Disconnect()
+	end
+	connections = {}
+
+	-- Unbind actions
+	ContextActionService:UnbindAction("LootPickup")
+
+	-- Remove loot displays
 	for id in pairs(nearbyLoot) do
 		LootUI.RemoveLootDisplay(id)
 	end
@@ -383,6 +396,8 @@ function LootUI.Cleanup()
 		screenGui:Destroy()
 		screenGui = nil
 	end
+
+	isInitialized = false
 end
 
 return LootUI

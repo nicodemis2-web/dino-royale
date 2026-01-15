@@ -13,8 +13,7 @@ local Events = require(game.ReplicatedStorage.Shared.Events)
 -- Forward declarations for dependencies
 local GameManager: any = nil
 local InventoryManager: any = nil
-local LootSpawner: any = nil
-local HealthManager: any = nil
+local CombatManager: any = nil
 
 local EliminationManager = {}
 
@@ -45,6 +44,7 @@ local eliminations = {} :: { EliminationInfo }
 local playerStats = {} :: { [number]: { kills: number, assists: number, damageDealt: number } }
 local rebootCards = {} :: { [number]: RebootCard }
 local currentPlacement = 100 -- Decrements as players are eliminated
+local downedPlayers = {} :: { [number]: { attacker: Player?, downedTime: number } } -- Track downed state locally
 
 -- Settings
 local REBOOT_CARD_DURATION = 120 -- 2 minutes
@@ -65,12 +65,8 @@ function EliminationManager.SetInventoryManager(manager: any)
 	InventoryManager = manager
 end
 
-function EliminationManager.SetLootSpawner(spawner: any)
-	LootSpawner = spawner
-end
-
-function EliminationManager.SetHealthManager(manager: any)
-	HealthManager = manager
+function EliminationManager.SetCombatManager(manager: any)
+	CombatManager = manager
 end
 
 --[[
@@ -143,14 +139,13 @@ local function dropPlayerLoot(player: Player, position: Vector3)
 				)
 				local dropPosition = position + offset
 
-				if LootSpawner then
-					LootSpawner.CreateWorldItem({
-						type = "Weapon",
-						id = weapon.id,
-						rarity = weapon.rarity,
-						state = weapon.state,
-					}, dropPosition)
-				end
+				InventoryManager.CreateWorldItem(
+					"Weapon",
+					weapon.id,
+					dropPosition,
+					weapon.rarity,
+					1
+				)
 			end
 		end
 	end
@@ -168,13 +163,13 @@ local function dropPlayerLoot(player: Player, position: Vector3)
 				)
 				local dropPosition = position + offset
 
-				if LootSpawner then
-					LootSpawner.CreateWorldItem({
-						type = "Consumable",
-						id = itemId,
-						count = count,
-					}, dropPosition)
-				end
+				InventoryManager.CreateWorldItem(
+					"Consumable",
+					itemId,
+					dropPosition,
+					nil,
+					count
+				)
 
 				consumableIndex = consumableIndex + 1
 			end
@@ -194,13 +189,13 @@ local function dropPlayerLoot(player: Player, position: Vector3)
 				)
 				local dropPosition = position + offset
 
-				if LootSpawner then
-					LootSpawner.CreateWorldItem({
-						type = "Ammo",
-						id = ammoType,
-						count = count,
-					}, dropPosition)
-				end
+				InventoryManager.CreateWorldItem(
+					"Ammo",
+					ammoType,
+					dropPosition,
+					nil,
+					count
+				)
 
 				ammoIndex = ammoIndex + 1
 			end
@@ -220,13 +215,15 @@ local function createRebootCard(player: Player, position: Vector3)
 	end
 
 	-- Create world item for reboot card
-	local cardPart: BasePart? = nil
-	if LootSpawner then
-		cardPart = LootSpawner.CreateWorldItem({
-			type = "RebootCard",
-			playerId = player.UserId,
-			playerName = player.Name,
-		}, position + Vector3.new(0, 1, 0))
+	local cardWorldItem = nil
+	if InventoryManager then
+		cardWorldItem = InventoryManager.CreateWorldItem(
+			"RebootCard",
+			tostring(player.UserId), -- Use UserId as itemId for reboot cards
+			position + Vector3.new(0, 1, 0),
+			nil,
+			1
+		)
 	end
 
 	rebootCards[player.UserId] = {
@@ -234,7 +231,7 @@ local function createRebootCard(player: Player, position: Vector3)
 		playerName = player.Name,
 		position = position,
 		expirationTime = tick() + REBOOT_CARD_DURATION,
-		worldItem = cardPart,
+		worldItem = cardWorldItem and cardWorldItem.model or nil,
 	}
 
 	-- Notify team
@@ -310,10 +307,9 @@ function EliminationManager.UseRebootCard(user: Player, cardPlayerId: number, be
 		end
 	end
 
-	-- Restore health (half health, no shield)
-	if HealthManager then
-		HealthManager.SetHealth(cardPlayer, 50)
-		HealthManager.SetShield(cardPlayer, 0)
+	-- Restore health (reset to default state)
+	if CombatManager then
+		CombatManager.ResetPlayer(cardPlayer)
 	end
 
 	-- Register as alive again
@@ -404,7 +400,7 @@ function EliminationManager.EliminatePlayer(
 	})
 
 	-- Notify victim of their placement
-	Events.FireClient(victim, "Combat", "YouWereEliminated", {
+	Events.FireClient("Combat", "YouWereEliminated", victim, {
 		placement = placement,
 		eliminator = eliminator and eliminator.Name or source,
 		weapon = weapon,
@@ -434,10 +430,11 @@ function EliminationManager.DownPlayer(victim: Player, attacker: Player?)
 		return
 	end
 
-	-- Set downed state through HealthManager
-	if HealthManager then
-		HealthManager.SetDowned(victim, attacker)
-	end
+	-- Track downed state locally
+	downedPlayers[victim.UserId] = {
+		attacker = attacker,
+		downedTime = tick(),
+	}
 
 	-- Notify team
 	local position = Vector3.zero
@@ -456,12 +453,10 @@ function EliminationManager.DownPlayer(victim: Player, attacker: Player?)
 
 	-- Start bleedout timer
 	task.delay(DOWNED_BLEEDOUT_TIME, function()
-		-- Check if still downed
-		if HealthManager then
-			local state = HealthManager.GetState(victim)
-			if state and state.isDowned then
-				EliminationManager.EliminatePlayer(victim, attacker, nil, "Bleedout")
-			end
+		-- Check if still downed (not revived)
+		if downedPlayers[victim.UserId] then
+			EliminationManager.EliminatePlayer(victim, attacker, nil, "Bleedout")
+			downedPlayers[victim.UserId] = nil
 		end
 	end)
 
@@ -472,8 +467,12 @@ end
 	Handle revive complete
 ]]
 function EliminationManager.OnReviveComplete(reviver: Player, revived: Player)
-	if HealthManager then
-		HealthManager.Revive(revived, reviver)
+	-- Clear downed state
+	downedPlayers[revived.UserId] = nil
+
+	-- Restore some health via CombatManager
+	if CombatManager then
+		CombatManager.HealPlayer(revived, 30, "Revive") -- Revive with 30 HP
 	end
 
 	Events.FireAllClients("Team", "ReviveComplete", {
@@ -538,7 +537,6 @@ end
 ]]
 function EliminationManager.Reset()
 	eliminations = {}
-	rebootCards = {}
 	currentPlacement = 100
 
 	-- Clear reboot card world items
@@ -548,6 +546,9 @@ function EliminationManager.Reset()
 		end
 	end
 	rebootCards = {}
+
+	-- Clear downed state
+	downedPlayers = {}
 
 	-- Reset player stats
 	for userId, _ in pairs(playerStats) do
@@ -562,6 +563,13 @@ function EliminationManager.Reset()
 end
 
 --[[
+	Check if a player is currently downed
+]]
+function EliminationManager.IsPlayerDowned(player: Player): boolean
+	return downedPlayers[player.UserId] ~= nil
+end
+
+--[[
 	Cleanup on player leaving
 ]]
 function EliminationManager.OnPlayerRemoving(player: Player)
@@ -571,6 +579,9 @@ function EliminationManager.OnPlayerRemoving(player: Player)
 		card.worldItem:Destroy()
 	end
 	rebootCards[player.UserId] = nil
+
+	-- Clear downed state
+	downedPlayers[player.UserId] = nil
 
 	-- Clear stats
 	playerStats[player.UserId] = nil

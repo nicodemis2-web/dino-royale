@@ -9,6 +9,7 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 
 local Events = require(game.ReplicatedStorage.Shared.Events)
 
@@ -22,6 +23,9 @@ local MatchInfo: any = nil
 local DamageIndicator: any = nil
 local InteractionPrompt: any = nil
 local InventoryScreen: any = nil
+local ToastNotification: any = nil
+local ConfirmDialog: any = nil
+local UIHelpers: any = nil
 
 local HUDController = {}
 
@@ -65,6 +69,9 @@ local function loadComponents()
 	DamageIndicator = require(Components.DamageIndicator)
 	InteractionPrompt = require(Components.InteractionPrompt)
 	InventoryScreen = require(Components.InventoryScreen)
+	ToastNotification = require(Components.ToastNotification)
+	ConfirmDialog = require(Components.ConfirmDialog)
+	UIHelpers = require(script.Parent.UIHelpers)
 end
 
 --[[
@@ -401,45 +408,134 @@ local function setupUpdateLoop()
 end
 
 --[[
-	Handle game state changes
+	Handle game state changes with smooth transitions
 ]]
 function HUDController.OnGameStateChanged(newState: string)
+	local previousState = currentGameState
 	currentGameState = newState
 
+	-- Transition duration
+	local FADE_DURATION = 0.2
+
 	if newState == "Lobby" then
-		HUDController.SetHUDVisible(false)
+		HUDController.SetHUDVisible(false, FADE_DURATION)
+
 	elseif newState == "Loading" then
-		HUDController.SetHUDVisible(false)
+		HUDController.SetHUDVisible(false, FADE_DURATION)
+		if ToastNotification then
+			ToastNotification.Info("Loading match...")
+		end
+
 	elseif newState == "Deploying" then
-		-- Show minimal HUD during deployment
-		HUDController.SetHUDVisible(true)
+		-- Show minimal HUD during deployment with fade
+		HUDController.SetHUDVisible(true, FADE_DURATION)
 		if ammoDisplay then
 			ammoDisplay:SetVisible(false)
 		end
 		if weaponSlots then
 			weaponSlots.frame.Visible = false
 		end
+		if ToastNotification then
+			ToastNotification.Info("Get ready to deploy!")
+		end
+
 	elseif newState == "Playing" then
-		HUDController.SetHUDVisible(true)
+		HUDController.SetHUDVisible(true, FADE_DURATION)
 		if ammoDisplay then
 			ammoDisplay:SetVisible(true)
 		end
 		if weaponSlots then
 			weaponSlots.frame.Visible = true
 		end
+		if ToastNotification then
+			ToastNotification.Success("Match started - Good luck!")
+		end
+
 	elseif newState == "Ending" then
 		-- Keep HUD visible for results
+		if ToastNotification then
+			ToastNotification.Info("Match ended")
+		end
+
+	elseif newState == "Spectating" then
+		if ToastNotification then
+			ToastNotification.Info("You are now spectating")
+		end
 	end
 end
 
 --[[
-	Set overall HUD visibility
+	Set overall HUD visibility with optional fade transition
+	@param visible Whether to show or hide
+	@param fadeDuration Optional fade duration (instant if nil)
 ]]
-function HUDController.SetHUDVisible(visible: boolean)
+function HUDController.SetHUDVisible(visible: boolean, fadeDuration: number?)
 	isHUDVisible = visible
 
-	if hudGui then
+	if not hudGui then
+		return
+	end
+
+	if not fadeDuration or fadeDuration <= 0 then
+		-- Instant visibility change
 		hudGui.Enabled = visible
+		return
+	end
+
+	if visible then
+		-- Fade in
+		hudGui.Enabled = true
+
+		-- Fade all direct children
+		for _, child in ipairs(hudGui:GetChildren()) do
+			if child:IsA("GuiObject") then
+				-- Store original transparency if not stored
+				local originalTransparency = child:GetAttribute("OriginalTransparency")
+				if originalTransparency == nil then
+					if child:IsA("Frame") then
+						child:SetAttribute("OriginalTransparency", child.BackgroundTransparency)
+					end
+				end
+
+				-- Start transparent
+				if child:IsA("Frame") then
+					child.BackgroundTransparency = 1
+				end
+
+				-- Fade in
+				TweenService:Create(child, TweenInfo.new(fadeDuration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+					BackgroundTransparency = originalTransparency or 0,
+				}):Play()
+			end
+		end
+	else
+		-- Fade out
+		local fadeTween: Tween? = nil
+
+		for _, child in ipairs(hudGui:GetChildren()) do
+			if child:IsA("GuiObject") and child:IsA("Frame") then
+				-- Store original transparency
+				child:SetAttribute("OriginalTransparency", child.BackgroundTransparency)
+
+				-- Fade out
+				fadeTween = TweenService:Create(child, TweenInfo.new(fadeDuration, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+					BackgroundTransparency = 1,
+				})
+				fadeTween:Play()
+			end
+		end
+
+		-- Disable after fade completes
+		if fadeTween then
+			-- Use Once to avoid connection leak on repeated fade operations
+			fadeTween.Completed:Once(function()
+				if not isHUDVisible and hudGui then
+					hudGui.Enabled = false
+				end
+			end)
+		else
+			hudGui.Enabled = false
+		end
 	end
 end
 
@@ -484,11 +580,57 @@ function HUDController.Initialize()
 	setupInput()
 	setupUpdateLoop()
 
+	-- Initialize toast and dialog systems
+	if ToastNotification then
+		ToastNotification.Initialize()
+	end
+	if ConfirmDialog then
+		ConfirmDialog.Initialize()
+	end
+
 	-- Start with HUD hidden (lobby state)
 	HUDController.SetHUDVisible(false)
 
 	isInitialized = true
 	print("[HUDController] Initialized")
+end
+
+--[[
+	Show a toast notification (convenience method)
+	@param message The message to display
+	@param toastType Type: "success", "error", "warning", "info"
+	@param duration Optional duration in seconds
+]]
+function HUDController.ShowToast(message: string, toastType: string?, duration: number?)
+	if not ToastNotification then
+		return
+	end
+
+	ToastNotification.Show({
+		message = message,
+		toastType = toastType or "info",
+		duration = duration,
+	})
+end
+
+--[[
+	Show a confirmation dialog
+	@param config Dialog configuration
+]]
+function HUDController.ShowConfirmDialog(config: {
+	title: string?,
+	message: string,
+	confirmText: string?,
+	cancelText: string?,
+	confirmColor: Color3?,
+	onConfirm: (() -> ())?,
+	onCancel: (() -> ())?,
+})
+	if not ConfirmDialog then
+		return
+	end
+
+	ConfirmDialog.Show(config)
 end
 
 --[[

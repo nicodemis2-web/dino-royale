@@ -2,323 +2,296 @@
 --[[
 	BiomeData.lua
 	=============
-	Defines all biome types and their properties for Isla Primordial
-	Based on GDD Section 3: Map Design
+	Defines all biome types and their properties for Dino Royale
+	Map divided into 3 biomes: Jungle, Desert, Mountains
 ]]
 
-export type BiomeType = "Jungle" | "Plains" | "Volcanic" | "Swamp" | "Coast" | "Research"
+-- Main terrain biomes + legacy POI biomes for compatibility
+export type BiomeType = "Jungle" | "Desert" | "Mountains" | "Plains" | "Volcanic" | "Swamp" | "Coast" | "Research"
 
 export type BiomeConfig = {
 	name: string,
 	displayName: string,
 	description: string,
 
-	-- Map position (normalized 0-1 coordinates)
-	region: {
-		centerX: number,
-		centerZ: number,
-		radius: number,
-	},
-
-	-- World bounds (for minimap)
-	bounds: {
-		center: Vector3,
-		radius: number,
+	-- Angle-based sector (radians, map divided into thirds)
+	sector: {
+		startAngle: number,
+		endAngle: number,
 	},
 
 	-- Minimap display
 	minimapColor: Color3,
 
 	-- Loot settings
-	lootTier: string, -- "Low" | "Medium" | "High" | "VeryHigh"
-	lootDensity: number, -- Multiplier for spawn points
+	lootTier: string,
+	lootDensity: number,
 
 	-- Dinosaur spawning
 	dinosaurTypes: { string },
 	dinosaurDensity: number,
 
+	-- Terrain materials
+	primaryMaterial: Enum.Material,
+	secondaryMaterial: Enum.Material,
+	peakMaterial: Enum.Material,
+
 	-- Environment
 	ambientSound: string,
 	weatherEffects: { string },
 	hazards: { string },
-
-	-- Visual
-	fogDensity: number,
-	fogColor: { r: number, g: number, b: number },
-	lighting: {
-		ambient: { r: number, g: number, b: number },
-		brightness: number,
-	},
 }
 
 local BiomeData = {}
+
+-- Map configuration
+BiomeData.MapSize = {
+	width = 2000,
+	height = 2000,
+}
+BiomeData.MapCenter = Vector3.new(0, 0, 0)
 
 BiomeData.Biomes: { [BiomeType]: BiomeConfig } = {
 	Jungle = {
 		name = "Jungle",
 		displayName = "Jungle Zone",
-		description = "Dense tropical jungle with raptor paddocks and the iconic Visitor Center",
+		description = "Dense tropical jungle with raptors and lush vegetation",
 
-		region = {
-			centerX = 0.5,
-			centerZ = 0.5,
-			radius = 0.25,
-		},
-
-		bounds = {
-			center = Vector3.new(2000, 0, 2000),
-			radius = 1000,
+		sector = {
+			startAngle = 0,
+			endAngle = math.pi * 2/3, -- 0° to 120°
 		},
 
 		minimapColor = Color3.fromRGB(34, 139, 34),
 
-		lootTier = "Medium-High",
+		lootTier = "Medium",
 		lootDensity = 1.2,
 
 		dinosaurTypes = { "Velociraptor", "Dilophosaurus", "Compsognathus" },
 		dinosaurDensity = 1.5,
 
+		primaryMaterial = Enum.Material.LeafyGrass,
+		secondaryMaterial = Enum.Material.Grass,
+		peakMaterial = Enum.Material.Rock,
+
 		ambientSound = "JungleAmbient",
 		weatherEffects = { "Rain", "Fog" },
-		hazards = { "RaptorNest", "VenomPool" },
-
-		fogDensity = 0.3,
-		fogColor = { r = 100, g = 120, b = 80 },
-		lighting = {
-			ambient = { r = 80, g = 100, b = 60 },
-			brightness = 0.8,
-		},
+		hazards = { "RaptorNest", "QuicksandPit" },
 	},
 
-	Plains = {
-		name = "Plains",
-		displayName = "Open Plains",
-		description = "Wide grasslands where herbivores roam - beginner friendly with good sightlines",
+	Desert = {
+		name = "Desert",
+		displayName = "Desert Dunes",
+		description = "Arid desert with sand dunes and ancient ruins",
 
-		region = {
-			centerX = 0.25,
-			centerZ = 0.5,
-			radius = 0.2,
+		sector = {
+			startAngle = math.pi * 2/3,
+			endAngle = math.pi * 4/3, -- 120° to 240°
 		},
 
-		bounds = {
-			center = Vector3.new(1000, 0, 2000),
-			radius = 800,
-		},
+		minimapColor = Color3.fromRGB(210, 180, 140),
 
-		minimapColor = Color3.fromRGB(154, 205, 50),
-
-		lootTier = "Medium",
+		lootTier = "Low",
 		lootDensity = 0.8,
 
-		dinosaurTypes = { "Triceratops", "Gallimimus" },
-		dinosaurDensity = 1.0,
+		dinosaurTypes = { "Gallimimus", "Pteranodon" },
+		dinosaurDensity = 0.7,
 
-		ambientSound = "PlainsAmbient",
-		weatherEffects = { "Wind", "Dust" },
-		hazards = { "Stampede" },
+		primaryMaterial = Enum.Material.Sand,
+		secondaryMaterial = Enum.Material.Sandstone,
+		peakMaterial = Enum.Material.Sandstone,
 
-		fogDensity = 0.1,
-		fogColor = { r = 200, g = 200, b = 180 },
-		lighting = {
-			ambient = { r = 180, g = 180, b = 160 },
-			brightness = 1.2,
-		},
+		ambientSound = "DesertAmbient",
+		weatherEffects = { "Sandstorm" },
+		hazards = { "Heatstroke", "Quicksand" },
 	},
 
-	Volcanic = {
-		name = "Volcanic",
-		displayName = "Volcanic Region",
-		description = "Dangerous northern zone with lava flows and apex predators",
+	Mountains = {
+		name = "Mountains",
+		displayName = "Mountain Peaks",
+		description = "Snowy mountain peaks with treacherous cliffs and predators",
 
-		region = {
-			centerX = 0.5,
-			centerZ = 0.15,
-			radius = 0.2,
+		sector = {
+			startAngle = math.pi * 4/3,
+			endAngle = math.pi * 2, -- 240° to 360°
 		},
 
-		bounds = {
-			center = Vector3.new(2000, 0, 600),
-			radius = 800,
-		},
-
-		minimapColor = Color3.fromRGB(178, 34, 34),
+		minimapColor = Color3.fromRGB(200, 200, 220),
 
 		lootTier = "High",
 		lootDensity = 1.5,
 
-		dinosaurTypes = { "TRex", "Carnotaurus" },
-		dinosaurDensity = 0.8,
+		dinosaurTypes = { "TRex", "Triceratops", "Indoraptor" },
+		dinosaurDensity = 1.0,
 
-		ambientSound = "VolcanicAmbient",
-		weatherEffects = { "AshFall", "HeatWave" },
-		hazards = { "LavaPool", "Eruption", "SteamVent" },
+		primaryMaterial = Enum.Material.Rock,
+		secondaryMaterial = Enum.Material.Slate,
+		peakMaterial = Enum.Material.Snow,
 
-		fogDensity = 0.5,
-		fogColor = { r = 80, g = 60, b = 50 },
-		lighting = {
-			ambient = { r = 200, g = 100, b = 50 },
-			brightness = 0.9,
-		},
+		ambientSound = "MountainAmbient",
+		weatherEffects = { "Snow", "Wind" },
+		hazards = { "Avalanche", "IcySlope" },
 	},
 
-	Swamp = {
-		name = "Swamp",
-		displayName = "Swamplands",
-		description = "Murky wetlands in the east, home to aquatic predators",
+	-- POI-specific biomes (used for environmental effects and POI categorization)
+	Plains = {
+		name = "Plains",
+		displayName = "Open Plains",
+		description = "Open grasslands with scattered outposts",
 
-		region = {
-			centerX = 0.8,
-			centerZ = 0.5,
-			radius = 0.18,
-		},
+		sector = { startAngle = 0, endAngle = 0 }, -- POI biome, not angle-based
 
-		bounds = {
-			center = Vector3.new(3200, 0, 2000),
-			radius = 720,
-		},
-
-		minimapColor = Color3.fromRGB(85, 107, 47),
+		minimapColor = Color3.fromRGB(144, 238, 144),
 
 		lootTier = "Medium",
 		lootDensity = 1.0,
 
-		dinosaurTypes = { "Spinosaurus", "Baryonyx", "Pteranodon" },
-		dinosaurDensity = 1.2,
+		dinosaurTypes = { "Gallimimus", "Triceratops" },
+		dinosaurDensity = 0.8,
+
+		primaryMaterial = Enum.Material.Grass,
+		secondaryMaterial = Enum.Material.Ground,
+		peakMaterial = Enum.Material.Rock,
+
+		ambientSound = "PlainsAmbient",
+		weatherEffects = { "Wind" },
+		hazards = { "Stampede" },
+	},
+
+	Volcanic = {
+		name = "Volcanic",
+		displayName = "Volcanic Zone",
+		description = "Dangerous volcanic region with lava flows and geothermal vents",
+
+		sector = { startAngle = 0, endAngle = 0 }, -- POI biome, not angle-based
+
+		minimapColor = Color3.fromRGB(255, 69, 0),
+
+		lootTier = "High",
+		lootDensity = 1.8,
+
+		dinosaurTypes = { "TRex", "Pteranodon" },
+		dinosaurDensity = 0.5,
+
+		primaryMaterial = Enum.Material.Basalt,
+		secondaryMaterial = Enum.Material.Rock,
+		peakMaterial = Enum.Material.CrackedLava,
+
+		ambientSound = "VolcanicAmbient",
+		weatherEffects = { "AshFall", "Smoke" },
+		hazards = { "LavaFlow", "Heat", "GeyserEruption" },
+	},
+
+	Swamp = {
+		name = "Swamp",
+		displayName = "Murky Swamp",
+		description = "Foggy swampland with hidden dangers",
+
+		sector = { startAngle = 0, endAngle = 0 }, -- POI biome, not angle-based
+
+		minimapColor = Color3.fromRGB(85, 107, 47),
+
+		lootTier = "Medium",
+		lootDensity = 1.1,
+
+		dinosaurTypes = { "Dilophosaurus", "Spinosaurus" },
+		dinosaurDensity = 1.3,
+
+		primaryMaterial = Enum.Material.Mud,
+		secondaryMaterial = Enum.Material.Ground,
+		peakMaterial = Enum.Material.Grass,
 
 		ambientSound = "SwampAmbient",
-		weatherEffects = { "Fog", "Rain", "Monsoon" },
-		hazards = { "Quicksand", "DeepWater" },
-
-		fogDensity = 0.6,
-		fogColor = { r = 80, g = 100, b = 80 },
-		lighting = {
-			ambient = { r = 60, g = 80, b = 60 },
-			brightness = 0.6,
-		},
+		weatherEffects = { "Fog", "Rain" },
+		hazards = { "PoisonousGas", "Quicksand", "DeepWater" },
 	},
 
 	Coast = {
 		name = "Coast",
-		displayName = "Coastal Area",
-		description = "Southern beaches and harbor - mixed danger with water threats",
+		displayName = "Coastal Shores",
+		description = "Beaches and coastal cliffs with marine life",
 
-		region = {
-			centerX = 0.5,
-			centerZ = 0.85,
-			radius = 0.15,
-		},
-
-		bounds = {
-			center = Vector3.new(2000, 0, 3400),
-			radius = 600,
-		},
+		sector = { startAngle = 0, endAngle = 0 }, -- POI biome, not angle-based
 
 		minimapColor = Color3.fromRGB(135, 206, 235),
 
-		lootTier = "Low-Medium",
-		lootDensity = 0.7,
+		lootTier = "Low",
+		lootDensity = 0.9,
 
-		dinosaurTypes = { "Pteranodon", "Dimorphodon" },
+		dinosaurTypes = { "Pteranodon", "Mosasaurus" },
 		dinosaurDensity = 0.6,
 
-		ambientSound = "CoastAmbient",
-		weatherEffects = { "SeaBreeze", "Storm" },
-		hazards = { "Mosasaurus", "TidalWave" },
+		primaryMaterial = Enum.Material.Sand,
+		secondaryMaterial = Enum.Material.Rock,
+		peakMaterial = Enum.Material.Slate,
 
-		fogDensity = 0.2,
-		fogColor = { r = 180, g = 200, b = 220 },
-		lighting = {
-			ambient = { r = 150, g = 180, b = 200 },
-			brightness = 1.3,
-		},
+		ambientSound = "CoastAmbient",
+		weatherEffects = { "SeaSpray", "Storm" },
+		hazards = { "Tide", "RipCurrent" },
 	},
 
 	Research = {
 		name = "Research",
-		displayName = "Research Complex",
-		description = "Abandoned laboratory complex - highest loot but extreme danger",
+		displayName = "Research Facility",
+		description = "Abandoned research facilities with experimental dangers",
 
-		region = {
-			centerX = 0.6,
-			centerZ = 0.4,
-			radius = 0.12,
-		},
+		sector = { startAngle = 0, endAngle = 0 }, -- POI biome, not angle-based
 
-		bounds = {
-			center = Vector3.new(2400, 0, 1600),
-			radius = 480,
-		},
+		minimapColor = Color3.fromRGB(192, 192, 192),
 
-		minimapColor = Color3.fromRGB(128, 128, 128),
-
-		lootTier = "VeryHigh",
+		lootTier = "Legendary",
 		lootDensity = 2.0,
 
 		dinosaurTypes = { "Indoraptor", "Velociraptor" },
-		dinosaurDensity = 0.5,
+		dinosaurDensity = 1.2,
 
-		ambientSound = "LabAmbient",
-		weatherEffects = { "PowerFlicker" },
-		hazards = { "Lockdown", "IndoraptorRelease" },
+		primaryMaterial = Enum.Material.Concrete,
+		secondaryMaterial = Enum.Material.Metal,
+		peakMaterial = Enum.Material.DiamondPlate,
 
-		fogDensity = 0.1,
-		fogColor = { r = 150, g = 150, b = 160 },
-		lighting = {
-			ambient = { r = 200, g = 200, b = 220 },
-			brightness = 0.7,
-		},
+		ambientSound = "ResearchAmbient",
+		weatherEffects = {},
+		hazards = { "SecuritySystem", "BiohazardLeak", "PowerSurge" },
 	},
 }
 
--- Map constants
-BiomeData.MapSize = {
-	width = 4000, -- studs (4km)
-	height = 4000,
-}
-
-BiomeData.MapCenter = {
-	x = 2000,
-	z = 2000,
-}
-
 --[[
-	Get biome at world position
+	Get biome at world position (angle-based)
 ]]
 function BiomeData.GetBiomeAtPosition(x: number, z: number): BiomeType
-	local normalizedX = x / BiomeData.MapSize.width
-	local normalizedZ = z / BiomeData.MapSize.height
-
-	local closestBiome: BiomeType = "Jungle"
-	local closestDistance = math.huge
+	local angle = math.atan2(z, x) + math.pi -- Convert to 0-2π range
 
 	for biomeName, config in pairs(BiomeData.Biomes) do
-		local dx = normalizedX - config.region.centerX
-		local dz = normalizedZ - config.region.centerZ
-		local distance = math.sqrt(dx * dx + dz * dz)
-
-		if distance < config.region.radius and distance < closestDistance then
-			closestDistance = distance
-			closestBiome = biomeName :: BiomeType
+		if angle >= config.sector.startAngle and angle < config.sector.endAngle then
+			return biomeName :: BiomeType
 		end
 	end
 
-	return closestBiome
+	return "Jungle" -- Default fallback
 end
 
 --[[
-	Get danger level for a biome (1-5)
+	Get biome config by name
+]]
+function BiomeData.GetBiomeConfig(biome: BiomeType): BiomeConfig
+	return BiomeData.Biomes[biome]
+end
+
+--[[
+	Get danger level for biome (1-5)
 ]]
 function BiomeData.GetDangerLevel(biome: BiomeType): number
-	local dangerLevels = {
-		Plains = 1,
-		Coast = 2,
+	local levels = {
 		Jungle = 3,
+		Desert = 2,
+		Mountains = 4,
+		Plains = 2,
+		Volcanic = 5,
 		Swamp = 3,
-		Volcanic = 4,
-		Research = 5,
+		Coast = 2,
+		Research = 4,
 	}
-	return dangerLevels[biome] or 2
+	return levels[biome] or 2
 end
 
 --[[
@@ -326,8 +299,28 @@ end
 ]]
 function BiomeData.GetLootMultiplier(biome: BiomeType): number
 	local config = BiomeData.Biomes[biome]
-	if not config then return 1.0 end
-	return config.lootDensity
+	return config and config.lootDensity or 1.0
+end
+
+--[[
+	Get main terrain biome names (angle-based map sectors)
+]]
+function BiomeData.GetTerrainBiomes(): { BiomeType }
+	return { "Jungle", "Desert", "Mountains" }
+end
+
+--[[
+	Get POI-specific biome names
+]]
+function BiomeData.GetPOIBiomes(): { BiomeType }
+	return { "Plains", "Volcanic", "Swamp", "Coast", "Research" }
+end
+
+--[[
+	Get all biome names (terrain + POI biomes)
+]]
+function BiomeData.GetAllBiomes(): { BiomeType }
+	return { "Jungle", "Desert", "Mountains", "Plains", "Volcanic", "Swamp", "Coast", "Research" }
 end
 
 return BiomeData

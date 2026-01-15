@@ -40,6 +40,7 @@ local TutorialManager: any = nil
 local PartyManager: any = nil
 local RankedManager: any = nil
 local AccessibilityManager: any = nil
+local AdminConsole: any = nil
 
 -- State
 local isInitialized = false
@@ -62,6 +63,7 @@ local function loadModules()
 	GameManager = require(Core.GameManager)
 	StormManager = require(Core.StormManager)
 	DeploymentManager = require(Core.DeploymentManager)
+	AdminConsole = require(Core.AdminConsole)
 
 	-- Map systems
 	MapManager = require(Map.MapManager)
@@ -109,11 +111,12 @@ end
 local function initializeSystems()
 	print("[Server] Initializing systems...")
 
+	-- Initialize events system first (creates RemoteEvents)
+	Events.Initialize()
+
 	-- Initialize in dependency order
 	GameManager.Initialize()
 	MapManager.Initialize() -- Map must init before storm/dinos
-	StormManager.Initialize()
-	DeploymentManager.Initialize()
 	WeaponManager.Initialize()
 	InventoryManager.Initialize()
 	EliminationManager.Initialize()
@@ -134,6 +137,28 @@ local function initializeSystems()
 	PartyManager.Initialize()
 	RankedManager.Initialize()
 	AccessibilityManager.Initialize()
+
+	-- Set manager references on GameManager
+	GameManager.SetStormManager(StormManager)
+	GameManager.SetDeploymentManager(DeploymentManager)
+	GameManager.SetEliminationManager(EliminationManager)
+
+	-- Set CombatManager reference on StormManager for damage dealing
+	StormManager.SetCombatManager(CombatManager)
+
+	-- Set dependencies on EliminationManager
+	EliminationManager.SetGameManager(GameManager)
+	EliminationManager.SetInventoryManager(InventoryManager)
+	EliminationManager.SetCombatManager(CombatManager)
+
+	-- Initialize StormManager with map parameters
+	local mapCenter = Vector3.new(0, 0, 0)
+	local mapRadius = 2000 -- Match BiomeData.MapSize
+	StormManager.Initialize(mapCenter, mapRadius)
+
+	-- Admin console (debug/testing)
+	AdminConsole.SetGameManager(GameManager)
+	AdminConsole.Initialize()
 
 	-- Connect systems
 	connectSystems()
@@ -163,25 +188,26 @@ local function connectSystems()
 			LootManager.Reset()
 			CombatManager.Reset()
 			HealingManager.Reset()
+			InventoryManager.Reset()
+			DeploymentManager.Reset()
 
 		elseif newState == "Deploying" then
 			-- Start deployment phase
 			MapManager.StartMatch() -- Initialize POIs and map content
-			DeploymentManager.StartDeployment()
-			DinosaurManager.SpawnInitial()
-			VehicleManager.Initialize() -- Spawns vehicles
+			-- Note: DeploymentManager.StartDeployment is called by GameManager with flight path
+			-- Dinosaurs spawn during DinosaurManager.Initialize()
+			-- Vehicles spawn during VehicleManager.Initialize() via spawnInitialVehicles()
 			LootManager.SpawnPOILoot() -- Spawn loot at all POIs
 
 		elseif newState == "Playing" then
-			-- Start the storm
-			StormManager.Start()
-			BossEventManager.Initialize()
+			-- Start the storm (phase 1)
+			StormManager.StartPhase(1)
+			-- BossEventManager tracks triggers via CheckEventTriggers
 			MapManager.OnMatchPhaseChanged("Playing")
 
 		elseif newState == "Ending" then
 			-- Match ended
-			StormManager.Stop()
-			DinosaurManager.StopSpawning()
+			-- StormManager doesn't have Stop(), it uses Reset() for cleanup
 
 		elseif newState == "Resetting" then
 			-- Prepare for next match
@@ -191,43 +217,62 @@ local function connectSystems()
 		end
 	end)
 
-	-- Storm manager updates
-	StormManager.OnPhaseChanged:Connect(function(phase, circleData)
-		-- Broadcast to clients
-		Events.FireAllClients("Storm", "PhaseChanged", {
-			phase = phase,
-			center = circleData.center,
-			radius = circleData.radius,
-			shrinkTime = circleData.shrinkTime,
-		})
+	-- Storm manager updates (if StormManager has this signal)
+	if StormManager.OnPhaseChanged then
+		StormManager.OnPhaseChanged:Connect(function(phase, circleData)
+			-- Broadcast to clients using GameState.StormUpdate event
+			Events.FireAllClients("GameState", "StormUpdate", {
+				phase = phase,
+				center = circleData.center,
+				radius = circleData.radius,
+				nextRadius = circleData.nextRadius,
+				timeRemaining = circleData.timeRemaining,
+			})
 
-		-- Check boss spawn triggers
-		BossEventManager.CheckEventTriggers({
-			currentPhase = phase,
-			aliveCount = EliminationManager.GetAliveCount(),
-		})
-	end)
+			-- Check boss spawn triggers
+			if BossEventManager.CheckEventTriggers then
+				BossEventManager.CheckEventTriggers({
+					currentPhase = phase,
+					aliveCount = EliminationManager.GetAliveCount(),
+				})
+			end
+		end)
+	end
 
-	-- Elimination tracking
-	EliminationManager.OnPlayerEliminated:Connect(function(victim, killer, source)
-		-- Update game manager
-		GameManager.OnPlayerEliminated(victim)
+	-- Elimination tracking (if EliminationManager has this signal)
+	if EliminationManager.OnPlayerEliminated then
+		EliminationManager.OnPlayerEliminated:Connect(function(victim, killer, source)
+			-- Update game manager
+			GameManager.RemoveAlivePlayer(victim)
 
-		-- Broadcast
-		Events.FireAllClients("Combat", "PlayerKilled", {
-			victimName = victim.Name,
-			victimId = victim.UserId,
-			killerName = killer and killer.Name or source,
-			killerId = killer and killer.UserId or nil,
-			weapon = source,
-		})
-	end)
+			-- Broadcast using Combat.PlayerEliminated event
+			Events.FireAllClients("Combat", "PlayerEliminated", {
+				victimId = victim.UserId,
+				killerId = killer and killer.UserId or nil,
+				weapon = source,
+				placement = GameManager.GetAlivePlayerCount() + 1,
+			})
+		end)
+	end
 
 	-- Player count tracking
 	Players.PlayerRemoving:Connect(function(player)
-		local isAlive = EliminationManager.IsPlayerAlive(player)
-		if isAlive then
-			EliminationManager.HandleDisconnect(player)
+		if EliminationManager.IsPlayerAlive and EliminationManager.IsPlayerAlive(player) then
+			if EliminationManager.HandleDisconnect then
+				EliminationManager.HandleDisconnect(player)
+			end
+		end
+	end)
+
+	-- Deployment events (jump and glider input)
+	Events.OnServerEvent("GameState", "PlayerJumped", function(player, _data)
+		-- Let GameManager handle jump tracking and forward to DeploymentManager
+		GameManager.OnPlayerJump(player)
+	end)
+
+	Events.OnServerEvent("GameState", "GliderInput", function(player, data)
+		if DeploymentManager and DeploymentManager.IsActive() and DeploymentManager.IsPlayerGliding(player) then
+			DeploymentManager.ValidateGliderInput(player, data)
 		end
 	end)
 end
@@ -248,10 +293,16 @@ local function setupPlayerHandling()
 		local currentState = GameManager.GetState()
 		if currentState == "Playing" then
 			-- Late joiner becomes spectator
-			Events.FireClient(player, "GameState", "Spectate", {})
+			Events.FireClient("GameState", "MatchStateChanged", player, {
+				newState = "Spectating",
+				isLateJoin = true,
+			})
 		elseif currentState == "Lobby" then
 			-- Add to lobby
-			Events.FireClient(player, "GameState", "JoinLobby", {})
+			Events.FireClient("GameState", "MatchStateChanged", player, {
+				newState = "Lobby",
+				playerCount = GameManager.GetAlivePlayerCount(),
+			})
 		end
 	end)
 

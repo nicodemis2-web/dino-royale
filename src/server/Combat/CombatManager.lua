@@ -10,7 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 
 local Events = require(ReplicatedStorage.Shared.Events)
-local WeaponData = require(ReplicatedStorage.Shared.WeaponData)
+local WeaponData = require(ReplicatedStorage.Shared.Config.WeaponData)
 
 local CombatManager = {}
 
@@ -37,6 +37,7 @@ export type PlayerCombatState = {
 	damageDealt: number,
 	damageTaken: number,
 	assists: { [number]: number }, -- UserId -> damage dealt
+	isDead: boolean, -- Prevents duplicate death processing
 }
 
 -- State
@@ -74,12 +75,12 @@ function CombatManager.Initialize()
 	print("[CombatManager] Initializing...")
 
 	-- Setup client events
-	Events.OnServerEvent("Combat", function(player, action, data)
-		if action == "RequestHit" then
-			CombatManager.ProcessHitRequest(player, data)
-		elseif action == "RequestMelee" then
-			CombatManager.ProcessMeleeRequest(player, data)
-		end
+	Events.OnServerEvent("Combat", "RequestHit", function(player, data)
+		CombatManager.ProcessHitRequest(player, data)
+	end)
+
+	Events.OnServerEvent("Combat", "RequestMelee", function(player, data)
+		CombatManager.ProcessMeleeRequest(player, data)
 	end)
 
 	-- Setup player tracking
@@ -115,6 +116,7 @@ function CombatManager.InitializePlayer(player: Player)
 		damageDealt = 0,
 		damageTaken = 0,
 		assists = {},
+		isDead = false,
 	}
 
 	playerStates[player] = state
@@ -177,7 +179,7 @@ function CombatManager.ProcessHitRequest(attacker: Player, data: any)
 	local hitPart = data.hitPart
 
 	-- Validate weapon
-	local weaponStats = WeaponData.Weapons[weaponId]
+	local weaponStats = WeaponData.GetWeapon(weaponId)
 	if not weaponStats then return end
 
 	-- Validate distance (anti-cheat)
@@ -275,6 +277,9 @@ function CombatManager.DealDamage(target: Player, damageInfo: DamageInfo)
 	local state = playerStates[target]
 	if not state then return end
 
+	-- Prevent damage to dead players (race condition guard)
+	if state.isDead then return end
+
 	local damage = damageInfo.amount
 
 	-- Apply armor
@@ -287,7 +292,7 @@ function CombatManager.DealDamage(target: Player, damageInfo: DamageInfo)
 
 		if state.armor <= 0 then
 			onArmorBroken:Fire(target)
-			Events.FireClient(target, "Combat", "ArmorBroken", {})
+			Events.FireClient("Combat", "ArmorBroken", target, {})
 		end
 	end
 
@@ -320,7 +325,7 @@ function CombatManager.DealDamage(target: Player, damageInfo: DamageInfo)
 	end
 
 	-- Broadcast damage event
-	Events.FireClient(target, "Combat", "DamageTaken", {
+	Events.FireClient("Combat", "DamageTaken", target, {
 		amount = damage,
 		armorDamage = armorDamage,
 		health = state.health,
@@ -332,7 +337,7 @@ function CombatManager.DealDamage(target: Player, damageInfo: DamageInfo)
 	})
 
 	if damageInfo.source then
-		Events.FireClient(damageInfo.source, "Combat", "DamageDealt", {
+		Events.FireClient("Combat", "DamageDealt", damageInfo.source, {
 			amount = damage,
 			targetId = target.UserId,
 			targetName = target.Name,
@@ -405,6 +410,10 @@ function CombatManager.HandlePlayerDeath(victim: Player)
 	local state = playerStates[victim]
 	if not state then return end
 
+	-- Prevent duplicate death processing (race condition guard)
+	if state.isDead then return end
+	state.isDead = true
+
 	local killer = state.lastDamageSource
 
 	-- Find assists
@@ -425,7 +434,7 @@ function CombatManager.HandlePlayerDeath(victim: Player)
 			killerState.killStreak = killerState.killStreak + 1
 
 			-- Notify killer
-			Events.FireClient(killer, "Combat", "Kill", {
+			Events.FireClient("Combat", "Kill", killer, {
 				victimId = victim.UserId,
 				victimName = victim.Name,
 				killStreak = killerState.killStreak,
@@ -436,7 +445,7 @@ function CombatManager.HandlePlayerDeath(victim: Player)
 
 	-- Notify assists
 	for _, assistPlayer in ipairs(assists) do
-		Events.FireClient(assistPlayer, "Combat", "Assist", {
+		Events.FireClient("Combat", "Assist", assistPlayer, {
 			victimId = victim.UserId,
 			victimName = victim.Name,
 		})
@@ -470,7 +479,7 @@ function CombatManager.HealPlayer(target: Player, amount: number, source: string
 	end
 
 	-- Notify client
-	Events.FireClient(target, "Combat", "Healed", {
+	Events.FireClient("Combat", "Healed", target, {
 		amount = actualHeal,
 		health = state.health,
 		source = source,
@@ -491,7 +500,7 @@ function CombatManager.AddArmor(target: Player, amount: number, armorType: strin
 	local actualArmor = state.armor - previousArmor
 
 	-- Notify client
-	Events.FireClient(target, "Combat", "ArmorAdded", {
+	Events.FireClient("Combat", "ArmorAdded", target, {
 		amount = actualArmor,
 		armor = state.armor,
 		armorType = armorType,
@@ -507,7 +516,7 @@ function CombatManager.SetArmor(target: Player, amount: number)
 
 	state.armor = math.clamp(amount, 0, state.maxArmor)
 
-	Events.FireClient(target, "Combat", "ArmorUpdated", {
+	Events.FireClient("Combat", "ArmorUpdated", target, {
 		armor = state.armor,
 	})
 end
@@ -550,7 +559,7 @@ function CombatManager.BroadcastHealthUpdate(player: Player)
 	local state = playerStates[player]
 	if not state then return end
 
-	Events.FireClient(player, "Combat", "HealthUpdate", {
+	Events.FireClient("Combat", "HealthUpdate", player, {
 		health = state.health,
 		maxHealth = state.maxHealth,
 		armor = state.armor,
@@ -573,6 +582,7 @@ function CombatManager.ResetPlayer(player: Player)
 	state.damageDealt = 0
 	state.damageTaken = 0
 	state.assists = {}
+	state.isDead = false -- Allow damage processing again
 
 	CombatManager.BroadcastHealthUpdate(player)
 end

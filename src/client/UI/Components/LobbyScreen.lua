@@ -11,6 +11,12 @@ local TweenService = game:GetService("TweenService")
 
 local Events = require(ReplicatedStorage.Shared.Events)
 
+-- Toast notification (loaded lazily)
+local ToastNotification: any = nil
+
+-- Animation settings
+local FADE_DURATION = 0.25
+
 local LobbyScreen = {}
 
 -- State
@@ -454,7 +460,21 @@ function LobbyScreen.CancelCountdown()
 end
 
 --[[
-	Show the lobby screen
+	Load toast notification module
+]]
+local function loadToast()
+	if ToastNotification then return end
+
+	local success, result = pcall(function()
+		return require(script.Parent.ToastNotification)
+	end)
+	if success then
+		ToastNotification = result
+	end
+end
+
+--[[
+	Show the lobby screen with fade animation
 ]]
 function LobbyScreen.Show()
 	if not screenGui then return end
@@ -470,16 +490,32 @@ function LobbyScreen.Show()
 			readyButton.Text = "READY"
 			readyButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
 		end
+
+		-- Start with transparency for fade in
+		mainFrame.BackgroundTransparency = 1
 	end
 
 	screenGui.Enabled = true
 
+	-- Fade in animation
+	if mainFrame then
+		TweenService:Create(mainFrame, TweenInfo.new(FADE_DURATION, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			BackgroundTransparency = 0,
+		}):Play()
+	end
+
 	-- Refresh player list
 	LobbyScreen.RefreshPlayerList()
+
+	-- Show welcome toast
+	loadToast()
+	if ToastNotification then
+		ToastNotification.Info("Welcome to the lobby!", 2)
+	end
 end
 
 --[[
-	Hide the lobby screen
+	Hide the lobby screen with fade animation
 ]]
 function LobbyScreen.Hide()
 	if not screenGui then return end
@@ -487,7 +523,22 @@ function LobbyScreen.Hide()
 
 	isVisible = false
 	countdownActive = false
-	screenGui.Enabled = false
+
+	-- Fade out animation
+	if mainFrame then
+		local fadeOut = TweenService:Create(mainFrame, TweenInfo.new(FADE_DURATION, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+			BackgroundTransparency = 1,
+		})
+		fadeOut:Play()
+		-- Use Once to avoid connection leak on repeated Hide() calls
+		fadeOut.Completed:Once(function()
+			if not isVisible and screenGui then
+				screenGui.Enabled = false
+			end
+		end)
+	else
+		screenGui.Enabled = false
+	end
 end
 
 --[[

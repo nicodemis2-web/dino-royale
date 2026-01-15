@@ -7,7 +7,7 @@
 ]]
 
 local TweenService = game:GetService("TweenService")
-local UserInputService = game:GetService("UserInputService")
+local ContextActionService = game:GetService("ContextActionService")
 
 local InventoryScreen = {}
 InventoryScreen.__index = InventoryScreen
@@ -61,6 +61,8 @@ export type InventoryScreenInstance = {
 	selectedSlot: number?,
 	hoveredSlot: number?,
 	isOpen: boolean,
+	connections: { RBXScriptConnection },
+	instanceId: string,
 	onItemSelect: ((ItemData?, number) -> ())?,
 	onItemDrop: ((ItemData, number) -> ())?,
 	onItemUse: ((ItemData, number) -> ())?,
@@ -90,6 +92,8 @@ function InventoryScreen.new(playerGui: PlayerGui, slotCount: number?): Inventor
 	self.selectedSlot = nil
 	self.hoveredSlot = nil
 	self.isOpen = false
+	self.connections = {}
+	self.instanceId = tostring(math.random(100000, 999999))
 	self.onItemSelect = nil
 	self.onItemDrop = nil
 	self.onItemUse = nil
@@ -313,17 +317,22 @@ end
 	Setup keyboard input
 ]]
 function InventoryScreen:SetupInput()
-	UserInputService.InputBegan:Connect(function(input, gameProcessed)
-		if gameProcessed then
-			return
-		end
+	local toggleActionName = `InventoryToggle_{self.instanceId}`
+	local closeActionName = `InventoryClose_{self.instanceId}`
 
-		if input.KeyCode == Enum.KeyCode.Tab or input.KeyCode == Enum.KeyCode.I then
+	ContextActionService:BindAction(toggleActionName, function(_, inputState)
+		if inputState == Enum.UserInputState.Begin then
 			self:Toggle()
-		elseif input.KeyCode == Enum.KeyCode.Escape and self.isOpen then
+		end
+		return Enum.ContextActionResult.Pass
+	end, false, Enum.KeyCode.Tab, Enum.KeyCode.I)
+
+	ContextActionService:BindAction(closeActionName, function(_, inputState)
+		if inputState == Enum.UserInputState.Begin and self.isOpen then
 			self:Close()
 		end
-	end)
+		return Enum.ContextActionResult.Pass
+	end, false, Enum.KeyCode.Escape)
 end
 
 --[[
@@ -518,6 +527,16 @@ end
 	Destroy the screen
 ]]
 function InventoryScreen:Destroy()
+	-- Disconnect all connections
+	for _, conn in ipairs(self.connections) do
+		conn:Disconnect()
+	end
+	self.connections = {}
+
+	-- Unbind actions
+	ContextActionService:UnbindAction(`InventoryToggle_{self.instanceId}`)
+	ContextActionService:UnbindAction(`InventoryClose_{self.instanceId}`)
+
 	self.screenGui:Destroy()
 end
 
