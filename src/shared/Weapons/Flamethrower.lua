@@ -97,10 +97,25 @@ export type FirePatch = {
 
 --[[
 	Create new Flamethrower
+	Note: Does not call WeaponBase.new() as it uses its own Stats table
 ]]
 function Flamethrower.new(config: any?): any
-	local self = WeaponBase.new(Flamethrower.Stats, config)
-	setmetatable(self, Flamethrower)
+	local self = setmetatable({}, Flamethrower)
+
+	-- Initialize base weapon properties using our own Stats
+	self.id = Flamethrower.Stats.name
+	self.rarity = (config and config.rarity) or Flamethrower.Stats.rarity
+	self.stats = Flamethrower.Stats
+	self.definition = Flamethrower.Stats
+	self.owner = config and config.owner or nil
+
+	-- Initialize weapon state
+	self.state = {
+		currentAmmo = Flamethrower.Stats.magazineSize,
+		reserveAmmo = Flamethrower.Stats.reserveAmmo,
+		isReloading = false,
+		lastFireTime = 0,
+	}
 
 	self.flameState = {
 		isFiring = false,

@@ -214,6 +214,12 @@ local function createRebootCard(player: Player, position: Vector3)
 		return
 	end
 
+	-- Clean up old card first (prevents overwrite without cleanup)
+	local existingCard = rebootCards[player.UserId]
+	if existingCard and existingCard.worldItem then
+		existingCard.worldItem:Destroy()
+	end
+
 	-- Create world item for reboot card
 	local cardWorldItem = nil
 	if InventoryManager then
@@ -226,11 +232,16 @@ local function createRebootCard(player: Player, position: Vector3)
 		)
 	end
 
+	-- Use a unique creation time to identify this specific card instance
+	local creationTime = tick()
+	local expirationTime = creationTime + REBOOT_CARD_DURATION
+
 	rebootCards[player.UserId] = {
 		playerId = player.UserId,
 		playerName = player.Name,
 		position = position,
-		expirationTime = tick() + REBOOT_CARD_DURATION,
+		creationTime = creationTime, -- Unique identifier for this card instance
+		expirationTime = expirationTime,
 		worldItem = cardWorldItem and cardWorldItem.model or nil,
 	}
 
@@ -240,10 +251,11 @@ local function createRebootCard(player: Player, position: Vector3)
 		position = position,
 	})
 
-	-- Schedule expiration
+	-- Schedule expiration (using creationTime to verify this is the same card)
 	task.delay(REBOOT_CARD_DURATION, function()
 		local card = rebootCards[player.UserId]
-		if card and card.expirationTime <= tick() then
+		-- Only expire if this is the same card (same creation time)
+		if card and card.creationTime == creationTime then
 			EliminationManager.ExpireRebootCard(player.UserId)
 		end
 	end)

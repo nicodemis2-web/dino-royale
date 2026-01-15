@@ -123,6 +123,17 @@ DinosaurData.Rare = {
 		behavior = "Swoop",
 		special = "Flight",
 	},
+	Dimorphodon = {
+		name = "Dimorphodon",
+		tier = "Rare" :: Types.DinosaurTier,
+		health = 40,
+		damage = 15,
+		speed = 35,
+		detectionRange = 45,
+		behavior = "Swarm",
+		packSize = { 4, 8 },
+		special = "Flight",
+	},
 }
 
 --[[
@@ -150,6 +161,17 @@ DinosaurData.Epic = {
 		behavior = "Territorial",
 		special = "Aquatic",
 		territorySize = 100,
+	},
+	Mosasaurus = {
+		name = "Mosasaurus",
+		tier = "Epic" :: Types.DinosaurTier,
+		health = 800,
+		damage = 90,
+		speed = 30, -- Fast in water
+		detectionRange = 80,
+		behavior = "Ambush",
+		special = { "Aquatic", "DeepDive", "SurfaceStrike" },
+		territorySize = 150,
 	},
 }
 

@@ -47,6 +47,7 @@ local isTeamMode = false
 local BLEEDOUT_DURATION = 90 -- seconds
 local BLEEDOUT_BASE_RATE = Constants.PLAYER.MAX_HEALTH / BLEEDOUT_DURATION
 local BLEEDOUT_DAMAGE_ACCELERATION = 0.5 -- Extra bleed rate per damage taken while downed
+local BLEEDOUT_MAX_RATE = BLEEDOUT_BASE_RATE * 5 -- Cap at 5x normal bleedout rate
 local REVIVE_TIME = 5 -- seconds to revive
 
 --[[
@@ -136,8 +137,9 @@ function HealthManager.ApplyDamage(player: Player, amount: number, source: strin
 
 	-- Handle downed state damage differently
 	if state.isDowned then
-		-- Damage while downed accelerates bleedout
+		-- Damage while downed accelerates bleedout (capped to prevent overflow)
 		state.bleedoutRate = state.bleedoutRate + (finalDamage * BLEEDOUT_DAMAGE_ACCELERATION)
+		state.bleedoutRate = math.min(state.bleedoutRate, BLEEDOUT_MAX_RATE)
 		healthDamage = finalDamage
 
 		-- Direct lethal damage while downed = elimination

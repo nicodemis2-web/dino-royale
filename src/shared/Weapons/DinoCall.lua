@@ -96,10 +96,25 @@ export type ActiveCall = {
 
 --[[
 	Create new Dino Call
+	Note: Does not call WeaponBase.new() as it uses its own Stats table
 ]]
 function DinoCall.new(variant: string?, config: any?): any
-	local self = WeaponBase.new(DinoCall.Stats, config)
-	setmetatable(self, DinoCall)
+	local self = setmetatable({}, DinoCall)
+
+	-- Initialize base weapon properties using our own Stats
+	self.id = DinoCall.Stats.name
+	self.rarity = (config and config.rarity) or DinoCall.Stats.rarity
+	self.stats = DinoCall.Stats
+	self.definition = DinoCall.Stats
+	self.owner = config and config.owner or nil
+
+	-- Initialize weapon state (DinoCall uses charges instead of ammo)
+	self.state = {
+		currentAmmo = DinoCall.Stats.magazineSize,
+		reserveAmmo = DinoCall.Stats.reserveAmmo,
+		isReloading = false,
+		lastFireTime = 0,
+	}
 
 	self.callState = {
 		variant = variant or "Carnivore",

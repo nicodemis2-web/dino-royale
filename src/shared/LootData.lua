@@ -52,21 +52,40 @@ LootData.RarityWeights: { [Rarity]: number } = {
 }
 
 -- All loot items
+-- Note: Weapon IDs must match WeaponData.lua definitions
 LootData.Items: { [string]: LootItem } = {
-	-- WEAPONS (from WeaponData)
-	Pistol = { id = "Pistol", name = "Pistol", displayName = "9mm Pistol", category = "Weapon", rarity = "Common", stackable = false, maxStack = 1, weight = 100 },
-	SMG = { id = "SMG", name = "SMG", displayName = "SMG", category = "Weapon", rarity = "Common", stackable = false, maxStack = 1, weight = 80 },
-	AssaultRifle = { id = "AssaultRifle", name = "AssaultRifle", displayName = "Assault Rifle", category = "Weapon", rarity = "Uncommon", stackable = false, maxStack = 1, weight = 60 },
-	Shotgun = { id = "Shotgun", name = "Shotgun", displayName = "Pump Shotgun", category = "Weapon", rarity = "Uncommon", stackable = false, maxStack = 1, weight = 50 },
-	SniperRifle = { id = "SniperRifle", name = "SniperRifle", displayName = "Sniper Rifle", category = "Weapon", rarity = "Rare", stackable = false, maxStack = 1, weight = 30 },
-	LMG = { id = "LMG", name = "LMG", displayName = "Light Machine Gun", category = "Weapon", rarity = "Rare", stackable = false, maxStack = 1, weight = 25 },
-	RocketLauncher = { id = "RocketLauncher", name = "RocketLauncher", displayName = "Rocket Launcher", category = "Weapon", rarity = "Epic", stackable = false, maxStack = 1, weight = 10 },
+	-- PISTOLS (from WeaponData.Pistols)
+	RangerSidearm = { id = "RangerSidearm", name = "RangerSidearm", displayName = "Ranger Sidearm", category = "Weapon", rarity = "Common", stackable = false, maxStack = 1, weight = 100 },
+	SurvivorsFriend = { id = "SurvivorsFriend", name = "SurvivorsFriend", displayName = "Survivor's Friend", category = "Weapon", rarity = "Uncommon", stackable = false, maxStack = 1, weight = 60 },
+	DesertClaw = { id = "DesertClaw", name = "DesertClaw", displayName = "Desert Claw", category = "Weapon", rarity = "Rare", stackable = false, maxStack = 1, weight = 30 },
 
-	-- Special Weapons
-	ElectroNetGun = { id = "ElectroNetGun", name = "ElectroNetGun", displayName = "Electro Net Gun", category = "Weapon", rarity = "Epic", stackable = false, maxStack = 1, weight = 8 },
-	DinoCall = { id = "DinoCall", name = "DinoCall", displayName = "Dino Call", category = "Weapon", rarity = "Rare", stackable = false, maxStack = 1, weight = 20 },
-	AmberLauncher = { id = "AmberLauncher", name = "AmberLauncher", displayName = "Amber Launcher", category = "Weapon", rarity = "Legendary", stackable = false, maxStack = 1, weight = 3 },
-	TranquilizerGun = { id = "TranquilizerGun", name = "TranquilizerGun", displayName = "Tranquilizer Gun", category = "Weapon", rarity = "Epic", stackable = false, maxStack = 1, weight = 12 },
+	-- SMGS (from WeaponData.SMGs)
+	RaptorSMG = { id = "RaptorSMG", name = "RaptorSMG", displayName = "Raptor SMG", category = "Weapon", rarity = "Common", stackable = false, maxStack = 1, weight = 80 },
+	JungleSprayer = { id = "JungleSprayer", name = "JungleSprayer", displayName = "Jungle Sprayer", category = "Weapon", rarity = "Uncommon", stackable = false, maxStack = 1, weight = 50 },
+	CompactSurvivor = { id = "CompactSurvivor", name = "CompactSurvivor", displayName = "Compact Survivor", category = "Weapon", rarity = "Rare", stackable = false, maxStack = 1, weight = 25 },
+
+	-- ASSAULT RIFLES (from WeaponData.AssaultRifles)
+	RangerAR = { id = "RangerAR", name = "RangerAR", displayName = "Ranger AR", category = "Weapon", rarity = "Uncommon", stackable = false, maxStack = 1, weight = 60 },
+	ExpeditionRifle = { id = "ExpeditionRifle", name = "ExpeditionRifle", displayName = "Expedition Rifle", category = "Weapon", rarity = "Rare", stackable = false, maxStack = 1, weight = 35 },
+	PredatorCarbine = { id = "PredatorCarbine", name = "PredatorCarbine", displayName = "Predator Carbine", category = "Weapon", rarity = "Epic", stackable = false, maxStack = 1, weight = 15 },
+
+	-- SHOTGUNS (from WeaponData.Shotguns)
+	RexBlaster = { id = "RexBlaster", name = "RexBlaster", displayName = "Rex Blaster", category = "Weapon", rarity = "Uncommon", stackable = false, maxStack = 1, weight = 50 },
+	SafariPump = { id = "SafariPump", name = "SafariPump", displayName = "Safari Pump", category = "Weapon", rarity = "Rare", stackable = false, maxStack = 1, weight = 30 },
+	DinoDeva = { id = "DinoDeva", name = "DinoDeva", displayName = "Dino Devastator", category = "Weapon", rarity = "Epic", stackable = false, maxStack = 1, weight = 10 },
+
+	-- SNIPERS (from WeaponData.Snipers)
+	TranqRifle = { id = "TranqRifle", name = "TranqRifle", displayName = "Tranq Rifle", category = "Weapon", rarity = "Rare", stackable = false, maxStack = 1, weight = 25 },
+	SpottersChoice = { id = "SpottersChoice", name = "SpottersChoice", displayName = "Spotter's Choice", category = "Weapon", rarity = "Epic", stackable = false, maxStack = 1, weight = 12 },
+	ApexHunter = { id = "ApexHunter", name = "ApexHunter", displayName = "Apex Hunter", category = "Weapon", rarity = "Legendary", stackable = false, maxStack = 1, weight = 5 },
+
+	-- DMRs (from WeaponData.DMRs)
+	ScoutMarksman = { id = "ScoutMarksman", name = "ScoutMarksman", displayName = "Scout Marksman", category = "Weapon", rarity = "Uncommon", stackable = false, maxStack = 1, weight = 40 },
+	ParkWarden = { id = "ParkWarden", name = "ParkWarden", displayName = "Park Warden", category = "Weapon", rarity = "Rare", stackable = false, maxStack = 1, weight = 20 },
+	PrecisionRanger = { id = "PrecisionRanger", name = "PrecisionRanger", displayName = "Precision Ranger", category = "Weapon", rarity = "Epic", stackable = false, maxStack = 1, weight = 8 },
+
+	-- SPECIAL WEAPONS (from WeaponData.Special)
+	TranqDartGun = { id = "TranqDartGun", name = "TranqDartGun", displayName = "Tranq Dart Gun", category = "Weapon", rarity = "Epic", stackable = false, maxStack = 1, weight = 12 },
 	Flamethrower = { id = "Flamethrower", name = "Flamethrower", displayName = "Flamethrower", category = "Weapon", rarity = "Legendary", stackable = false, maxStack = 1, weight = 2 },
 
 	-- AMMO

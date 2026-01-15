@@ -294,6 +294,12 @@ function StormManager.ApplyStormDamage(damage: number)
 			continue
 		end
 
+		-- Check if player is already dead to prevent damage loop exploit
+		local combatState = CombatManager.GetPlayerState and CombatManager.GetPlayerState(player)
+		if combatState and combatState.isDead then
+			continue
+		end
+
 		local position = rootPart.Position
 		if not StormManager.IsInSafeZone(position) then
 			-- Apply storm damage through CombatManager

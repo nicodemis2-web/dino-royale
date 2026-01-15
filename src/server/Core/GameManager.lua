@@ -40,6 +40,9 @@ local eliminationManager: any = nil
 local alivePlayers = {} :: { [number]: Player }
 local totalPlayersInMatch = 0
 
+-- Win condition mutex to prevent race conditions
+local isCheckingWinCondition = false
+
 --[[
 	State handler definitions
 ]]
@@ -140,9 +143,15 @@ function GameManager.BroadcastPlayerCount()
 end
 
 --[[
-	Check win condition
+	Check win condition (mutex protected to prevent race conditions)
 ]]
 function GameManager.CheckWinCondition()
+	-- Prevent concurrent win condition checks
+	if isCheckingWinCondition then
+		return
+	end
+	isCheckingWinCondition = true
+
 	local aliveCount = GameManager.GetAlivePlayerCount()
 
 	if aliveCount <= 1 then
@@ -158,6 +167,8 @@ function GameManager.CheckWinCondition()
 			placement = 1,
 		})
 	end
+
+	isCheckingWinCondition = false
 end
 
 --[[

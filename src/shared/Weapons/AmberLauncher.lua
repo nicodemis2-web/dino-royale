@@ -69,10 +69,25 @@ AmberLauncher.Stats = {
 
 --[[
 	Create new Amber Launcher
+	Note: Does not call WeaponBase.new() as it uses its own Stats table
 ]]
 function AmberLauncher.new(config: any?): any
-	local self = WeaponBase.new(AmberLauncher.Stats, config)
-	setmetatable(self, AmberLauncher)
+	local self = setmetatable({}, AmberLauncher)
+
+	-- Initialize base weapon properties using our own Stats
+	self.id = AmberLauncher.Stats.name
+	self.rarity = (config and config.rarity) or AmberLauncher.Stats.rarity
+	self.stats = AmberLauncher.Stats
+	self.definition = AmberLauncher.Stats
+	self.owner = config and config.owner or nil
+
+	-- Initialize weapon state
+	self.state = {
+		currentAmmo = AmberLauncher.Stats.magazineSize,
+		reserveAmmo = AmberLauncher.Stats.reserveAmmo,
+		isReloading = false,
+		lastFireTime = 0,
+	}
 
 	-- Track active amber zones
 	self.activeZones = {} :: { AmberZone }

@@ -68,10 +68,25 @@ ElectroNetGun.Stats = {
 
 --[[
 	Create new Electro Net Gun
+	Note: Does not call WeaponBase.new() as it uses its own Stats table
 ]]
 function ElectroNetGun.new(config: any?): any
-	local self = WeaponBase.new(ElectroNetGun.Stats, config)
-	setmetatable(self, ElectroNetGun)
+	local self = setmetatable({}, ElectroNetGun)
+
+	-- Initialize base weapon properties using our own Stats
+	self.id = ElectroNetGun.Stats.name
+	self.rarity = (config and config.rarity) or ElectroNetGun.Stats.rarity
+	self.stats = ElectroNetGun.Stats
+	self.definition = ElectroNetGun.Stats
+	self.owner = config and config.owner or nil
+
+	-- Initialize weapon state
+	self.state = {
+		currentAmmo = ElectroNetGun.Stats.magazineSize,
+		reserveAmmo = ElectroNetGun.Stats.reserveAmmo,
+		isReloading = false,
+		lastFireTime = 0,
+	}
 
 	return self
 end

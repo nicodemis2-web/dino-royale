@@ -90,10 +90,25 @@ export type TranqStack = {
 
 --[[
 	Create new Tranquilizer Gun
+	Note: Does not call WeaponBase.new() as it uses its own Stats table
 ]]
 function TranquilizerGun.new(config: any?): any
-	local self = WeaponBase.new(TranquilizerGun.Stats, config)
-	setmetatable(self, TranquilizerGun)
+	local self = setmetatable({}, TranquilizerGun)
+
+	-- Initialize base weapon properties using our own Stats
+	self.id = TranquilizerGun.Stats.name
+	self.rarity = (config and config.rarity) or TranquilizerGun.Stats.rarity
+	self.stats = TranquilizerGun.Stats
+	self.definition = TranquilizerGun.Stats
+	self.owner = config and config.owner or nil
+
+	-- Initialize weapon state
+	self.state = {
+		currentAmmo = TranquilizerGun.Stats.magazineSize,
+		reserveAmmo = TranquilizerGun.Stats.reserveAmmo,
+		isReloading = false,
+		lastFireTime = 0,
+	}
 
 	-- Track tranq stacks
 	self.tranqStacks = {} :: { [any]: TranqStack }

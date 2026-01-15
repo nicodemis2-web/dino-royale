@@ -36,7 +36,7 @@ export type PlayerCombatState = {
 	killStreak: number,
 	damageDealt: number,
 	damageTaken: number,
-	assists: { [number]: number }, -- UserId -> damage dealt
+	assists: { [number]: { damage: number, timestamp: number } }, -- UserId -> damage and time
 	isDead: boolean, -- Prevents duplicate death processing
 }
 
@@ -303,10 +303,15 @@ function CombatManager.DealDamage(target: Player, damageInfo: DamageInfo)
 	state.lastDamageTime = tick()
 	state.lastDamageSource = damageInfo.source
 
-	-- Track assists
+	-- Track assists with timestamp
 	if damageInfo.source then
 		local sourceId = damageInfo.source.UserId
-		state.assists[sourceId] = (state.assists[sourceId] or 0) + damage
+		local currentTime = tick()
+		local existingAssist = state.assists[sourceId]
+		state.assists[sourceId] = {
+			damage = (existingAssist and existingAssist.damage or 0) + damage,
+			timestamp = currentTime,
+		}
 
 		-- Update attacker stats
 		local attackerState = playerStates[damageInfo.source]
@@ -415,11 +420,17 @@ function CombatManager.HandlePlayerDeath(victim: Player)
 	state.isDead = true
 
 	local killer = state.lastDamageSource
+	local currentTime = tick()
 
-	-- Find assists
+	-- Find assists (filtering expired ones based on ASSIST_TIMEOUT)
 	local assists: { Player } = {}
-	for userId, damage in pairs(state.assists) do
-		if damage >= ASSIST_THRESHOLD and userId ~= (killer and killer.UserId or 0) then
+	for userId, assistData in pairs(state.assists) do
+		-- Check if assist has expired
+		if currentTime - assistData.timestamp > ASSIST_TIMEOUT then
+			continue
+		end
+		-- Check damage threshold and not the killer
+		if assistData.damage >= ASSIST_THRESHOLD and userId ~= (killer and killer.UserId or 0) then
 			local assistPlayer = Players:GetPlayerByUserId(userId)
 			if assistPlayer then
 				table.insert(assists, assistPlayer)
