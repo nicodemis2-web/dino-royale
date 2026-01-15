@@ -196,13 +196,36 @@ local TERRAIN_CONFIG = {
 }
 
 -- =============================================
+-- GROUND LEVEL HELPER FUNCTIONS
+-- =============================================
+
+-- Raycast to find ground level at a position
+local function getGroundLevel(x: number, z: number, defaultY: number?): number
+	local rayOrigin = Vector3.new(x, 500, z)
+	local rayResult = workspace:Raycast(rayOrigin, Vector3.new(0, -600, 0))
+	if rayResult then
+		return rayResult.Position.Y
+	end
+	return defaultY or 25
+end
+
+-- Place object at ground level
+local function placeAtGroundLevel(position: Vector3, offsetY: number?): Vector3
+	local groundY = getGroundLevel(position.X, position.Z, position.Y)
+	return Vector3.new(position.X, groundY + (offsetY or 0), position.Z)
+end
+
+-- =============================================
 -- BUILDING AND STRUCTURE CREATION HELPERS
 -- =============================================
 
--- Create a simple building structure
+-- Create a simple building structure (anchored at ground level)
 local function createBuilding(name: string, position: Vector3, size: Vector3, color: BrickColor, material: Enum.Material?): Model
 	local building = Instance.new("Model")
 	building.Name = name
+
+	-- Raycast to find actual ground level
+	local groundPos = placeAtGroundLevel(position, 0)
 
 	local mat = material or Enum.Material.Concrete
 
@@ -210,7 +233,7 @@ local function createBuilding(name: string, position: Vector3, size: Vector3, co
 	local floor = Instance.new("Part")
 	floor.Name = "Floor"
 	floor.Size = Vector3.new(size.X, 1, size.Z)
-	floor.Position = position + Vector3.new(0, 0.5, 0)
+	floor.Position = groundPos + Vector3.new(0, 0.5, 0)
 	floor.Anchored = true
 	floor.BrickColor = BrickColor.new("Medium stone grey")
 	floor.Material = Enum.Material.Concrete
@@ -224,7 +247,7 @@ local function createBuilding(name: string, position: Vector3, size: Vector3, co
 	local frontLeft = Instance.new("Part")
 	frontLeft.Name = "FrontWallLeft"
 	frontLeft.Size = Vector3.new((size.X - 10) / 2, wallHeight, wallThickness)
-	frontLeft.Position = position + Vector3.new(-(size.X / 4) - 2.5, wallHeight / 2 + 1, -size.Z / 2)
+	frontLeft.Position = groundPos + Vector3.new(-(size.X / 4) - 2.5, wallHeight / 2 + 1, -size.Z / 2)
 	frontLeft.Anchored = true
 	frontLeft.BrickColor = color
 	frontLeft.Material = mat
@@ -233,7 +256,7 @@ local function createBuilding(name: string, position: Vector3, size: Vector3, co
 	local frontRight = Instance.new("Part")
 	frontRight.Name = "FrontWallRight"
 	frontRight.Size = Vector3.new((size.X - 10) / 2, wallHeight, wallThickness)
-	frontRight.Position = position + Vector3.new((size.X / 4) + 2.5, wallHeight / 2 + 1, -size.Z / 2)
+	frontRight.Position = groundPos + Vector3.new((size.X / 4) + 2.5, wallHeight / 2 + 1, -size.Z / 2)
 	frontRight.Anchored = true
 	frontRight.BrickColor = color
 	frontRight.Material = mat
@@ -243,7 +266,7 @@ local function createBuilding(name: string, position: Vector3, size: Vector3, co
 	local backWall = Instance.new("Part")
 	backWall.Name = "BackWall"
 	backWall.Size = Vector3.new(size.X, wallHeight, wallThickness)
-	backWall.Position = position + Vector3.new(0, wallHeight / 2 + 1, size.Z / 2)
+	backWall.Position = groundPos + Vector3.new(0, wallHeight / 2 + 1, size.Z / 2)
 	backWall.Anchored = true
 	backWall.BrickColor = color
 	backWall.Material = mat
@@ -253,7 +276,7 @@ local function createBuilding(name: string, position: Vector3, size: Vector3, co
 	local leftWall = Instance.new("Part")
 	leftWall.Name = "LeftWall"
 	leftWall.Size = Vector3.new(wallThickness, wallHeight, size.Z)
-	leftWall.Position = position + Vector3.new(-size.X / 2, wallHeight / 2 + 1, 0)
+	leftWall.Position = groundPos + Vector3.new(-size.X / 2, wallHeight / 2 + 1, 0)
 	leftWall.Anchored = true
 	leftWall.BrickColor = color
 	leftWall.Material = mat
@@ -262,7 +285,7 @@ local function createBuilding(name: string, position: Vector3, size: Vector3, co
 	local rightWall = Instance.new("Part")
 	rightWall.Name = "RightWall"
 	rightWall.Size = Vector3.new(wallThickness, wallHeight, size.Z)
-	rightWall.Position = position + Vector3.new(size.X / 2, wallHeight / 2 + 1, 0)
+	rightWall.Position = groundPos + Vector3.new(size.X / 2, wallHeight / 2 + 1, 0)
 	rightWall.Anchored = true
 	rightWall.BrickColor = color
 	rightWall.Material = mat
@@ -272,7 +295,7 @@ local function createBuilding(name: string, position: Vector3, size: Vector3, co
 	local roof = Instance.new("Part")
 	roof.Name = "Roof"
 	roof.Size = Vector3.new(size.X + 4, 2, size.Z + 4)
-	roof.Position = position + Vector3.new(0, wallHeight + 2, 0)
+	roof.Position = groundPos + Vector3.new(0, wallHeight + 2, 0)
 	roof.Anchored = true
 	roof.BrickColor = BrickColor.new("Dark stone grey")
 	roof.Material = Enum.Material.Slate
@@ -284,16 +307,19 @@ local function createBuilding(name: string, position: Vector3, size: Vector3, co
 	return building
 end
 
--- Create a simple house/cabin
+-- Create a simple house/cabin (anchored at ground level)
 local function createHouse(name: string, position: Vector3, size: number): Model
 	local house = Instance.new("Model")
 	house.Name = name
+
+	-- Raycast to find actual ground level
+	local groundPos = placeAtGroundLevel(position, 0)
 
 	-- Base/Foundation
 	local foundation = Instance.new("Part")
 	foundation.Name = "Foundation"
 	foundation.Size = Vector3.new(size, 2, size)
-	foundation.Position = position + Vector3.new(0, 1, 0)
+	foundation.Position = groundPos + Vector3.new(0, 1, 0)
 	foundation.Anchored = true
 	foundation.BrickColor = BrickColor.new("Brick yellow")
 	foundation.Material = Enum.Material.Concrete
@@ -303,7 +329,7 @@ local function createHouse(name: string, position: Vector3, size: number): Model
 	local main = Instance.new("Part")
 	main.Name = "MainStructure"
 	main.Size = Vector3.new(size - 2, size * 0.6, size - 2)
-	main.Position = position + Vector3.new(0, 2 + (size * 0.3), 0)
+	main.Position = groundPos + Vector3.new(0, 2 + (size * 0.3), 0)
 	main.Anchored = true
 	main.BrickColor = BrickColor.new("Reddish brown")
 	main.Material = Enum.Material.Wood
@@ -313,7 +339,7 @@ local function createHouse(name: string, position: Vector3, size: number): Model
 	local roofLeft = Instance.new("Part")
 	roofLeft.Name = "RoofLeft"
 	roofLeft.Size = Vector3.new(size + 2, 1, size * 0.6)
-	roofLeft.Position = position + Vector3.new(0, 2 + size * 0.6 + 0.5, -size * 0.15)
+	roofLeft.Position = groundPos + Vector3.new(0, 2 + size * 0.6 + 0.5, -size * 0.15)
 	roofLeft.Rotation = Vector3.new(25, 0, 0)
 	roofLeft.Anchored = true
 	roofLeft.BrickColor = BrickColor.new("Brown")
@@ -323,7 +349,7 @@ local function createHouse(name: string, position: Vector3, size: number): Model
 	local roofRight = Instance.new("Part")
 	roofRight.Name = "RoofRight"
 	roofRight.Size = Vector3.new(size + 2, 1, size * 0.6)
-	roofRight.Position = position + Vector3.new(0, 2 + size * 0.6 + 0.5, size * 0.15)
+	roofRight.Position = groundPos + Vector3.new(0, 2 + size * 0.6 + 0.5, size * 0.15)
 	roofRight.Rotation = Vector3.new(-25, 0, 0)
 	roofRight.Anchored = true
 	roofRight.BrickColor = BrickColor.new("Brown")
@@ -334,7 +360,7 @@ local function createHouse(name: string, position: Vector3, size: number): Model
 	local door = Instance.new("Part")
 	door.Name = "Door"
 	door.Size = Vector3.new(4, 7, 1)
-	door.Position = position + Vector3.new(0, 5.5, -size / 2 + 0.5)
+	door.Position = groundPos + Vector3.new(0, 5.5, -size / 2 + 0.5)
 	door.Anchored = true
 	door.BrickColor = BrickColor.new("Dark orange")
 	door.Material = Enum.Material.Wood
@@ -345,7 +371,7 @@ local function createHouse(name: string, position: Vector3, size: number): Model
 		local window = Instance.new("Part")
 		window.Name = "Window" .. (i == -1 and "Left" or "Right")
 		window.Size = Vector3.new(1, 4, 4)
-		window.Position = position + Vector3.new(i * (size / 2 - 0.5), 5, 0)
+		window.Position = groundPos + Vector3.new(i * (size / 2 - 0.5), 5, 0)
 		window.Anchored = true
 		window.BrickColor = BrickColor.new("Cyan")
 		window.Material = Enum.Material.Glass
@@ -359,10 +385,13 @@ local function createHouse(name: string, position: Vector3, size: number): Model
 	return house
 end
 
--- Create a tree
+-- Create a tree (anchored at ground level)
 local function createTree(position: Vector3, height: number, treeType: string?): Model
 	local tree = Instance.new("Model")
 	tree.Name = "Tree"
+
+	-- Raycast to find actual ground level
+	local groundPos = placeAtGroundLevel(position, 0)
 
 	local trunkHeight = height * 0.4
 	local canopySize = height * 0.8
@@ -371,7 +400,7 @@ local function createTree(position: Vector3, height: number, treeType: string?):
 	local trunk = Instance.new("Part")
 	trunk.Name = "Trunk"
 	trunk.Size = Vector3.new(height * 0.15, trunkHeight, height * 0.15)
-	trunk.Position = position + Vector3.new(0, trunkHeight / 2, 0)
+	trunk.Position = groundPos + Vector3.new(0, trunkHeight / 2, 0)
 	trunk.Anchored = true
 	trunk.BrickColor = BrickColor.new("Reddish brown")
 	trunk.Material = Enum.Material.Wood
@@ -382,7 +411,7 @@ local function createTree(position: Vector3, height: number, treeType: string?):
 	canopy.Name = "Canopy"
 	canopy.Shape = Enum.PartType.Ball
 	canopy.Size = Vector3.new(canopySize, canopySize, canopySize)
-	canopy.Position = position + Vector3.new(0, trunkHeight + canopySize * 0.3, 0)
+	canopy.Position = groundPos + Vector3.new(0, trunkHeight + canopySize * 0.3, 0)
 	canopy.Anchored = true
 	canopy.BrickColor = treeType == "palm" and BrickColor.new("Bright green") or BrickColor.new("Forest green")
 	canopy.Material = Enum.Material.Grass
@@ -407,10 +436,13 @@ local function createRock(position: Vector3, size: number, material: Enum.Materi
 	return rock
 end
 
--- Create a watchtower/observation tower
+-- Create a watchtower/observation tower (anchored at ground level)
 local function createTower(name: string, position: Vector3, height: number): Model
 	local tower = Instance.new("Model")
 	tower.Name = name
+
+	-- Raycast to find actual ground level
+	local groundPos = placeAtGroundLevel(position, 0)
 
 	-- Support legs (4 corners)
 	local legSize = 2
@@ -419,7 +451,7 @@ local function createTower(name: string, position: Vector3, height: number): Mod
 			local leg = Instance.new("Part")
 			leg.Name = "Leg"
 			leg.Size = Vector3.new(legSize, height, legSize)
-			leg.Position = position + Vector3.new(x * 5, height / 2, z * 5)
+			leg.Position = groundPos + Vector3.new(x * 5, height / 2, z * 5)
 			leg.Anchored = true
 			leg.BrickColor = BrickColor.new("Brown")
 			leg.Material = Enum.Material.Wood
@@ -431,7 +463,7 @@ local function createTower(name: string, position: Vector3, height: number): Mod
 	local platform = Instance.new("Part")
 	platform.Name = "Platform"
 	platform.Size = Vector3.new(14, 1, 14)
-	platform.Position = position + Vector3.new(0, height, 0)
+	platform.Position = groundPos + Vector3.new(0, height, 0)
 	platform.Anchored = true
 	platform.BrickColor = BrickColor.new("Brown")
 	platform.Material = Enum.Material.WoodPlanks
@@ -446,7 +478,7 @@ local function createTower(name: string, position: Vector3, height: number): Mod
 					   i == 2 and Vector3.new(0, height + 2, -7) or
 					   i == 3 and Vector3.new(7, height + 2, 0) or
 					   Vector3.new(-7, height + 2, 0)
-		rail.Position = position + offset
+		rail.Position = groundPos + offset
 		rail.Anchored = true
 		rail.BrickColor = BrickColor.new("Brown")
 		rail.Material = Enum.Material.Wood
@@ -457,7 +489,7 @@ local function createTower(name: string, position: Vector3, height: number): Mod
 	local roof = Instance.new("Part")
 	roof.Name = "Roof"
 	roof.Size = Vector3.new(16, 1, 16)
-	roof.Position = position + Vector3.new(0, height + 8, 0)
+	roof.Position = groundPos + Vector3.new(0, height + 8, 0)
 	roof.Anchored = true
 	roof.BrickColor = BrickColor.new("Bright green")
 	roof.Material = Enum.Material.Grass
@@ -469,16 +501,19 @@ local function createTower(name: string, position: Vector3, height: number): Mod
 	return tower
 end
 
--- Create industrial structure (for geothermal plant)
+-- Create industrial structure (for geothermal plant, anchored at ground level)
 local function createIndustrialBuilding(name: string, position: Vector3): Model
 	local building = Instance.new("Model")
 	building.Name = name
+
+	-- Raycast to find actual ground level
+	local groundPos = placeAtGroundLevel(position, 0)
 
 	-- Main structure
 	local main = Instance.new("Part")
 	main.Name = "MainBuilding"
 	main.Size = Vector3.new(60, 25, 40)
-	main.Position = position + Vector3.new(0, 12.5, 0)
+	main.Position = groundPos + Vector3.new(0, 12.5, 0)
 	main.Anchored = true
 	main.BrickColor = BrickColor.new("Medium stone grey")
 	main.Material = Enum.Material.Concrete
@@ -488,7 +523,7 @@ local function createIndustrialBuilding(name: string, position: Vector3): Model
 	local stack = Instance.new("Part")
 	stack.Name = "Smokestack"
 	stack.Size = Vector3.new(8, 50, 8)
-	stack.Position = position + Vector3.new(20, 25, 10)
+	stack.Position = groundPos + Vector3.new(20, 25, 10)
 	stack.Anchored = true
 	stack.BrickColor = BrickColor.new("Dark stone grey")
 	stack.Material = Enum.Material.Metal
@@ -499,7 +534,7 @@ local function createIndustrialBuilding(name: string, position: Vector3): Model
 		local pipe = Instance.new("Part")
 		pipe.Name = "Pipe" .. i
 		pipe.Size = Vector3.new(3, 20, 3)
-		pipe.Position = position + Vector3.new(-15 + (i * 10), 20, -25)
+		pipe.Position = groundPos + Vector3.new(-15 + (i * 10), 20, -25)
 		pipe.Rotation = Vector3.new(0, 0, 45)
 		pipe.Anchored = true
 		pipe.BrickColor = BrickColor.new("Rust")
@@ -512,7 +547,7 @@ local function createIndustrialBuilding(name: string, position: Vector3): Model
 		local vent = Instance.new("Part")
 		vent.Name = "SteamVent" .. i
 		vent.Size = Vector3.new(6, 2, 6)
-		vent.Position = position + Vector3.new(-20 + (i * 12), 1, 30)
+		vent.Position = groundPos + Vector3.new(-20 + (i * 12), 1, 30)
 		vent.Anchored = true
 		vent.BrickColor = BrickColor.new("Dark stone grey")
 		vent.Material = Enum.Material.DiamondPlate
@@ -525,16 +560,19 @@ local function createIndustrialBuilding(name: string, position: Vector3): Model
 	return building
 end
 
--- Create lighthouse
+-- Create lighthouse (anchored at ground level)
 local function createLighthouse(position: Vector3): Model
 	local lighthouse = Instance.new("Model")
 	lighthouse.Name = "Lighthouse"
+
+	-- Raycast to find actual ground level
+	local groundPos = placeAtGroundLevel(position, 0)
 
 	-- Base
 	local base = Instance.new("Part")
 	base.Name = "Base"
 	base.Size = Vector3.new(20, 5, 20)
-	base.Position = position + Vector3.new(0, 2.5, 0)
+	base.Position = groundPos + Vector3.new(0, 2.5, 0)
 	base.Anchored = true
 	base.BrickColor = BrickColor.new("White")
 	base.Material = Enum.Material.Concrete
@@ -549,7 +587,7 @@ local function createLighthouse(position: Vector3): Model
 		local sectionHeight = towerHeight / sections
 		local sectionWidth = 12 - (i * 1.2) -- Tapers up
 		section.Size = Vector3.new(sectionWidth, sectionHeight, sectionWidth)
-		section.Position = position + Vector3.new(0, 5 + (i - 0.5) * sectionHeight, 0)
+		section.Position = groundPos + Vector3.new(0, 5 + (i - 0.5) * sectionHeight, 0)
 		section.Anchored = true
 		section.BrickColor = i % 2 == 1 and BrickColor.new("White") or BrickColor.new("Bright red")
 		section.Material = Enum.Material.Concrete
@@ -560,7 +598,7 @@ local function createLighthouse(position: Vector3): Model
 	local lightRoom = Instance.new("Part")
 	lightRoom.Name = "LightRoom"
 	lightRoom.Size = Vector3.new(10, 8, 10)
-	lightRoom.Position = position + Vector3.new(0, towerHeight + 9, 0)
+	lightRoom.Position = groundPos + Vector3.new(0, towerHeight + 9, 0)
 	lightRoom.Anchored = true
 	lightRoom.BrickColor = BrickColor.new("Black")
 	lightRoom.Material = Enum.Material.Metal
@@ -571,7 +609,7 @@ local function createLighthouse(position: Vector3): Model
 	light.Name = "Light"
 	light.Shape = Enum.PartType.Ball
 	light.Size = Vector3.new(6, 6, 6)
-	light.Position = position + Vector3.new(0, towerHeight + 9, 0)
+	light.Position = groundPos + Vector3.new(0, towerHeight + 9, 0)
 	light.Anchored = true
 	light.BrickColor = BrickColor.new("Bright yellow")
 	light.Material = Enum.Material.Neon
@@ -581,7 +619,7 @@ local function createLighthouse(position: Vector3): Model
 	local roof = Instance.new("Part")
 	roof.Name = "Roof"
 	roof.Size = Vector3.new(12, 3, 12)
-	roof.Position = position + Vector3.new(0, towerHeight + 14, 0)
+	roof.Position = groundPos + Vector3.new(0, towerHeight + 14, 0)
 	roof.Anchored = true
 	roof.BrickColor = BrickColor.new("Bright red")
 	roof.Material = Enum.Material.Metal
@@ -593,16 +631,19 @@ local function createLighthouse(position: Vector3): Model
 	return lighthouse
 end
 
--- Create dock/pier
+-- Create dock/pier (anchored at ground level)
 local function createDock(position: Vector3, length: number): Model
 	local dock = Instance.new("Model")
 	dock.Name = "Dock"
+
+	-- Raycast to find actual ground level
+	local groundPos = placeAtGroundLevel(position, 0)
 
 	-- Main platform
 	local platform = Instance.new("Part")
 	platform.Name = "Platform"
 	platform.Size = Vector3.new(15, 2, length)
-	platform.Position = position + Vector3.new(0, 3, length / 2)
+	platform.Position = groundPos + Vector3.new(0, 3, length / 2)
 	platform.Anchored = true
 	platform.BrickColor = BrickColor.new("Brown")
 	platform.Material = Enum.Material.WoodPlanks
@@ -614,7 +655,7 @@ local function createDock(position: Vector3, length: number): Model
 		local pillar = Instance.new("Part")
 		pillar.Name = "Pillar" .. i
 		pillar.Size = Vector3.new(2, 10, 2)
-		pillar.Position = position + Vector3.new(0, -2, i * 20)
+		pillar.Position = groundPos + Vector3.new(0, -2, i * 20)
 		pillar.Anchored = true
 		pillar.BrickColor = BrickColor.new("Dark stone grey")
 		pillar.Material = Enum.Material.Concrete
@@ -636,6 +677,9 @@ local function createPineTree(position: Vector3, height: number): Model
 	local tree = Instance.new("Model")
 	tree.Name = "PineTree"
 
+	-- Raycast to find actual ground level
+	local groundPos = placeAtGroundLevel(position, 0)
+
 	local trunkHeight = height * 0.7
 	local trunkWidth = height * 0.08
 
@@ -643,7 +687,7 @@ local function createPineTree(position: Vector3, height: number): Model
 	local trunk = Instance.new("Part")
 	trunk.Name = "Trunk"
 	trunk.Size = Vector3.new(trunkWidth, trunkHeight, trunkWidth)
-	trunk.Position = position + Vector3.new(0, trunkHeight / 2, 0)
+	trunk.Position = groundPos + Vector3.new(0, trunkHeight / 2, 0)
 	trunk.Anchored = true
 	trunk.BrickColor = BrickColor.new("Reddish brown")
 	trunk.Material = Enum.Material.Wood
@@ -656,7 +700,7 @@ local function createPineTree(position: Vector3, height: number): Model
 		local layer = Instance.new("Part")
 		layer.Name = "Foliage" .. i
 		layer.Size = Vector3.new(layerWidth, layerHeight, layerWidth)
-		layer.Position = position + Vector3.new(0, trunkHeight * 0.3 + i * (height * 0.2), 0)
+		layer.Position = groundPos + Vector3.new(0, trunkHeight * 0.3 + i * (height * 0.2), 0)
 		layer.Anchored = true
 		layer.BrickColor = BrickColor.new("Dark green")
 		layer.Material = Enum.Material.Grass
@@ -668,10 +712,13 @@ local function createPineTree(position: Vector3, height: number): Model
 	return tree
 end
 
--- Create an oak tree (wide spreading canopy)
+-- Create an oak tree (wide spreading canopy, anchored at ground level)
 local function createOakTree(position: Vector3, height: number): Model
 	local tree = Instance.new("Model")
 	tree.Name = "OakTree"
+
+	-- Raycast to find actual ground level
+	local groundPos = placeAtGroundLevel(position, 0)
 
 	local trunkHeight = height * 0.5
 	local canopyWidth = height * 1.2
@@ -680,7 +727,7 @@ local function createOakTree(position: Vector3, height: number): Model
 	local trunk = Instance.new("Part")
 	trunk.Name = "Trunk"
 	trunk.Size = Vector3.new(height * 0.18, trunkHeight, height * 0.18)
-	trunk.Position = position + Vector3.new(0, trunkHeight / 2, 0)
+	trunk.Position = groundPos + Vector3.new(0, trunkHeight / 2, 0)
 	trunk.Anchored = true
 	trunk.BrickColor = BrickColor.new("Brown")
 	trunk.Material = Enum.Material.Wood
@@ -701,7 +748,7 @@ local function createOakTree(position: Vector3, height: number): Model
 		canopy.Shape = Enum.PartType.Ball
 		local size = height * (0.6 - math.abs(offset.X + offset.Z) * 0.001)
 		canopy.Size = Vector3.new(size, size * 0.7, size)
-		canopy.Position = position + Vector3.new(0, trunkHeight + height * 0.25, 0) + offset
+		canopy.Position = groundPos + Vector3.new(0, trunkHeight + height * 0.25, 0) + offset
 		canopy.Anchored = true
 		canopy.BrickColor = BrickColor.new("Forest green")
 		canopy.Material = Enum.Material.Grass
@@ -713,10 +760,13 @@ local function createOakTree(position: Vector3, height: number): Model
 	return tree
 end
 
--- Create a birch tree (white bark, smaller leaves)
+-- Create a birch tree (white bark, smaller leaves, anchored at ground level)
 local function createBirchTree(position: Vector3, height: number): Model
 	local tree = Instance.new("Model")
 	tree.Name = "BirchTree"
+
+	-- Raycast to find actual ground level
+	local groundPos = placeAtGroundLevel(position, 0)
 
 	local trunkHeight = height * 0.65
 	local canopySize = height * 0.5
@@ -725,7 +775,7 @@ local function createBirchTree(position: Vector3, height: number): Model
 	local trunk = Instance.new("Part")
 	trunk.Name = "Trunk"
 	trunk.Size = Vector3.new(height * 0.08, trunkHeight, height * 0.08)
-	trunk.Position = position + Vector3.new(0, trunkHeight / 2, 0)
+	trunk.Position = groundPos + Vector3.new(0, trunkHeight / 2, 0)
 	trunk.Anchored = true
 	trunk.BrickColor = BrickColor.new("Institutional white")
 	trunk.Material = Enum.Material.Wood
@@ -738,7 +788,7 @@ local function createBirchTree(position: Vector3, height: number): Model
 		canopy.Shape = Enum.PartType.Ball
 		canopy.Size = Vector3.new(canopySize * 0.6, canopySize * 0.5, canopySize * 0.6)
 		local angle = (i / 4) * math.pi * 2
-		canopy.Position = position + Vector3.new(
+		canopy.Position = groundPos + Vector3.new(
 			math.cos(angle) * canopySize * 0.2,
 			trunkHeight + canopySize * 0.2 + (i % 2) * canopySize * 0.15,
 			math.sin(angle) * canopySize * 0.2
@@ -754,10 +804,13 @@ local function createBirchTree(position: Vector3, height: number): Model
 	return tree
 end
 
--- Create a jungle tree (large, with vines)
+-- Create a jungle tree (large, with vines, anchored at ground level)
 local function createJungleTree(position: Vector3, height: number): Model
 	local tree = Instance.new("Model")
 	tree.Name = "JungleTree"
+
+	-- Raycast to find actual ground level
+	local groundPos = placeAtGroundLevel(position, 0)
 
 	local trunkHeight = height * 0.55
 	local canopySize = height * 0.9
@@ -766,7 +819,7 @@ local function createJungleTree(position: Vector3, height: number): Model
 	local trunk = Instance.new("Part")
 	trunk.Name = "Trunk"
 	trunk.Size = Vector3.new(height * 0.2, trunkHeight, height * 0.2)
-	trunk.Position = position + Vector3.new(0, trunkHeight / 2, 0)
+	trunk.Position = groundPos + Vector3.new(0, trunkHeight / 2, 0)
 	trunk.Anchored = true
 	trunk.BrickColor = BrickColor.new("Reddish brown")
 	trunk.Material = Enum.Material.Wood
@@ -778,7 +831,7 @@ local function createJungleTree(position: Vector3, height: number): Model
 		root.Name = "Root" .. i
 		root.Size = Vector3.new(height * 0.08, height * 0.2, height * 0.3)
 		local angle = (i / 4) * math.pi * 2
-		root.Position = position + Vector3.new(math.cos(angle) * height * 0.15, height * 0.1, math.sin(angle) * height * 0.15)
+		root.Position = groundPos + Vector3.new(math.cos(angle) * height * 0.15, height * 0.1, math.sin(angle) * height * 0.15)
 		root.Rotation = Vector3.new(0, math.deg(angle), 30)
 		root.Anchored = true
 		root.BrickColor = BrickColor.new("Reddish brown")
@@ -791,7 +844,7 @@ local function createJungleTree(position: Vector3, height: number): Model
 	mainCanopy.Name = "MainCanopy"
 	mainCanopy.Shape = Enum.PartType.Ball
 	mainCanopy.Size = Vector3.new(canopySize, canopySize * 0.6, canopySize)
-	mainCanopy.Position = position + Vector3.new(0, trunkHeight + canopySize * 0.25, 0)
+	mainCanopy.Position = groundPos + Vector3.new(0, trunkHeight + canopySize * 0.25, 0)
 	mainCanopy.Anchored = true
 	mainCanopy.BrickColor = BrickColor.new("Dark green")
 	mainCanopy.Material = Enum.Material.Grass
@@ -803,7 +856,7 @@ local function createJungleTree(position: Vector3, height: number): Model
 		vine.Name = "Vine" .. i
 		vine.Size = Vector3.new(0.3, height * 0.4, 0.3)
 		local angle = (i / 6) * math.pi * 2
-		vine.Position = position + Vector3.new(
+		vine.Position = groundPos + Vector3.new(
 			math.cos(angle) * canopySize * 0.35,
 			trunkHeight + canopySize * 0.1,
 			math.sin(angle) * canopySize * 0.35
@@ -819,10 +872,13 @@ local function createJungleTree(position: Vector3, height: number): Model
 	return tree
 end
 
--- Create palm tree (enhanced version)
+-- Create palm tree (enhanced version, anchored at ground level)
 local function createPalmTree(position: Vector3, height: number): Model
 	local tree = Instance.new("Model")
 	tree.Name = "PalmTree"
+
+	-- Raycast to find actual ground level
+	local groundPos = placeAtGroundLevel(position, 0)
 
 	local trunkHeight = height * 0.8
 
@@ -834,7 +890,7 @@ local function createPalmTree(position: Vector3, height: number): Model
 		local segmentHeight = trunkHeight / segments
 		local curve = math.sin((i / segments) * math.pi * 0.3) * height * 0.1
 		segment.Size = Vector3.new(height * 0.1, segmentHeight, height * 0.1)
-		segment.Position = position + Vector3.new(curve, (i - 0.5) * segmentHeight, 0)
+		segment.Position = groundPos + Vector3.new(curve, (i - 0.5) * segmentHeight, 0)
 		segment.Anchored = true
 		segment.BrickColor = BrickColor.new("Brown")
 		segment.Material = Enum.Material.Wood
@@ -847,7 +903,7 @@ local function createPalmTree(position: Vector3, height: number): Model
 		frond.Name = "Frond" .. i
 		frond.Size = Vector3.new(height * 0.08, height * 0.5, height * 0.02)
 		local angle = (i / 8) * math.pi * 2
-		frond.Position = position + Vector3.new(
+		frond.Position = groundPos + Vector3.new(
 			math.cos(angle) * height * 0.15,
 			trunkHeight + height * 0.05,
 			math.sin(angle) * height * 0.15
@@ -864,7 +920,7 @@ local function createPalmTree(position: Vector3, height: number): Model
 	coconuts.Name = "Coconuts"
 	coconuts.Shape = Enum.PartType.Ball
 	coconuts.Size = Vector3.new(height * 0.15, height * 0.12, height * 0.15)
-	coconuts.Position = position + Vector3.new(0, trunkHeight, 0)
+	coconuts.Position = groundPos + Vector3.new(0, trunkHeight, 0)
 	coconuts.Anchored = true
 	coconuts.BrickColor = BrickColor.new("Brown")
 	coconuts.Material = Enum.Material.Wood
@@ -874,16 +930,19 @@ local function createPalmTree(position: Vector3, height: number): Model
 	return tree
 end
 
--- Create dead/swamp tree
+-- Create dead/swamp tree (anchored at ground level)
 local function createDeadTree(position: Vector3, height: number): Model
 	local tree = Instance.new("Model")
 	tree.Name = "DeadTree"
+
+	-- Raycast to find actual ground level
+	local groundPos = placeAtGroundLevel(position, 0)
 
 	-- Gnarled trunk
 	local trunk = Instance.new("Part")
 	trunk.Name = "Trunk"
 	trunk.Size = Vector3.new(height * 0.12, height * 0.6, height * 0.12)
-	trunk.Position = position + Vector3.new(0, height * 0.3, 0)
+	trunk.Position = groundPos + Vector3.new(0, height * 0.3, 0)
 	trunk.Rotation = Vector3.new(math.random(-5, 5), 0, math.random(-5, 5))
 	trunk.Anchored = true
 	trunk.BrickColor = BrickColor.new("Dark taupe")
@@ -896,7 +955,7 @@ local function createDeadTree(position: Vector3, height: number): Model
 		branch.Name = "Branch" .. i
 		branch.Size = Vector3.new(height * 0.04, height * (0.2 + math.random() * 0.2), height * 0.04)
 		local angle = (i / 5) * math.pi * 2
-		branch.Position = position + Vector3.new(
+		branch.Position = groundPos + Vector3.new(
 			math.cos(angle) * height * 0.08,
 			height * (0.4 + i * 0.1),
 			math.sin(angle) * height * 0.08
@@ -917,7 +976,144 @@ end
 -- MULTI-STORY BUILDING FUNCTIONS
 -- =============================================
 
--- Create a multi-story building
+-- Helper: Create a statue decoration
+local function createStatue(parent: Model, position: Vector3, statueType: string)
+	local statue = Instance.new("Model")
+	statue.Name = "Statue"
+
+	if statueType == "dinosaur" then
+		-- Dinosaur statue (T-Rex silhouette)
+		local body = Instance.new("Part")
+		body.Name = "Body"
+		body.Size = Vector3.new(3, 4, 6)
+		body.Position = position + Vector3.new(0, 2, 0)
+		body.Anchored = true
+		body.BrickColor = BrickColor.new("Dark stone grey")
+		body.Material = Enum.Material.Rock
+		body.Parent = statue
+
+		local head = Instance.new("Part")
+		head.Name = "Head"
+		head.Size = Vector3.new(2, 2.5, 3)
+		head.Position = position + Vector3.new(0, 4.5, 3.5)
+		head.Anchored = true
+		head.BrickColor = BrickColor.new("Dark stone grey")
+		head.Material = Enum.Material.Rock
+		head.Parent = statue
+
+		local tail = Instance.new("Part")
+		tail.Name = "Tail"
+		tail.Size = Vector3.new(1.5, 1.5, 5)
+		tail.Position = position + Vector3.new(0, 2.5, -4)
+		tail.Anchored = true
+		tail.BrickColor = BrickColor.new("Dark stone grey")
+		tail.Material = Enum.Material.Rock
+		tail.Parent = statue
+	elseif statueType == "pillar" then
+		-- Decorative pillar
+		local base = Instance.new("Part")
+		base.Name = "Base"
+		base.Size = Vector3.new(3, 1, 3)
+		base.Position = position + Vector3.new(0, 0.5, 0)
+		base.Anchored = true
+		base.BrickColor = BrickColor.new("Medium stone grey")
+		base.Material = Enum.Material.Marble
+		base.Parent = statue
+
+		local column = Instance.new("Part")
+		column.Name = "Column"
+		column.Size = Vector3.new(2, 6, 2)
+		column.Position = position + Vector3.new(0, 4, 0)
+		column.Anchored = true
+		column.BrickColor = BrickColor.new("White")
+		column.Material = Enum.Material.Marble
+		column.Parent = statue
+
+		local top = Instance.new("Part")
+		top.Name = "Top"
+		top.Size = Vector3.new(3.5, 1, 3.5)
+		top.Position = position + Vector3.new(0, 7.5, 0)
+		top.Anchored = true
+		top.BrickColor = BrickColor.new("Medium stone grey")
+		top.Material = Enum.Material.Marble
+		top.Parent = statue
+	else
+		-- Explorer statue
+		local pedestal = Instance.new("Part")
+		pedestal.Name = "Pedestal"
+		pedestal.Size = Vector3.new(4, 2, 4)
+		pedestal.Position = position + Vector3.new(0, 1, 0)
+		pedestal.Anchored = true
+		pedestal.BrickColor = BrickColor.new("Dark stone grey")
+		pedestal.Material = Enum.Material.Concrete
+		pedestal.Parent = statue
+
+		local figure = Instance.new("Part")
+		figure.Name = "Figure"
+		figure.Size = Vector3.new(2, 5, 2)
+		figure.Position = position + Vector3.new(0, 4.5, 0)
+		figure.Anchored = true
+		figure.BrickColor = BrickColor.new("Medium stone grey")
+		figure.Material = Enum.Material.Rock
+		figure.Parent = statue
+	end
+
+	statue.Parent = parent
+	return statue
+end
+
+-- Helper: Create a loot chest
+local function createChest(parent: Model, position: Vector3)
+	local chest = Instance.new("Model")
+	chest.Name = "LootChest"
+
+	-- Chest body
+	local body = Instance.new("Part")
+	body.Name = "Body"
+	body.Size = Vector3.new(4, 3, 3)
+	body.Position = position + Vector3.new(0, 1.5, 0)
+	body.Anchored = true
+	body.BrickColor = BrickColor.new("Reddish brown")
+	body.Material = Enum.Material.Wood
+	body.Parent = chest
+
+	-- Chest lid
+	local lid = Instance.new("Part")
+	lid.Name = "Lid"
+	lid.Size = Vector3.new(4.2, 1.5, 3.2)
+	lid.Position = position + Vector3.new(0, 3.5, 0)
+	lid.Anchored = true
+	lid.BrickColor = BrickColor.new("Brown")
+	lid.Material = Enum.Material.Wood
+	lid.Parent = chest
+
+	-- Metal bands
+	for i = -1, 1, 2 do
+		local band = Instance.new("Part")
+		band.Name = "Band"
+		band.Size = Vector3.new(0.3, 3.5, 3.2)
+		band.Position = position + Vector3.new(i * 1.5, 2, 0)
+		band.Anchored = true
+		band.BrickColor = BrickColor.new("Dark stone grey")
+		band.Material = Enum.Material.Metal
+		band.Parent = chest
+	end
+
+	-- Lock
+	local lock = Instance.new("Part")
+	lock.Name = "Lock"
+	lock.Size = Vector3.new(0.8, 0.8, 0.5)
+	lock.Position = position + Vector3.new(0, 2.5, -1.6)
+	lock.Anchored = true
+	lock.BrickColor = BrickColor.new("Bright yellow")
+	lock.Material = Enum.Material.Metal
+	lock.Parent = chest
+
+	chest.Parent = parent
+	return chest
+end
+
+-- Create a multi-story building with full interior (anchored at ground level)
 local function createMultiStoryBuilding(
 	name: string,
 	position: Vector3,
@@ -928,36 +1124,43 @@ local function createMultiStoryBuilding(
 	local building = Instance.new("Model")
 	building.Name = name
 
+	-- Raycast to find actual ground level
+	local groundPos = placeAtGroundLevel(position, 0)
+
 	local width = footprint.X
 	local floorHeight = footprint.Y
 	local depth = footprint.Z
 	local wallThickness = 2
 
 	-- Style-based colors
-	local wallColor, roofColor, windowColor
+	local wallColor, roofColor, windowColor, interiorWallColor
 	if style == "residential" then
 		wallColor = BrickColor.new("Brick yellow")
 		roofColor = BrickColor.new("Brown")
 		windowColor = BrickColor.new("Cyan")
+		interiorWallColor = BrickColor.new("Institutional white")
 	elseif style == "commercial" then
 		wallColor = BrickColor.new("Medium stone grey")
 		roofColor = BrickColor.new("Dark stone grey")
 		windowColor = BrickColor.new("Light blue")
+		interiorWallColor = BrickColor.new("White")
 	elseif style == "industrial" then
 		wallColor = BrickColor.new("Dark stone grey")
 		roofColor = BrickColor.new("Really black")
 		windowColor = BrickColor.new("Medium stone grey")
+		interiorWallColor = BrickColor.new("Medium stone grey")
 	else
 		wallColor = BrickColor.new("White")
 		roofColor = BrickColor.new("Dark stone grey")
 		windowColor = BrickColor.new("Cyan")
+		interiorWallColor = BrickColor.new("Institutional white")
 	end
 
 	-- Foundation
 	local foundation = Instance.new("Part")
 	foundation.Name = "Foundation"
 	foundation.Size = Vector3.new(width + 4, 3, depth + 4)
-	foundation.Position = position + Vector3.new(0, 1.5, 0)
+	foundation.Position = groundPos + Vector3.new(0, 1.5, 0)
 	foundation.Anchored = true
 	foundation.BrickColor = BrickColor.new("Dark stone grey")
 	foundation.Material = Enum.Material.Concrete
@@ -971,7 +1174,7 @@ local function createMultiStoryBuilding(
 		local slab = Instance.new("Part")
 		slab.Name = "Floor" .. floor
 		slab.Size = Vector3.new(width, 1, depth)
-		slab.Position = position + Vector3.new(0, floorY + 0.5, 0)
+		slab.Position = groundPos + Vector3.new(0, floorY + 0.5, 0)
 		slab.Anchored = true
 		slab.BrickColor = BrickColor.new("Medium stone grey")
 		slab.Material = Enum.Material.Concrete
@@ -980,21 +1183,52 @@ local function createMultiStoryBuilding(
 		-- Walls for this floor
 		local wallHeight = floorHeight - 1
 
-		-- Front wall with door/windows
-		local frontWall = Instance.new("Part")
-		frontWall.Name = "FrontWall" .. floor
-		frontWall.Size = Vector3.new(width, wallHeight, wallThickness)
-		frontWall.Position = position + Vector3.new(0, floorY + 1 + wallHeight / 2, -depth / 2)
-		frontWall.Anchored = true
-		frontWall.BrickColor = wallColor
-		frontWall.Material = Enum.Material.Concrete
-		frontWall.Parent = building
+		-- Front wall with door/windows (split for door opening)
+		if floor == 1 then
+			-- Ground floor: door gap
+			local frontLeft = Instance.new("Part")
+			frontLeft.Name = "FrontWallLeft" .. floor
+			frontLeft.Size = Vector3.new((width - 8) / 2, wallHeight, wallThickness)
+			frontLeft.Position = groundPos + Vector3.new(-(width / 4) - 2, floorY + 1 + wallHeight / 2, -depth / 2)
+			frontLeft.Anchored = true
+			frontLeft.BrickColor = wallColor
+			frontLeft.Material = Enum.Material.Concrete
+			frontLeft.Parent = building
+
+			local frontRight = Instance.new("Part")
+			frontRight.Name = "FrontWallRight" .. floor
+			frontRight.Size = Vector3.new((width - 8) / 2, wallHeight, wallThickness)
+			frontRight.Position = groundPos + Vector3.new((width / 4) + 2, floorY + 1 + wallHeight / 2, -depth / 2)
+			frontRight.Anchored = true
+			frontRight.BrickColor = wallColor
+			frontRight.Material = Enum.Material.Concrete
+			frontRight.Parent = building
+
+			-- Door frame header
+			local doorHeader = Instance.new("Part")
+			doorHeader.Name = "DoorHeader" .. floor
+			doorHeader.Size = Vector3.new(8, wallHeight - 8, wallThickness)
+			doorHeader.Position = groundPos + Vector3.new(0, floorY + 1 + 8 + (wallHeight - 8) / 2, -depth / 2)
+			doorHeader.Anchored = true
+			doorHeader.BrickColor = wallColor
+			doorHeader.Material = Enum.Material.Concrete
+			doorHeader.Parent = building
+		else
+			local frontWall = Instance.new("Part")
+			frontWall.Name = "FrontWall" .. floor
+			frontWall.Size = Vector3.new(width, wallHeight, wallThickness)
+			frontWall.Position = groundPos + Vector3.new(0, floorY + 1 + wallHeight / 2, -depth / 2)
+			frontWall.Anchored = true
+			frontWall.BrickColor = wallColor
+			frontWall.Material = Enum.Material.Concrete
+			frontWall.Parent = building
+		end
 
 		-- Back wall
 		local backWall = Instance.new("Part")
 		backWall.Name = "BackWall" .. floor
 		backWall.Size = Vector3.new(width, wallHeight, wallThickness)
-		backWall.Position = position + Vector3.new(0, floorY + 1 + wallHeight / 2, depth / 2)
+		backWall.Position = groundPos + Vector3.new(0, floorY + 1 + wallHeight / 2, depth / 2)
 		backWall.Anchored = true
 		backWall.BrickColor = wallColor
 		backWall.Material = Enum.Material.Concrete
@@ -1004,7 +1238,7 @@ local function createMultiStoryBuilding(
 		local leftWall = Instance.new("Part")
 		leftWall.Name = "LeftWall" .. floor
 		leftWall.Size = Vector3.new(wallThickness, wallHeight, depth)
-		leftWall.Position = position + Vector3.new(-width / 2, floorY + 1 + wallHeight / 2, 0)
+		leftWall.Position = groundPos + Vector3.new(-width / 2, floorY + 1 + wallHeight / 2, 0)
 		leftWall.Anchored = true
 		leftWall.BrickColor = wallColor
 		leftWall.Material = Enum.Material.Concrete
@@ -1013,50 +1247,145 @@ local function createMultiStoryBuilding(
 		local rightWall = Instance.new("Part")
 		rightWall.Name = "RightWall" .. floor
 		rightWall.Size = Vector3.new(wallThickness, wallHeight, depth)
-		rightWall.Position = position + Vector3.new(width / 2, floorY + 1 + wallHeight / 2, 0)
+		rightWall.Position = groundPos + Vector3.new(width / 2, floorY + 1 + wallHeight / 2, 0)
 		rightWall.Anchored = true
 		rightWall.BrickColor = wallColor
 		rightWall.Material = Enum.Material.Concrete
 		rightWall.Parent = building
 
-		-- Windows on each floor
-		local windowsPerSide = math.floor(width / 10)
+		-- =============================================
+		-- INTERIOR ROOMS
+		-- =============================================
+
+		-- Interior dividing wall (creates 2 rooms per floor)
+		local interiorWall = Instance.new("Part")
+		interiorWall.Name = "InteriorWall" .. floor
+		interiorWall.Size = Vector3.new(1, wallHeight - 2, depth - 10)
+		interiorWall.Position = groundPos + Vector3.new(-width / 6, floorY + 1 + (wallHeight - 2) / 2, 0)
+		interiorWall.Anchored = true
+		interiorWall.BrickColor = interiorWallColor
+		interiorWall.Material = Enum.Material.SmoothPlastic
+		interiorWall.Parent = building
+
+		-- Interior cross wall for hallway
+		local hallwayWall = Instance.new("Part")
+		hallwayWall.Name = "HallwayWall" .. floor
+		hallwayWall.Size = Vector3.new(width / 3, wallHeight - 2, 1)
+		hallwayWall.Position = groundPos + Vector3.new(width / 4, floorY + 1 + (wallHeight - 2) / 2, depth / 4)
+		hallwayWall.Anchored = true
+		hallwayWall.BrickColor = interiorWallColor
+		hallwayWall.Material = Enum.Material.SmoothPlastic
+		hallwayWall.Parent = building
+
+		-- Windows on front and back
+		local windowsPerSide = math.max(2, math.floor(width / 12))
 		for w = 1, windowsPerSide do
 			local windowX = -width / 2 + w * (width / (windowsPerSide + 1))
-			local window = Instance.new("Part")
-			window.Name = "Window" .. floor .. "_" .. w
-			window.Size = Vector3.new(4, 5, 1)
-			window.Position = position + Vector3.new(windowX, floorY + 1 + wallHeight / 2, -depth / 2 - 0.5)
-			window.Anchored = true
-			window.BrickColor = windowColor
-			window.Material = Enum.Material.Glass
-			window.Transparency = 0.5
-			window.Parent = building
+
+			-- Front window
+			local frontWindow = Instance.new("Part")
+			frontWindow.Name = "FrontWindow" .. floor .. "_" .. w
+			frontWindow.Size = Vector3.new(4, 5, 1)
+			frontWindow.Position = groundPos + Vector3.new(windowX, floorY + 1 + wallHeight / 2, -depth / 2 - 0.5)
+			frontWindow.Anchored = true
+			frontWindow.BrickColor = windowColor
+			frontWindow.Material = Enum.Material.Glass
+			frontWindow.Transparency = 0.5
+			frontWindow.Parent = building
+
+			-- Back window
+			local backWindow = Instance.new("Part")
+			backWindow.Name = "BackWindow" .. floor .. "_" .. w
+			backWindow.Size = Vector3.new(4, 5, 1)
+			backWindow.Position = groundPos + Vector3.new(windowX, floorY + 1 + wallHeight / 2, depth / 2 + 0.5)
+			backWindow.Anchored = true
+			backWindow.BrickColor = windowColor
+			backWindow.Material = Enum.Material.Glass
+			backWindow.Transparency = 0.5
+			backWindow.Parent = building
 		end
 
-		-- Door on ground floor
-		if floor == 1 then
-			local door = Instance.new("Part")
-			door.Name = "Door"
-			door.Size = Vector3.new(6, 8, 1)
-			door.Position = position + Vector3.new(0, floorY + 5, -depth / 2 - 0.5)
-			door.Anchored = true
-			door.BrickColor = BrickColor.new("Dark orange")
-			door.Material = Enum.Material.Wood
-			door.Parent = building
-		end
-
-		-- Stairs between floors (inside)
+		-- =============================================
+		-- STAIRS (Proper stepped staircase)
+		-- =============================================
 		if floor < floors then
-			local stairs = Instance.new("Part")
-			stairs.Name = "Stairs" .. floor
-			stairs.Size = Vector3.new(6, floorHeight, 12)
-			stairs.Position = position + Vector3.new(width / 2 - 5, floorY + floorHeight / 2 + 1, depth / 2 - 8)
-			stairs.Rotation = Vector3.new(30, 0, 0)
-			stairs.Anchored = true
-			stairs.BrickColor = BrickColor.new("Medium stone grey")
-			stairs.Material = Enum.Material.Concrete
-			stairs.Parent = building
+			local stairWidth = 5
+			local stairDepth = 10
+			local stepCount = 10
+			local stepHeight = floorHeight / stepCount
+
+			-- Stairwell location (back-right corner)
+			local stairBaseX = width / 2 - stairWidth - 2
+			local stairBaseZ = depth / 2 - stairDepth - 2
+
+			-- Floor opening for stairs (hole in floor above)
+			local stairOpening = Instance.new("Part")
+			stairOpening.Name = "StairOpening" .. floor
+			stairOpening.Size = Vector3.new(stairWidth + 4, 1, stairDepth + 2)
+			stairOpening.Position = groundPos + Vector3.new(stairBaseX, floorY + floorHeight + 0.5, stairBaseZ + stairDepth / 2)
+			stairOpening.Anchored = true
+			stairOpening.BrickColor = BrickColor.new("Dark stone grey")
+			stairOpening.Material = Enum.Material.Concrete
+			stairOpening.Transparency = 1 -- Invisible, just for collision
+			stairOpening.CanCollide = false
+			stairOpening.Parent = building
+
+			-- Create individual steps
+			for step = 1, stepCount do
+				local stepPart = Instance.new("Part")
+				stepPart.Name = "Step" .. floor .. "_" .. step
+				stepPart.Size = Vector3.new(stairWidth, stepHeight * 0.8, stairDepth / stepCount)
+				stepPart.Position = groundPos + Vector3.new(
+					stairBaseX,
+					floorY + 1 + (step - 0.5) * stepHeight,
+					stairBaseZ + (step - 0.5) * (stairDepth / stepCount)
+				)
+				stepPart.Anchored = true
+				stepPart.BrickColor = BrickColor.new("Medium stone grey")
+				stepPart.Material = Enum.Material.Concrete
+				stepPart.Parent = building
+			end
+
+			-- Stair railings
+			local leftRailing = Instance.new("Part")
+			leftRailing.Name = "StairRailingLeft" .. floor
+			leftRailing.Size = Vector3.new(0.5, 3, stairDepth)
+			leftRailing.Position = groundPos + Vector3.new(stairBaseX - stairWidth / 2 - 0.25, floorY + floorHeight / 2 + 2, stairBaseZ + stairDepth / 2)
+			leftRailing.Anchored = true
+			leftRailing.BrickColor = BrickColor.new("Brown")
+			leftRailing.Material = Enum.Material.Wood
+			leftRailing.Parent = building
+
+			local rightRailing = Instance.new("Part")
+			rightRailing.Name = "StairRailingRight" .. floor
+			rightRailing.Size = Vector3.new(0.5, 3, stairDepth)
+			rightRailing.Position = groundPos + Vector3.new(stairBaseX + stairWidth / 2 + 0.25, floorY + floorHeight / 2 + 2, stairBaseZ + stairDepth / 2)
+			rightRailing.Anchored = true
+			rightRailing.BrickColor = BrickColor.new("Brown")
+			rightRailing.Material = Enum.Material.Wood
+			rightRailing.Parent = building
+		end
+
+		-- =============================================
+		-- DECORATIONS (Statues and Chests)
+		-- =============================================
+
+		-- Add statue on ground floor lobby
+		if floor == 1 then
+			local statueTypes = { "dinosaur", "pillar", "explorer" }
+			local statueType = statueTypes[math.random(1, #statueTypes)]
+			createStatue(building, groundPos + Vector3.new(-width / 4, floorY + 1, -depth / 4), statueType)
+		end
+
+		-- Add chest in each room (2 per floor)
+		local chestPositions = {
+			groundPos + Vector3.new(-width / 3, floorY + 1, depth / 4),
+			groundPos + Vector3.new(width / 4, floorY + 1, -depth / 4 + 2),
+		}
+		for _, chestPos in ipairs(chestPositions) do
+			if math.random() > 0.3 then -- 70% chance of chest
+				createChest(building, chestPos)
+			end
 		end
 	end
 
@@ -1065,20 +1394,30 @@ local function createMultiStoryBuilding(
 	local roof = Instance.new("Part")
 	roof.Name = "Roof"
 	roof.Size = Vector3.new(width + 4, 2, depth + 4)
-	roof.Position = position + Vector3.new(0, roofY + 1, 0)
+	roof.Position = groundPos + Vector3.new(0, roofY + 1, 0)
 	roof.Anchored = true
 	roof.BrickColor = roofColor
 	roof.Material = Enum.Material.Slate
 	roof.Parent = building
 
-	-- Roof access
+	-- Roof access structure
+	local roofAccess = Instance.new("Part")
+	roofAccess.Name = "RoofAccess"
+	roofAccess.Size = Vector3.new(8, 10, 8)
+	roofAccess.Position = groundPos + Vector3.new(width / 2 - 6, roofY + 6, depth / 2 - 6)
+	roofAccess.Anchored = true
+	roofAccess.BrickColor = wallColor
+	roofAccess.Material = Enum.Material.Concrete
+	roofAccess.Parent = building
+
+	-- Roof door opening
 	local roofDoor = Instance.new("Part")
-	roofDoor.Name = "RoofAccess"
-	roofDoor.Size = Vector3.new(8, 10, 8)
-	roofDoor.Position = position + Vector3.new(width / 2 - 6, roofY + 6, depth / 2 - 6)
+	roofDoor.Name = "RoofDoor"
+	roofDoor.Size = Vector3.new(4, 7, 0.5)
+	roofDoor.Position = groundPos + Vector3.new(width / 2 - 6, roofY + 5.5, depth / 2 - 10)
 	roofDoor.Anchored = true
-	roofDoor.BrickColor = wallColor
-	roofDoor.Material = Enum.Material.Concrete
+	roofDoor.BrickColor = BrickColor.new("Dark orange")
+	roofDoor.Material = Enum.Material.Wood
 	roofDoor.Parent = building
 
 	building.PrimaryPart = foundation
@@ -1091,16 +1430,19 @@ local function createApartmentBuilding(name: string, position: Vector3, floors: 
 	return createMultiStoryBuilding(name, position, floors, Vector3.new(30, 12, 20), "residential")
 end
 
--- Create warehouse (single story but tall)
+-- Create warehouse (single story but tall, anchored at ground level)
 local function createWarehouse(name: string, position: Vector3): Model
 	local warehouse = Instance.new("Model")
 	warehouse.Name = name
+
+	-- Raycast to find actual ground level
+	local groundPos = placeAtGroundLevel(position, 0)
 
 	-- Main structure
 	local main = Instance.new("Part")
 	main.Name = "Main"
 	main.Size = Vector3.new(60, 25, 45)
-	main.Position = position + Vector3.new(0, 12.5, 0)
+	main.Position = groundPos + Vector3.new(0, 12.5, 0)
 	main.Anchored = true
 	main.BrickColor = BrickColor.new("Dark stone grey")
 	main.Material = Enum.Material.Metal
@@ -1111,7 +1453,7 @@ local function createWarehouse(name: string, position: Vector3): Model
 		local door = Instance.new("Part")
 		door.Name = "LoadingDoor" .. i
 		door.Size = Vector3.new(12, 15, 1)
-		door.Position = position + Vector3.new(-20 + i * 15, 7.5, -23)
+		door.Position = groundPos + Vector3.new(-20 + i * 15, 7.5, -23)
 		door.Anchored = true
 		door.BrickColor = BrickColor.new("Medium stone grey")
 		door.Material = Enum.Material.DiamondPlate
@@ -1122,7 +1464,7 @@ local function createWarehouse(name: string, position: Vector3): Model
 	local office = Instance.new("Part")
 	office.Name = "Office"
 	office.Size = Vector3.new(15, 12, 20)
-	office.Position = position + Vector3.new(-22, 6, 12)
+	office.Position = groundPos + Vector3.new(-22, 6, 12)
 	office.Anchored = true
 	office.BrickColor = BrickColor.new("Brick yellow")
 	office.Material = Enum.Material.Concrete
@@ -1133,16 +1475,19 @@ local function createWarehouse(name: string, position: Vector3): Model
 	return warehouse
 end
 
--- Create small shed
+-- Create small shed (anchored at ground level)
 local function createShed(name: string, position: Vector3, size: number): Model
 	local shed = Instance.new("Model")
 	shed.Name = name
+
+	-- Raycast to find actual ground level
+	local groundPos = placeAtGroundLevel(position, 0)
 
 	-- Floor
 	local floor = Instance.new("Part")
 	floor.Name = "Floor"
 	floor.Size = Vector3.new(size, 0.5, size)
-	floor.Position = position + Vector3.new(0, 0.25, 0)
+	floor.Position = groundPos + Vector3.new(0, 0.25, 0)
 	floor.Anchored = true
 	floor.BrickColor = BrickColor.new("Brown")
 	floor.Material = Enum.Material.WoodPlanks
@@ -1161,7 +1506,7 @@ local function createShed(name: string, position: Vector3, size: number): Model
 		local wall = Instance.new("Part")
 		wall.Name = "Wall" .. i
 		wall.Size = wallData[1]
-		wall.Position = position + wallData[2]
+		wall.Position = groundPos + wallData[2]
 		wall.Anchored = true
 		wall.BrickColor = BrickColor.new("Reddish brown")
 		wall.Material = Enum.Material.Wood
@@ -1172,7 +1517,7 @@ local function createShed(name: string, position: Vector3, size: number): Model
 	local roof = Instance.new("Part")
 	roof.Name = "Roof"
 	roof.Size = Vector3.new(size + 1, 0.5, size + 1)
-	roof.Position = position + Vector3.new(0, wallHeight + 0.75, 0)
+	roof.Position = groundPos + Vector3.new(0, wallHeight + 0.75, 0)
 	roof.Anchored = true
 	roof.BrickColor = BrickColor.new("Dark stone grey")
 	roof.Material = Enum.Material.Metal
@@ -1183,16 +1528,19 @@ local function createShed(name: string, position: Vector3, size: number): Model
 	return shed
 end
 
--- Create ruins/destroyed building
+-- Create ruins/destroyed building (anchored at ground level)
 local function createRuins(name: string, position: Vector3, size: number): Model
 	local ruins = Instance.new("Model")
 	ruins.Name = name
+
+	-- Raycast to find actual ground level
+	local groundPos = placeAtGroundLevel(position, 0)
 
 	-- Broken foundation
 	local foundation = Instance.new("Part")
 	foundation.Name = "Foundation"
 	foundation.Size = Vector3.new(size, 2, size)
-	foundation.Position = position + Vector3.new(0, 1, 0)
+	foundation.Position = groundPos + Vector3.new(0, 1, 0)
 	foundation.Anchored = true
 	foundation.BrickColor = BrickColor.new("Dark stone grey")
 	foundation.Material = Enum.Material.Concrete
@@ -1207,7 +1555,7 @@ local function createRuins(name: string, position: Vector3, size: number): Model
 			math.random(4, 12),
 			math.random(1, 3)
 		)
-		fragment.Position = position + Vector3.new(
+		fragment.Position = groundPos + Vector3.new(
 			math.random(-size / 2, size / 2),
 			fragment.Size.Y / 2 + 2,
 			math.random(-size / 2, size / 2)
@@ -1228,7 +1576,7 @@ local function createRuins(name: string, position: Vector3, size: number): Model
 			math.random(1, 3),
 			math.random(1, 4)
 		)
-		rubble.Position = position + Vector3.new(
+		rubble.Position = groundPos + Vector3.new(
 			math.random(-size / 2, size / 2),
 			rubble.Size.Y / 2 + 2,
 			math.random(-size / 2, size / 2)
@@ -2067,9 +2415,311 @@ local function createBaseTerrain()
 	createMultiStoryBuilding("Research2", Vector3.new(500, 25, -350), 2, Vector3.new(25, 12, 20), "commercial")
 
 	-- =============================================
-	-- PHASE 10: FINAL DETAILS
+	-- PHASE 10: LOOT CACHES NEAR SPAWN
 	-- =============================================
-	print("[MapManager] Phase 10: Adding final details...")
+	print("[MapManager] Phase 10: Adding loot caches near spawn...")
+
+	-- Spawn area is at (200, 30, 200) with 200 stud radius
+	-- Add loot caches within 300 studs (~100 yards) of spawn
+	local spawnCenter = Vector3.new(200, 30, 200)
+	local lootRadius = 300
+
+	-- Create floor loot cache (weapon crate)
+	local function createLootCache(position: Vector3, cacheType: string): Model
+		local cache = Instance.new("Model")
+		cache.Name = "LootCache_" .. cacheType
+
+		local groundPos = placeAtGroundLevel(position, 0)
+
+		if cacheType == "weapon_crate" then
+			-- Military-style weapon crate
+			local crate = Instance.new("Part")
+			crate.Name = "Crate"
+			crate.Size = Vector3.new(5, 3, 3)
+			crate.Position = groundPos + Vector3.new(0, 1.5, 0)
+			crate.Anchored = true
+			crate.BrickColor = BrickColor.new("Dark green")
+			crate.Material = Enum.Material.Metal
+			crate.Parent = cache
+
+			local lid = Instance.new("Part")
+			lid.Name = "Lid"
+			lid.Size = Vector3.new(5.2, 0.5, 3.2)
+			lid.Position = groundPos + Vector3.new(0, 3.25, 0)
+			lid.Anchored = true
+			lid.BrickColor = BrickColor.new("Dark green")
+			lid.Material = Enum.Material.Metal
+			lid.Parent = cache
+
+			-- Stencil markings (white stripe)
+			local stripe = Instance.new("Part")
+			stripe.Name = "Stripe"
+			stripe.Size = Vector3.new(4, 0.5, 0.1)
+			stripe.Position = groundPos + Vector3.new(0, 2, -1.55)
+			stripe.Anchored = true
+			stripe.BrickColor = BrickColor.new("White")
+			stripe.Material = Enum.Material.SmoothPlastic
+			stripe.Parent = cache
+
+		elseif cacheType == "ammo_box" then
+			-- Ammo box (smaller)
+			local box = Instance.new("Part")
+			box.Name = "Box"
+			box.Size = Vector3.new(2.5, 2, 2)
+			box.Position = groundPos + Vector3.new(0, 1, 0)
+			box.Anchored = true
+			box.BrickColor = BrickColor.new("Olive")
+			box.Material = Enum.Material.Metal
+			box.Parent = cache
+
+			local handle = Instance.new("Part")
+			handle.Name = "Handle"
+			handle.Size = Vector3.new(1.5, 0.3, 0.3)
+			handle.Position = groundPos + Vector3.new(0, 2.15, 0)
+			handle.Anchored = true
+			handle.BrickColor = BrickColor.new("Dark stone grey")
+			handle.Material = Enum.Material.Metal
+			handle.Parent = cache
+
+		elseif cacheType == "medkit" then
+			-- Medical supply kit
+			local kit = Instance.new("Part")
+			kit.Name = "Kit"
+			kit.Size = Vector3.new(3, 2, 2)
+			kit.Position = groundPos + Vector3.new(0, 1, 0)
+			kit.Anchored = true
+			kit.BrickColor = BrickColor.new("White")
+			kit.Material = Enum.Material.SmoothPlastic
+			kit.Parent = cache
+
+			-- Red cross
+			local crossH = Instance.new("Part")
+			crossH.Name = "CrossH"
+			crossH.Size = Vector3.new(1.2, 0.3, 0.1)
+			crossH.Position = groundPos + Vector3.new(0, 1.5, -1.05)
+			crossH.Anchored = true
+			crossH.BrickColor = BrickColor.new("Bright red")
+			crossH.Material = Enum.Material.SmoothPlastic
+			crossH.Parent = cache
+
+			local crossV = Instance.new("Part")
+			crossV.Name = "CrossV"
+			crossV.Size = Vector3.new(0.3, 1.2, 0.1)
+			crossV.Position = groundPos + Vector3.new(0, 1.5, -1.05)
+			crossV.Anchored = true
+			crossV.BrickColor = BrickColor.new("Bright red")
+			crossV.Material = Enum.Material.SmoothPlastic
+			crossV.Parent = cache
+
+		else -- supply_drop
+			-- General supply crate
+			local crate = Instance.new("Part")
+			crate.Name = "Crate"
+			crate.Size = Vector3.new(4, 4, 4)
+			crate.Position = groundPos + Vector3.new(0, 2, 0)
+			crate.Anchored = true
+			crate.BrickColor = BrickColor.new("Reddish brown")
+			crate.Material = Enum.Material.Wood
+			crate.Parent = cache
+
+			-- Metal straps
+			for i = -1, 1, 2 do
+				local strap = Instance.new("Part")
+				strap.Name = "Strap"
+				strap.Size = Vector3.new(4.2, 0.5, 0.3)
+				strap.Position = groundPos + Vector3.new(0, 2, i * 1.5)
+				strap.Anchored = true
+				strap.BrickColor = BrickColor.new("Dark stone grey")
+				strap.Material = Enum.Material.Metal
+				strap.Parent = cache
+			end
+		end
+
+		cache.Parent = workspace
+		return cache
+	end
+
+	-- Place loot caches around spawn in a ring pattern
+	local lootCacheCount = 16 -- 16 caches = good coverage within 300 studs
+	local cacheTypes = { "weapon_crate", "weapon_crate", "ammo_box", "ammo_box", "medkit", "supply_drop" }
+
+	for i = 1, lootCacheCount do
+		-- Distribute caches in rings
+		local ring = math.ceil(i / 8) -- 2 rings
+		local angleOffset = (ring - 1) * 0.25 -- Offset second ring
+		local angle = ((i - 1) / 8) * math.pi * 2 + angleOffset
+		local distance = 80 + (ring - 1) * 120 + math.random(-20, 20) -- 80-100 studs, then 200-220 studs
+
+		local cacheX = spawnCenter.X + math.cos(angle) * distance
+		local cacheZ = spawnCenter.Z + math.sin(angle) * distance
+
+		local cacheType = cacheTypes[math.random(1, #cacheTypes)]
+		createLootCache(Vector3.new(cacheX, spawnCenter.Y, cacheZ), cacheType)
+	end
+
+	-- Add additional random floor loot scattered around spawn
+	for i = 1, 20 do
+		local angle = math.random() * math.pi * 2
+		local distance = 50 + math.random() * 250 -- 50-300 studs from spawn
+		local lootX = spawnCenter.X + math.cos(angle) * distance
+		local lootZ = spawnCenter.Z + math.sin(angle) * distance
+
+		local cacheType = cacheTypes[math.random(1, #cacheTypes)]
+		createLootCache(Vector3.new(lootX, spawnCenter.Y, lootZ), cacheType)
+	end
+
+	print("[MapManager] Created 36 loot caches near spawn (within 300 studs)")
+
+	-- =============================================
+	-- PHASE 11: ADDITIONAL FOLIAGE DETAILS
+	-- =============================================
+	print("[MapManager] Phase 11: Adding foliage details...")
+
+	-- Create bush decoration
+	local function createBush(position: Vector3, size: number): Model
+		local bush = Instance.new("Model")
+		bush.Name = "Bush"
+
+		local groundPos = placeAtGroundLevel(position, 0)
+
+		-- Main bush body (cluster of spheres)
+		for i = 1, 3 do
+			local part = Instance.new("Part")
+			part.Name = "Foliage" .. i
+			part.Shape = Enum.PartType.Ball
+			local partSize = size * (0.6 + math.random() * 0.3)
+			part.Size = Vector3.new(partSize, partSize * 0.8, partSize)
+			local offsetX = (math.random() - 0.5) * size * 0.4
+			local offsetZ = (math.random() - 0.5) * size * 0.4
+			part.Position = groundPos + Vector3.new(offsetX, partSize * 0.35, offsetZ)
+			part.Anchored = true
+			part.BrickColor = BrickColor.new("Forest green")
+			part.Material = Enum.Material.Grass
+			part.Parent = bush
+		end
+
+		bush.Parent = workspace
+		return bush
+	end
+
+	-- Create fern
+	local function createFern(position: Vector3): Model
+		local fern = Instance.new("Model")
+		fern.Name = "Fern"
+
+		local groundPos = placeAtGroundLevel(position, 0)
+
+		-- Fern fronds radiating outward
+		for i = 1, 6 do
+			local frond = Instance.new("Part")
+			frond.Name = "Frond" .. i
+			frond.Size = Vector3.new(0.3, 2.5, 0.8)
+			local angle = (i / 6) * math.pi * 2
+			frond.Position = groundPos + Vector3.new(math.cos(angle) * 0.3, 1.2, math.sin(angle) * 0.3)
+			frond.Rotation = Vector3.new(30, math.deg(angle), 0)
+			frond.Anchored = true
+			frond.BrickColor = BrickColor.new("Bright green")
+			frond.Material = Enum.Material.Grass
+			frond.Parent = fern
+		end
+
+		fern.Parent = workspace
+		return fern
+	end
+
+	-- Create flower patch
+	local function createFlowerPatch(position: Vector3, count: number): Model
+		local patch = Instance.new("Model")
+		patch.Name = "FlowerPatch"
+
+		local groundPos = placeAtGroundLevel(position, 0)
+		local colors = { "Bright red", "Bright yellow", "Magenta", "Bright orange", "White" }
+
+		for i = 1, count do
+			local flower = Instance.new("Part")
+			flower.Name = "Flower" .. i
+			flower.Shape = Enum.PartType.Ball
+			flower.Size = Vector3.new(0.8, 0.8, 0.8)
+			local offsetX = (math.random() - 0.5) * 4
+			local offsetZ = (math.random() - 0.5) * 4
+			flower.Position = groundPos + Vector3.new(offsetX, 0.5, offsetZ)
+			flower.Anchored = true
+			flower.BrickColor = BrickColor.new(colors[math.random(1, #colors)])
+			flower.Material = Enum.Material.SmoothPlastic
+			flower.Parent = patch
+
+			-- Stem
+			local stem = Instance.new("Part")
+			stem.Name = "Stem" .. i
+			stem.Size = Vector3.new(0.1, 0.6, 0.1)
+			stem.Position = groundPos + Vector3.new(offsetX, 0.2, offsetZ)
+			stem.Anchored = true
+			stem.BrickColor = BrickColor.new("Bright green")
+			stem.Material = Enum.Material.Grass
+			stem.Parent = patch
+		end
+
+		patch.Parent = workspace
+		return patch
+	end
+
+	-- Add bushes throughout the map
+	print("[MapManager] Adding bushes...")
+	for i = 1, 100 do
+		local bushX = math.random(-1800, 1800)
+		local bushZ = math.random(-1500, 1500)
+		local bushY = 20
+		if bushZ < -800 then bushY = 45 end
+		if bushX > 800 then bushY = 12 end
+		if bushZ > 800 then bushY = 10 end
+		createBush(Vector3.new(bushX, bushY, bushZ), math.random(2, 5))
+	end
+
+	-- Add ferns in jungle and swamp areas
+	print("[MapManager] Adding ferns...")
+	for i = 1, 60 do
+		-- Jungle ferns
+		local fernX = math.random(-600, 600)
+		local fernZ = math.random(-500, 400)
+		createFern(Vector3.new(fernX, 25, fernZ))
+	end
+	for i = 1, 40 do
+		-- Swamp ferns
+		local fernX = swampCenter.X + math.random(-500, 500)
+		local fernZ = swampCenter.Z + math.random(-500, 500)
+		createFern(Vector3.new(fernX, 12, fernZ))
+	end
+
+	-- Add flower patches in plains and coastal
+	print("[MapManager] Adding flower patches...")
+	for i = 1, 30 do
+		-- Plains flowers
+		local flowerX = plainsCenter.X + math.random(-600, 600)
+		local flowerZ = plainsCenter.Z + math.random(-600, 600)
+		createFlowerPatch(Vector3.new(flowerX, 18, flowerZ), math.random(5, 12))
+	end
+	for i = 1, 20 do
+		-- Coastal flowers
+		local flowerX = coastalCenter.X + math.random(-600, 600)
+		local flowerZ = coastalCenter.Z + math.random(-200, 200)
+		createFlowerPatch(Vector3.new(flowerX, 10, flowerZ), math.random(4, 8))
+	end
+
+	-- Add dense bushes around spawn for early cover
+	for i = 1, 15 do
+		local angle = math.random() * math.pi * 2
+		local dist = 50 + math.random() * 150
+		local bushX = spawnCenter.X + math.cos(angle) * dist
+		local bushZ = spawnCenter.Z + math.sin(angle) * dist
+		createBush(Vector3.new(bushX, spawnCenter.Y, bushZ), math.random(3, 6))
+	end
+
+	print("[MapManager] Added 100 bushes, 100 ferns, 50 flower patches")
+
+	-- =============================================
+	-- PHASE 12: FINAL ROCK DETAILS
+	-- =============================================
+	print("[MapManager] Phase 12: Adding final rock details...")
 
 	-- Additional rock clusters everywhere
 	for i = 1, 40 do
@@ -2096,9 +2746,12 @@ local function createBaseTerrain()
 	print("    - 4 rivers with solid beds")
 	print("    - 11 lakes with terrain beds")
 	print("    - 7 accessible caves")
-	print("    - 500+ trees (6 varieties)")
-	print("    - 20+ multi-story buildings")
-	print("    - 80+ scattered structures")
+	print("    - 500+ trees (6 varieties, ground-anchored)")
+	print("    - 20+ multi-story buildings with interiors")
+	print("    - 80+ scattered structures (ground-anchored)")
+	print("    - 36 loot caches near spawn (~300 studs)")
+	print("    - 100 bushes, 100 ferns, 50 flower patches")
+	print("    - Building interiors with rooms, stairs, statues, chests")
 	print("  Coverage: ~30% water, ~30% foliage/structures")
 	print("===========================================")
 end
