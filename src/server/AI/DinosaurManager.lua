@@ -621,9 +621,11 @@ function DinosaurManager.Initialize()
 	findSpawnPoints()
 
 	-- Spawn initial dinosaurs around the spawn area (jungle biome)
-	-- Player spawns at (400, Y, 400), so spawn dinos in a ring around that
-	local initialCount = math.min(20, MAX_ACTIVE_DINOSAURS)
+	-- Player spawns at (400, Y, 400), so spawn dinos VERY CLOSE for testing
+	local initialCount = math.min(10, MAX_ACTIVE_DINOSAURS) -- Fewer for testing
 	local spawnCenter = Vector3.new(400, 50, 400) -- Jungle biome spawn area
+
+	print(`[DinosaurManager] Spawning {initialCount} dinosaurs around {spawnCenter}`)
 
 	for i = 1, initialCount do
 		-- Random position if no spawn points
@@ -633,23 +635,31 @@ function DinosaurManager.Initialize()
 			local point = spawnPoints[math.random(1, #spawnPoints)]
 			position = point.position
 		else
-			-- Spawn in a ring around the player spawn (100-300 studs away)
-			local angle = (i / initialCount) * math.pi * 2 + math.random() * 0.5
-			local distance = 100 + math.random() * 200
+			-- Spawn VERY CLOSE to player spawn (20-50 studs away) for testing
+			local angle = (i / initialCount) * math.pi * 2
+			local distance = 20 + math.random() * 30
 			position = spawnCenter + Vector3.new(
 				math.cos(angle) * distance,
-				50,
+				50, -- Will be adjusted by raycast
 				math.sin(angle) * distance
 			)
 		end
 
+		print(`[DinosaurManager] Attempting spawn at {position}`)
 		local species = selectRandomSpecies()
 		if species then
-			DinosaurManager.SpawnDinosaur(species, position)
+			local dino = DinosaurManager.SpawnDinosaur(species, position)
+			if dino then
+				print(`[DinosaurManager] SUCCESS: Spawned {species} at {dino.currentPosition}`)
+			else
+				warn(`[DinosaurManager] FAILED to spawn {species}`)
+			end
+		else
+			warn("[DinosaurManager] No species selected!")
 		end
 	end
 
-	print(`[DinosaurManager] Spawned {initialCount} initial dinosaurs around spawn area`)
+	print(`[DinosaurManager] Finished spawning initial dinosaurs`)
 
 	-- Update loop
 	local updateConnection = RunService.Heartbeat:Connect(function(dt)
