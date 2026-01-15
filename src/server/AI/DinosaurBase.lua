@@ -202,17 +202,24 @@ function DinosaurBase:Update(dt: number)
 		return
 	end
 
-	-- Update behavior tree
-	if self.behaviorTree then
-		self.behaviorTree:Run(dt)
-	end
-
-	-- Update position tracking
+	-- Update position tracking first (before AI)
 	if self.model then
 		local rootPart = self.model:FindFirstChild("HumanoidRootPart") :: BasePart?
 			or self.model.PrimaryPart
 		if rootPart then
 			self.currentPosition = rootPart.Position
+		end
+	end
+
+	-- Update behavior tree (wrapped in pcall for safety)
+	if self.behaviorTree then
+		local success, err = pcall(function()
+			self.behaviorTree:Run(dt)
+		end)
+		if not success then
+			-- Disable behavior tree if it keeps erroring
+			warn(`[DinosaurBase] Behavior tree error for {self.species}: {err}`)
+			self.behaviorTree = nil
 		end
 	end
 end
