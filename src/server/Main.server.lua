@@ -19,6 +19,28 @@ local RunService = game:GetService("RunService")
 Players.CharacterAutoLoads = false
 print("[Server] CharacterAutoLoads = false")
 
+-- STEP 1.5: FORCE CLEANUP of any old spawn platforms from .rbxlx file
+-- This removes legacy spawn locations that may have been saved in the place file
+local cleanupList = {
+	"LobbySpawn", "LobbyPlatform", "SpawnPlatform", "TempSpawnPlatform",
+	"TempLobbyPlatform", "FallbackSpawnPlatform", "MainSpawn", "TempSpawn"
+}
+for _, name in ipairs(cleanupList) do
+	local obj = Workspace:FindFirstChild(name)
+	if obj then
+		obj:Destroy()
+		print(`[Server] Removed legacy spawn object: {name}`)
+	end
+end
+-- Also remove ALL SpawnLocation objects in workspace root
+for _, child in ipairs(Workspace:GetChildren()) do
+	if child:IsA("SpawnLocation") then
+		child:Destroy()
+		print(`[Server] Removed SpawnLocation: {child.Name}`)
+	end
+end
+print("[Server] Legacy spawn cleanup complete")
+
 -- STEP 2: State tracking
 local playersToSpawn: {Player} = {}
 local worldReady = false
@@ -303,10 +325,26 @@ local function spawnPlayer(player: Player)
 	-- Wait for character to load
 	local character = player.Character or player.CharacterAdded:Wait()
 
+	-- Find actual terrain height at spawn location using raycast
+	local spawnX, spawnZ = 200, 200
+	local rayOrigin = Vector3.new(spawnX, 500, spawnZ)
+	local rayResult = Workspace:Raycast(rayOrigin, Vector3.new(0, -1000, 0))
+	local actualSpawnY = 30 -- Default fallback
+	if rayResult then
+		actualSpawnY = rayResult.Position.Y + 5 -- 5 studs above terrain
+		print(`[Server] Raycast found terrain at Y={rayResult.Position.Y}, spawning at Y={actualSpawnY}`)
+	else
+		print(`[Server] WARNING: Raycast missed terrain, using fallback Y={actualSpawnY}`)
+	end
+
 	-- Move to spawn position on terrain
 	local rootPart = character:WaitForChild("HumanoidRootPart", 5)
 	if rootPart then
-		rootPart.CFrame = CFrame.new(spawnPosition)
+		-- Small delay to ensure character is fully loaded
+		task.wait(0.1)
+		local finalSpawnPos = Vector3.new(spawnX, actualSpawnY, spawnZ)
+		rootPart.CFrame = CFrame.new(finalSpawnPos)
+		print(`[Server] Teleported {player.Name} to {finalSpawnPos}`)
 	end
 
 	-- Configure character (ready to move immediately)
@@ -317,13 +355,28 @@ end
 -- Handle death/respawn
 local function setupRespawnHandler(player: Player)
 	player.CharacterAdded:Connect(function(character)
-		-- Only freeze on initial spawn, not respawns
 		local humanoid = character:WaitForChild("Humanoid", 5) :: Humanoid?
 		if humanoid then
 			humanoid.WalkSpeed = Constants.PLAYER.WALK_SPEED
 			humanoid.JumpPower = Constants.PLAYER.JUMP_POWER
 			humanoid.MaxHealth = Constants.PLAYER.MAX_HEALTH
 			humanoid.Health = humanoid.MaxHealth
+
+			-- Teleport to terrain on respawn (in case default spawn is wrong)
+			task.spawn(function()
+				task.wait(0.2) -- Wait for character to fully load
+				local rootPart = character:FindFirstChild("HumanoidRootPart")
+				if rootPart then
+					-- Check if player is at wrong position (like at 0,0,0 or falling)
+					if rootPart.Position.Y < 0 or rootPart.Position.Y > 200 then
+						local spawnX, spawnZ = 200, 200
+						local rayResult = Workspace:Raycast(Vector3.new(spawnX, 500, spawnZ), Vector3.new(0, -1000, 0))
+						local spawnY = rayResult and (rayResult.Position.Y + 5) or 30
+						rootPart.CFrame = CFrame.new(spawnX, spawnY, spawnZ)
+						print(`[Server] Corrected {player.Name} position to terrain`)
+					end
+				end
+			end)
 
 			-- Handle death
 			humanoid.Died:Connect(function()
