@@ -46,7 +46,7 @@ MusicData.Contexts = {
 }
 
 -- Intensity levels (affects layer mixing)
-MusicData.IntensityLevels: { IntensityLevel } = {
+MusicData.IntensityLevels = {
 	{
 		level = 0,
 		name = "Silent",
@@ -86,7 +86,7 @@ MusicData.IntensityLevels: { IntensityLevel } = {
 }
 
 -- Main gameplay track with adaptive layers
-MusicData.Tracks: { MusicTrack } = {
+MusicData.Tracks = {
 	{
 		id = "MainTheme",
 		name = "Isla Primordial",

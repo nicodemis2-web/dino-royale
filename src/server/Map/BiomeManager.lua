@@ -47,7 +47,7 @@ local function updatePlayerBiome(player: Player)
 		playerBiomes[player] = newBiome
 
 		-- Notify client of biome change
-		Events.FireClient(player, "Map", "BiomeChanged", {
+		Events.FireClient("Map", "BiomeChanged", player, {
 			biome = newBiome,
 			config = BiomeData.Biomes[newBiome],
 		})
@@ -139,7 +139,7 @@ function BiomeManager.StartHazardEffect(player: Player, hazardType: string, conf
 				humanoid:TakeDamage(config.damagePerTick or 1)
 
 				-- Notify client
-				Events.FireClient(player, "Map", "HazardDamage", {
+				Events.FireClient("Map", "HazardDamage", player, {
 					hazardType = hazardType,
 					damage = config.damagePerTick,
 					message = config.message,
