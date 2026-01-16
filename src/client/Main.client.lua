@@ -43,6 +43,11 @@ local RankedUI: any = nil
 local AccessibilityUI: any = nil
 local DinosaurTargeting: any = nil
 
+-- Effects modules
+local CameraShake: any = nil
+local ScreenEffects: any = nil
+local FeedbackNotifications: any = nil
+
 -- State
 local isInitialized = false
 local currentGameState = "Loading"
@@ -85,6 +90,15 @@ local function loadModules()
 	-- Audio
 	AudioController = require(Audio.AudioController)
 
+	-- Effects
+	local Effects = script.Parent.Effects
+	CameraShake = require(Effects.CameraShake)
+	ScreenEffects = require(Effects.ScreenEffects)
+
+	-- Additional UI components
+	local Components = UI.Components
+	FeedbackNotifications = require(Components.FeedbackNotifications)
+
 	print("[Client] Modules loaded")
 end
 
@@ -123,6 +137,11 @@ local function initializeSystems()
 	RankedUI.Initialize()
 	AccessibilityUI.Initialize()
 	DinosaurTargeting.Initialize()
+
+	-- Initialize effects systems
+	CameraShake.Initialize()
+	ScreenEffects.Initialize()
+	FeedbackNotifications.Initialize()
 
 	print("[Client] Systems initialized")
 end
@@ -448,8 +467,127 @@ local function setupEventHandlers()
 		updateCountdown(data.remaining)
 	end)
 
-	-- Note: Removed broken event listeners for non-existent events
-	-- MatchStateChanged above handles all state transitions
+	-- ===== EFFECTS INTEGRATION =====
+
+	-- Player took damage - trigger screen effects and camera shake
+	Events.OnClientEvent("Combat", "PlayerDamaged", function(data)
+		local damage = data.damage or 10
+		local attacker = data.attacker
+
+		-- Screen damage flash
+		ScreenEffects.FlashDamage(math.clamp(damage / 50, 0.2, 1))
+
+		-- Camera shake based on damage
+		CameraShake.ShakeForDamage(damage)
+
+		-- Update health for low health effects
+		if data.currentHealth and data.maxHealth then
+			ScreenEffects.UpdateHealth(data.currentHealth, data.maxHealth)
+		end
+	end)
+
+	-- Player killed someone - show feedback
+	Events.OnClientEvent("Combat", "PlayerKill", function(data)
+		local victimName = data.victimName or "Enemy"
+		local isHeadshot = data.isHeadshot
+		local weaponName = data.weaponName
+		local xpGained = data.xpGained or 100
+
+		FeedbackNotifications.ShowKill(victimName, isHeadshot, weaponName)
+		FeedbackNotifications.ShowXPGain(xpGained, isHeadshot and "Headshot Kill" or "Elimination")
+
+		-- Camera bump for kill confirmation
+		CameraShake.ShakePreset("Bump")
+	end)
+
+	-- Kill streak notification
+	Events.OnClientEvent("Combat", "KillStreak", function(data)
+		local streakCount = data.count or 2
+		FeedbackNotifications.ShowKillStreak(streakCount)
+	end)
+
+	-- Dinosaur killed
+	Events.OnClientEvent("Combat", "DinosaurKill", function(data)
+		local dinoName = data.species or "Dinosaur"
+		local tier = data.tier or "Common"
+		local xpGained = data.xpGained or 50
+
+		FeedbackNotifications.ShowDinoKill(dinoName, tier, xpGained)
+		FeedbackNotifications.ShowXPGain(xpGained, "Dinosaur Kill")
+	end)
+
+	-- Player healed
+	Events.OnClientEvent("Inventory", "ItemUsed", function(data)
+		local itemType = data.itemType
+		if itemType == "Bandage" or itemType == "MedKit" then
+			ScreenEffects.FlashHeal()
+		elseif itemType == "MiniShield" or itemType == "BigShield" then
+			ScreenEffects.FlashShield()
+		end
+	end)
+
+	-- Loot pickup
+	Events.OnClientEvent("Inventory", "ItemPickup", function(data)
+		local itemName = data.name or "Item"
+		local rarity = data.rarity
+		local quantity = data.quantity
+
+		FeedbackNotifications.ShowLootPickup(itemName, rarity, quantity)
+	end)
+
+	-- Explosion nearby
+	Events.OnClientEvent("Combat", "Explosion", function(data)
+		local position = data.position
+		local character = localPlayer.Character
+		if character and position then
+			local rootPart = character:FindFirstChild("HumanoidRootPart")
+			if rootPart then
+				local distance = (rootPart.Position - position).Magnitude
+				CameraShake.ShakeForExplosion(distance)
+			end
+		end
+	end)
+
+	-- Dinosaur roar nearby
+	Events.OnClientEvent("Dinosaur", "Roar", function(data)
+		local position = data.position
+		local character = localPlayer.Character
+		if character and position then
+			local rootPart = character:FindFirstChild("HumanoidRootPart")
+			if rootPart then
+				local distance = (rootPart.Position - position).Magnitude
+				CameraShake.ShakeForDinosaur("Roar", distance)
+			end
+		end
+	end)
+
+	-- Achievement unlocked
+	Events.OnClientEvent("Progression", "AchievementUnlocked", function(data)
+		local achievementName = data.name or "Achievement"
+		local description = data.description
+		FeedbackNotifications.ShowAchievement(achievementName, description)
+	end)
+
+	-- Level up
+	Events.OnClientEvent("Progression", "LevelUp", function(data)
+		local newLevel = data.level or 2
+		FeedbackNotifications.ShowLevelUp(newLevel)
+	end)
+
+	-- XP gained
+	Events.OnClientEvent("Progression", "XPGained", function(data)
+		local amount = data.amount or 10
+		local reason = data.reason
+		FeedbackNotifications.ShowXPGain(amount, reason)
+	end)
+
+	-- Biome changed - update color grading
+	Events.OnClientEvent("Map", "BiomeChanged", function(data)
+		local biomeName = data.biome or "Plains"
+		ScreenEffects.SetBiomeColorGrade(biomeName)
+	end)
+
+	-- Note: MatchStateChanged above handles all state transitions
 end
 
 --[[
