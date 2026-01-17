@@ -371,18 +371,29 @@ end
 	Setup event listeners
 ]]
 function BattlePassUI.SetupEventListeners()
-	Events.OnClientEvent("BattlePass", function(action, data)
-		if action == "DataUpdate" then
-			BattlePassUI.OnDataUpdate(data)
-		elseif action == "XPGained" then
-			BattlePassUI.OnXPGained(data)
-		elseif action == "TierUp" then
-			BattlePassUI.OnTierUp(data)
-		elseif action == "RewardClaimed" then
-			BattlePassUI.OnRewardClaimed(data)
-		elseif action == "PremiumPurchased" then
-			BattlePassUI.OnPremiumPurchased()
-		end
+	-- Listen for data updates
+	Events.OnClientEvent("BattlePass", "DataUpdate", function(data)
+		BattlePassUI.OnDataUpdate(data)
+	end)
+
+	-- Listen for XP gained
+	Events.OnClientEvent("BattlePass", "XPGained", function(data)
+		BattlePassUI.OnXPGained(data)
+	end)
+
+	-- Listen for tier up
+	Events.OnClientEvent("BattlePass", "TierUp", function(data)
+		BattlePassUI.OnTierUp(data)
+	end)
+
+	-- Listen for reward claimed
+	Events.OnClientEvent("BattlePass", "RewardClaimed", function(data)
+		BattlePassUI.OnRewardClaimed(data)
+	end)
+
+	-- Listen for premium purchased
+	Events.OnClientEvent("BattlePass", "PremiumPurchased", function()
+		BattlePassUI.OnPremiumPurchased()
 	end)
 end
 

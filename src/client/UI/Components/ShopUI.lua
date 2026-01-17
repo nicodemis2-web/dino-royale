@@ -161,16 +161,24 @@ end
 	Setup event listeners
 ]]
 function ShopUI.SetupEventListeners()
-	Events.OnClientEvent("Shop", function(action, data)
-		if action == "DataUpdate" then
-			ShopUI.OnDataUpdate(data)
-		elseif action == "InventoryUpdate" then
-			ShopUI.OnInventoryUpdate(data)
-		elseif action == "PurchaseSuccess" then
-			ShopUI.OnPurchaseSuccess(data)
-		elseif action == "PurchaseFailed" then
-			ShopUI.OnPurchaseFailed(data)
-		end
+	-- Listen for shop data updates
+	Events.OnClientEvent("Shop", "DataUpdate", function(data)
+		ShopUI.OnDataUpdate(data)
+	end)
+
+	-- Listen for inventory updates
+	Events.OnClientEvent("Shop", "InventoryUpdate", function(data)
+		ShopUI.OnInventoryUpdate(data)
+	end)
+
+	-- Listen for purchase success
+	Events.OnClientEvent("Shop", "PurchaseSuccess", function(data)
+		ShopUI.OnPurchaseSuccess(data)
+	end)
+
+	-- Listen for purchase failure
+	Events.OnClientEvent("Shop", "PurchaseFailed", function(data)
+		ShopUI.OnPurchaseFailed(data)
 	end)
 
 	-- Update timer

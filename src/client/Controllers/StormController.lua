@@ -182,11 +182,22 @@ end
 	Setup event listeners
 ]]
 function StormController.SetupEventListeners()
-	Events.OnClientEvent("Storm", function(action, data)
-		if action == "PhaseChanged" then
+	-- Listen to GameState.StormUpdate for storm circle updates
+	Events.OnClientEvent("GameState", "StormUpdate", function(data)
+		StormController.OnStormUpdate(data)
+		-- Also treat StormUpdate as a phase change if it has phase info
+		if data.phase then
 			StormController.OnPhaseChanged(data)
-		elseif action == "Update" then
-			StormController.OnStormUpdate(data)
+		end
+	end)
+
+	-- Listen to Storm.PlayerInStorm for damage feedback
+	Events.OnClientEvent("Storm", "PlayerInStorm", function(data)
+		isInStorm = data.isInStorm
+		if isInStorm then
+			StormController.ShowDamageOverlay()
+		else
+			StormController.HideDamageOverlay()
 		end
 	end)
 end

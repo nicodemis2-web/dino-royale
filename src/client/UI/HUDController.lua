@@ -111,8 +111,8 @@ local function createComponents()
 	-- Ammo display (bottom right)
 	ammoDisplay = AmmoDisplay.new(hudGui, UDim2.new(1, -170, 1, -70))
 
-	-- Weapon slots (bottom center)
-	weaponSlots = WeaponSlots.new(hudGui, UDim2.new(0.5, 0, 1, -20))
+	-- Weapon slots (bottom right)
+	weaponSlots = WeaponSlots.new(hudGui, UDim2.new(1, -340, 1, -20))
 
 	-- Minimap (top right)
 	minimap = Minimap.new(hudGui, UDim2.new(1, -220, 0, 20))
@@ -258,28 +258,34 @@ local function setupEvents()
 
 	-- Inventory updates (main weapon/ammo data source)
 	local inventoryConn = Events.OnClientEvent("Inventory", "InventoryUpdate", function(data)
+		print("[HUDController] Received inventory update")
+
 		if inventoryScreen then
 			inventoryScreen:SetItems(data)
 		end
 
 		-- Update weapon slots from inventory data
-		if weaponSlots and data.weapons then
+		if weaponSlots and data and data.weapons then
+			print("[HUDController] Updating weapon slots with " .. tostring(#data.weapons) .. " potential weapons")
 			-- Clear and repopulate all slots
 			for slot = 1, 5 do
 				local weaponData = data.weapons[slot]
 				if weaponData then
+					print("[HUDController] Slot " .. slot .. ": " .. tostring(weaponData.id) .. " (" .. tostring(weaponData.rarity) .. ")")
 					weaponSlots:SetSlot(slot, {
 						weaponId = weaponData.id,
-						weaponName = weaponData.id, -- Name lookup could be added
+						weaponName = weaponData.id,
 						rarity = weaponData.rarity,
-						ammo = weaponData.currentAmmo,
-						maxAmmo = 30, -- Would come from WeaponData lookup
+						ammo = weaponData.currentAmmo or 0,
+						maxAmmo = 30,
 						icon = "",
 					})
 				else
 					weaponSlots:ClearSlot(slot)
 				end
 			end
+		else
+			print("[HUDController] No weapon data in inventory update")
 		end
 
 		-- Update ammo display for currently selected weapon
@@ -396,13 +402,13 @@ function HUDController.OnGameStateChanged(newState: string)
 	local FADE_DURATION = 0.2
 
 	if newState == "Lobby" then
-		-- Show HUD even in lobby for testing (minimal elements)
+		-- Show full HUD in lobby (for testing and immediate gameplay)
 		HUDController.SetHUDVisible(true, FADE_DURATION)
 		if ammoDisplay then
-			ammoDisplay:SetVisible(false)
+			ammoDisplay:SetVisible(true)
 		end
 		if weaponSlots then
-			weaponSlots.frame.Visible = false
+			weaponSlots.frame.Visible = true
 		end
 
 	elseif newState == "Loading" then
@@ -591,8 +597,16 @@ function HUDController.Initialize()
 		healthDisplay:Update(100, 100, 0, 100)
 	end
 
+	-- Show weapon slots and ammo display immediately (for testing and Lobby state)
+	if weaponSlots then
+		weaponSlots.frame.Visible = true
+	end
+	if ammoDisplay then
+		ammoDisplay:SetVisible(true)
+	end
+
 	isInitialized = true
-	print("[HUDController] Initialized - HUD visible")
+	print("[HUDController] Initialized - HUD visible with all components")
 end
 
 --[[

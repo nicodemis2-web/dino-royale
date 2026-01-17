@@ -1,5 +1,5 @@
 # DINO ROYALE - Game Design Document
-*Complete Edition v1.1*
+*Complete Edition v1.2*
 
 ---
 
@@ -15,7 +15,17 @@ A prehistoric-themed battle royale experience
 
 featuring dinosaurs, survival mechanics, and intense combat
 
-Version 1.1 | January 2026
+Version 1.2 | January 2026
+
+**v1.2 Updates:**
+- Added Section 3.5: Biome Atmosphere & Visual Design
+- Added Section 3.6: Strategic Cover & Environmental Props
+- Added Section 5.5: Dinosaur Abilities & Behavior Patterns
+- Added Section 5.6: Dinosaur Audio & Visual Design
+- Enhanced biome details with color palettes, fog settings, and landmarks
+- Added comprehensive dinosaur ability cooldowns and behavior phases
+- Documented pack coordination system for Velociraptors
+- Added sound design specifications for all major species
 
 
 ## Table of Contents
@@ -230,6 +240,101 @@ SOUTH: Coastal Area (Mixed)
 | Monsoon | Random | Reduced visibility, dinosaurs seek shelter |
 
 
+### 3.5 Biome Atmosphere & Visual Design
+
+Each biome features distinct atmosphere, lighting, and visual effects that create a cohesive and immersive environment. The system dynamically transitions between biome atmospheres as players move across the map.
+
+
+#### Visual Design Philosophy
+
+Following PVP map design best practices:
+- **3-5 Color Palette Rule**: Each biome uses a limited, cohesive color palette
+- **Layered Visual Depth**: Foreground, midground, and background elements create depth
+- **Clear Navigation**: Distinct landmarks visible from 500+ studs for orientation
+- **Readable Combat Spaces**: Cover and threats are visually distinct from decorative elements
+
+
+#### Biome Color Palettes
+
+| Biome | Primary | Secondary | Accent | Atmosphere |
+|---|---|---|---|---|
+| Jungle | Deep Green | Brown | Gold/Yellow | Humid, dappled light |
+| Desert | Sandy Tan | Orange | Red-Brown | Hot, hazy, intense sun |
+| Mountains | Gray-Blue | White | Dark Slate | Crisp, clear, high contrast |
+| Plains | Yellow-Green | Golden | Sky Blue | Open, bright, pastoral |
+| Volcanic | Black/Dark Red | Orange | Ember Glow | Smoky, ominous, warm tones |
+| Swamp | Murky Green | Brown | Teal | Foggy, mysterious, damp |
+| Coastal | Sandy White | Ocean Blue | Coral Pink | Bright, reflective, breezy |
+| Research | Gray Metal | White | Warning Yellow | Clinical, artificial lighting |
+
+
+#### Atmosphere Settings
+
+| Biome | Fog Density | Fog Distance | Ambient Color | Special Effects |
+|---|---|---|---|---|
+| Jungle | Medium | 400m | Warm Green | Floating pollen, light rays |
+| Desert | Low | 800m | Yellow-White | Heat shimmer, dust particles |
+| Mountains | Low | 1000m | Blue-White | Snow particles (peaks) |
+| Plains | Very Low | 1200m | Golden | Grass particles, butterflies |
+| Volcanic | High | 200m | Orange-Red | Ash particles, ember sparks |
+| Swamp | Very High | 150m | Green-Gray | Fireflies, mist wisps |
+| Coastal | Low | 600m | Blue-White | Sea spray, birds |
+| Research | None | Clear | Neutral White | Flickering lights, steam vents |
+
+
+### 3.6 Strategic Cover & Environmental Props
+
+The map features strategic cover placement designed for competitive PVP gameplay, following the principle that cover should create interesting combat decisions rather than random chance.
+
+
+#### Cover Design Principles
+
+- **32-Stud Pathways**: Minimum 32-stud clear paths between cover clusters
+- **Corner Bias**: Cover placed to create corner-peeking opportunities
+- **Verticality Reward/Risk**: High ground offers better sightlines but less cover
+- **Destructible Options**: Some cover can be destroyed, creating dynamic combat
+
+
+#### Cover Types by Biome
+
+| Biome | Primary Cover | Secondary Cover | Destructible |
+|---|---|---|---|
+| Jungle | Fallen logs, thick vegetation | Rock outcrops, temple ruins | Wooden crates |
+| Desert | Rock formations, dunes | Wrecked vehicles, metal debris | Wooden structures |
+| Mountains | Boulders, cliff edges | Pine trees, wooden cabins | Ice formations |
+| Plains | Hay bales, farm equipment | Fences, small hills | Wooden barriers |
+| Volcanic | Lava rock formations | Metal pipes, industrial debris | Vents, steam pipes |
+| Swamp | Mangrove roots, mud mounds | Abandoned boats, docks | Rotting wood |
+| Coastal | Beach rocks, pier pillars | Lifeguard towers, boats | Beach umbrellas |
+| Research | Metal containers, vehicles | Lab equipment, barriers | Glass panels |
+
+
+#### Landmark System
+
+Each biome features 2-3 major landmarks visible from 500+ studs for navigation:
+
+| Biome | Landmark | Description | Visibility |
+|---|---|---|---|
+| Jungle | Ancient Temple | Stone pyramid structure with beacon light | 800m |
+| Volcanic | Volcanic Caldera | Smoking crater with red glow | 1000m |
+| Swamp | Dead Tree | Massive dead tree with hanging moss | 600m |
+| Research | Radio Tower | Tall antenna with blinking lights | 1200m |
+| Coastal | Lighthouse | Classic lighthouse with rotating beam | 900m |
+| Mountains | Summit Marker | Snow-capped peak with flag | 1000m |
+
+
+#### Verticality Spots
+
+Strategic high-ground locations with risk/reward tradeoffs:
+
+| Type | Height Advantage | Risk Level | Cover Quality |
+|---|---|---|---|
+| Cliff Edge | +30-50 studs | Medium | Low (exposed) |
+| Tower/Platform | +20-40 studs | High | Medium |
+| Building Roof | +15-25 studs | Medium | Low-Medium |
+| Natural Ridge | +10-20 studs | Low | High |
+
+
 ## 4. Weapons System
 
 Weapons follow a rarity system (Common, Uncommon, Rare, Epic, Legendary) with prehistoric theming. All weapons are fictional variants that fit the aesthetic while providing satisfying gunplay.
@@ -439,6 +544,109 @@ Reward: Killing guarantees bonus rewards even without victory
 | Deploy Flare | Dinosaurs avoid flare area, draws player attention |
 | Kill Dinosaur | Drops loot based on tier, alerts nearby predators |
 | Crouch/Prone | Reduced detection range by dinosaurs |
+
+
+### 5.5 Dinosaur Abilities & Behavior Patterns
+
+Each dinosaur species has unique abilities and behavior patterns that create diverse gameplay encounters. The AI system uses multi-phase behavior that adapts based on health, aggro level, and environmental conditions.
+
+
+#### Ability System
+
+Dinosaurs use abilities on cooldowns, creating predictable but dangerous attack patterns:
+
+| Species | Primary Ability | Cooldown | Damage | Effect |
+|---|---|---|---|---|
+| Velociraptor | Pack Coordination | 15s | N/A | Signals pack to flank target |
+| Velociraptor | Pounce | 8s | 45 | Leaps 15 studs, knockdown on hit |
+| T-Rex | Thunderous Roar | 30s | N/A | 50-stud radius fear (3s slow) |
+| T-Rex | Crushing Bite | 12s | 150 | Grab attack, holds target |
+| Spinosaurus | Water Ambush | 20s | 80 | Emerges from water with splash |
+| Spinosaurus | Tail Sweep | 10s | 60 | 180° arc, knockback |
+| Triceratops | Defensive Stance | 25s | N/A | 50% damage reduction, 5s |
+| Triceratops | Gore Charge | 15s | 80 | 40-stud charge, impales |
+| Dilophosaurus | Venom Spit | 6s | 25 | 30-stud range, applies blind |
+| Pteranodon | Dive Bomb | 12s | 40 | Aerial attack, knockdown |
+| Carnotaurus | Bull Rush | 10s | 70 | Charges in straight line |
+| Indoraptor | Adaptive Hunter | 20s | N/A | Learns player patterns |
+
+
+#### Behavior Phases
+
+Dinosaurs transition between behavior phases based on conditions:
+
+| Phase | Trigger | Behavior | Duration |
+|---|---|---|---|
+| Idle | Default state | Wander territory, occasional calls | Until triggered |
+| Alert | Sound/Movement detected | Investigate source, heightened senses | 10-30 seconds |
+| Hunting | Target acquired | Pursue and attack, use abilities | Until target lost/dead |
+| Aggressive | Low health or pack attacked | Relentless pursuit, increased damage | Until threat eliminated |
+| Fleeing | Critical health (herbivores) | Run to safety, call for help | Until safe |
+| Territorial | Intruder in territory | Roar warnings, then attack | While intruder present |
+
+
+#### Pack Coordination (Raptors)
+
+Velociraptors use coordinated tactics:
+
+1. **Alpha Call**: Lead raptor signals attack, others respond
+2. **Flanking Formation**: Pack splits to surround target
+3. **Distraction**: One raptor draws attention while others position
+4. **Synchronized Strike**: Pack attacks simultaneously from multiple angles
+5. **Retreat Signal**: Alpha can call retreat if pack takes heavy losses
+
+
+### 5.6 Dinosaur Audio & Visual Design
+
+Comprehensive audio and visual design creates distinct, memorable dinosaur encounters.
+
+
+#### Sound Design
+
+| Species | Idle Sounds | Alert Sound | Attack Sound | Special |
+|---|---|---|---|---|
+| Velociraptor | Chirps, clicks | Bark warning | Screech | Pack communication calls |
+| T-Rex | Deep breathing | Ground-shaking growl | Iconic roar | Footsteps audible 100m away |
+| Spinosaurus | Water splashing | Hiss | Bellow | Jaw snap sound |
+| Triceratops | Grunts, snorts | Warning bellow | Charge trumpet | Horn scraping |
+| Dilophosaurus | Hooting | Frill rattle | Spit hiss | Distinctive frill shake |
+| Pteranodon | Wing flaps | Screech | Dive whistle | Sonar-like clicks |
+
+
+#### Hearing Ranges
+
+| Sound Type | Range | Alert Level |
+|---|---|---|
+| Gunshot | 150m | High |
+| Sprinting | 40m | Medium |
+| Walking | 15m | Low |
+| Crouch walking | 8m | Very Low |
+| Vehicle | 200m | High |
+
+
+#### Visual Effects
+
+| Species | Passive Effect | Combat Effect | Death Effect |
+|---|---|---|---|
+| Velociraptor | Subtle eye glow | Speed blur trail | Feather scatter |
+| T-Rex | Ground dust clouds | Red rage aura | Massive dust cloud |
+| Spinosaurus | Water drip particles | Splash effects | Water explosion |
+| Triceratops | Dust kick-up | Charge trail | Horn glow fade |
+| Dilophosaurus | Frill color pulse | Venom drip particles | Frill collapse |
+| Carnotaurus | Heat shimmer | Speed lines | Impact crater |
+| Indoraptor | Shadow wisps | Claw trail effects | Dissolve particles |
+
+
+#### Color Variations
+
+Each dinosaur species has 3-5 color variants for visual variety:
+
+| Species | Base Colors | Rare Variants |
+|---|---|---|
+| Velociraptor | Brown, Green, Gray | Albino White, Tiger Stripe |
+| T-Rex | Brown, Dark Green | Scarred (battle damage), Rex Red |
+| Triceratops | Gray, Brown, Tan | Blue Ridge, Golden |
+| Pteranodon | Brown, Tan | Ocean Blue, Sunset Orange |
 
 
 ## 6. Items & Equipment

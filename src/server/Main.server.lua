@@ -278,6 +278,9 @@ end
 if GameManager and EliminationManager then
 	pcall(function() GameManager.SetEliminationManager(EliminationManager) end)
 end
+if GameManager and MapManager then
+	pcall(function() GameManager.SetMapManager(MapManager) end)
+end
 if StormManager and CombatManager then
 	pcall(function() StormManager.SetCombatManager(CombatManager) end)
 end

@@ -497,12 +497,30 @@ function LobbyScreen.Show()
 	isVisible = true
 	isReady = false
 
-	-- Reset ready button
+	-- Reset ready button and all transparency values
 	if mainFrame then
 		local readyButton = mainFrame:FindFirstChild("ReadyButton") :: TextButton?
 		if readyButton then
 			readyButton.Text = "READY"
 			readyButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+			readyButton.TextTransparency = 0
+			readyButton.BackgroundTransparency = 0
+		end
+
+		-- Reset all children's transparency (in case they were faded out)
+		for _, child in ipairs(mainFrame:GetDescendants()) do
+			if child:IsA("TextLabel") or child:IsA("TextButton") then
+				child.TextTransparency = 0
+				child.BackgroundTransparency = child.Name == "Title" or child.Name == "Subtitle" or child.Name == "Tip"
+					or child.Name == "Count" or child.Name == "SubLabel" or child.Name == "Time" or child.Name == "Label"
+					or child.Name == "Name" or child.Name == "Status" or child.Name == "ControlsLabel"
+					and 1 or 0 -- Keep text labels with transparent backgrounds
+			elseif child:IsA("Frame") then
+				child.BackgroundTransparency = 0
+			elseif child:IsA("ScrollingFrame") then
+				child.BackgroundTransparency = 0
+				child.ScrollBarImageTransparency = 0
+			end
 		end
 
 		-- Start with transparency for fade in
@@ -538,14 +556,35 @@ function LobbyScreen.Hide()
 	isVisible = false
 	countdownActive = false
 
-	-- Fade out animation
+	-- Fade out animation for all children
 	if mainFrame then
-		local fadeOut = TweenService:Create(mainFrame, TweenInfo.new(FADE_DURATION, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-			BackgroundTransparency = 1,
-		})
-		fadeOut:Play()
-		-- Use Once to avoid connection leak on repeated Hide() calls
-		fadeOut.Completed:Once(function()
+		-- Create a CanvasGroup-like fade effect by animating all text and frame elements
+		local fadeInfo = TweenInfo.new(FADE_DURATION, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+
+		-- Fade the main frame background
+		TweenService:Create(mainFrame, fadeInfo, { BackgroundTransparency = 1 }):Play()
+
+		-- Fade all children (text labels, frames, buttons)
+		for _, child in ipairs(mainFrame:GetDescendants()) do
+			if child:IsA("TextLabel") or child:IsA("TextButton") then
+				TweenService:Create(child, fadeInfo, {
+					TextTransparency = 1,
+					BackgroundTransparency = 1,
+				}):Play()
+			elseif child:IsA("Frame") then
+				TweenService:Create(child, fadeInfo, {
+					BackgroundTransparency = 1,
+				}):Play()
+			elseif child:IsA("ScrollingFrame") then
+				TweenService:Create(child, fadeInfo, {
+					BackgroundTransparency = 1,
+					ScrollBarImageTransparency = 1,
+				}):Play()
+			end
+		end
+
+		-- Disable after fade completes
+		task.delay(FADE_DURATION + 0.05, function()
 			if not isVisible and screenGui then
 				screenGui.Enabled = false
 			end

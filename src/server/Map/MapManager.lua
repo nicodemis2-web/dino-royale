@@ -41,6 +41,7 @@ local BiomeManager = require(script.Parent.BiomeManager)
 local POIManager = require(script.Parent.POIManager)
 local EnvironmentalEventManager = require(script.Parent.EnvironmentalEventManager)
 local FloraGenerator = require(script.Parent.FloraGenerator)
+local EnvironmentalPropsGenerator = require(script.Parent.EnvironmentalPropsGenerator)
 local LootManager = require(script.Parent.Parent.Loot.LootManager)
 
 -- Configuration module (all hardcoded values extracted here)
@@ -2333,6 +2334,11 @@ local function createBaseTerrain()
 	createFoliageDetails(config)
 	createRockDetails(config)
 
+	-- Phase 13: Environmental props (cover, decorations, particles)
+	safeExecute("Phase 13: Environmental Props", function()
+		EnvironmentalPropsGenerator.GenerateMapProps()
+	end)
+
 	task.wait() -- Final yield
 
 	-- Print generation summary
@@ -2356,6 +2362,9 @@ local function createBaseTerrain()
 	print("    - Scattered structures (ground-anchored)")
 	print("    - Loot caches near spawn")
 	print("    - Bushes, ferns, flower patches")
+	print("    - Strategic cover props per biome")
+	print("    - Decorative environmental props")
+	print("    - Biome-specific landmarks")
 	print("  Coverage: ~30% water, ~30% foliage/structures")
 	print("===========================================")
 end
@@ -2427,6 +2436,7 @@ function MapManager.Reset()
 	BiomeManager.Reset()
 	POIManager.Reset()
 	EnvironmentalEventManager.Reset()
+	EnvironmentalPropsGenerator.Reset()
 
 	-- Respawn loot caches
 	createLootCaches(MapConfig)

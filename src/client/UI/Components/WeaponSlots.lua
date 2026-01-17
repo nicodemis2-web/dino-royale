@@ -76,9 +76,10 @@ function WeaponSlots.new(parent: GuiObject, position: UDim2): WeaponSlotsInstanc
 	self.frame = Instance.new("Frame")
 	self.frame.Name = "WeaponSlots"
 	self.frame.Position = position
-	self.frame.Size = UDim2.fromOffset(totalWidth, SLOT_SIZE)
+	self.frame.Size = UDim2.fromOffset(totalWidth, SLOT_SIZE + 10) -- Add padding
 	self.frame.AnchorPoint = Vector2.new(0.5, 1)
-	self.frame.BackgroundTransparency = 1
+	self.frame.BackgroundTransparency = 0.5 -- Semi-transparent for visibility debugging
+	self.frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0) -- Dark background
 	self.frame.Parent = parent
 
 	-- Create slots
