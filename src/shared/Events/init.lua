@@ -70,9 +70,20 @@ Events.GameState = {
 	"PlayerJumpedFromHelicopter", -- Server -> All: {playerId, position}
 	"SupplyDropIncoming", -- Server -> All: {position}
 	"WelcomeMessage", -- Server -> Client: {title, message, controls}
-	"LobbyUpdate", -- Server -> All: {players}
+	"LobbyUpdate", -- Server -> All: {players, readyCount, mode, countdown}
 	"ToggleReady", -- Client -> Server: {ready}
 	"ReturnToLobby", -- Client -> Server: {}
+	-- Lobby/Matchmaking events
+	"SelectMode", -- Client -> Server: {mode} (Test/Solo/Duos/Trios/Quads)
+	"ModeChanged", -- Server -> All: {mode, settings}
+	"StartMatch", -- Client -> Server: {} (host/test mode only)
+	"ForceStart", -- Client -> Server: {} (admin only)
+	"PlayerJoined", -- Server -> All: {playerId, playerName, teamId}
+	"PlayerLeft", -- Server -> All: {playerId}
+	"TeamAssigned", -- Server -> Client: {teamId, teammates}
+	"TeamUpdate", -- Server -> All: {teamId, players}
+	"SpawnPlayer", -- Server -> Client: {position, loadout}
+	"RequestSpawn", -- Client -> Server: {position?}
 	-- Boss events
 	"BossEvent", -- Server -> All: {eventType, bossId, data}
 	"BossLootDropped", -- Server -> All: {bossId, position, loot}

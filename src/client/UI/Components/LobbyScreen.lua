@@ -10,6 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
 local Events = require(ReplicatedStorage.Shared.Events)
+local MatchConfig = require(ReplicatedStorage.Shared.Config.MatchConfig)
 
 -- Toast notification (loaded lazily)
 local ToastNotification: any = nil
@@ -24,14 +25,19 @@ local player = Players.LocalPlayer
 local screenGui: ScreenGui? = nil
 local mainFrame: Frame? = nil
 local playerListFrame: Frame? = nil
+local modeButtonsFrame: Frame? = nil
 local isVisible = false
 local isReady = false
 local countdownActive = false
 local countdownTime = 0
+local currentMode: MatchConfig.GameMode = "Solo"
 
 -- Constants
 local MAX_PLAYERS = 100
 local MIN_PLAYERS_TO_START = 2
+
+-- Mode button references
+local modeButtons = {} :: { [string]: TextButton }
 
 --[[
 	Initialize the lobby screen
@@ -228,6 +234,127 @@ function LobbyScreen.CreateUI()
 	countdownSubLabel.Text = "Match starting..."
 	countdownSubLabel.Parent = countdownFrame
 
+	-- Mode selection frame (left side)
+	modeButtonsFrame = Instance.new("Frame")
+	modeButtonsFrame.Name = "ModeSelection"
+	modeButtonsFrame.Size = UDim2.fromOffset(200, 280)
+	modeButtonsFrame.Position = UDim2.fromOffset(50, 220)
+	modeButtonsFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+	modeButtonsFrame.BorderSizePixel = 0
+	modeButtonsFrame.Parent = mainFrame
+
+	local modeCorner = Instance.new("UICorner")
+	modeCorner.CornerRadius = UDim.new(0, 8)
+	modeCorner.Parent = modeButtonsFrame
+
+	local modeTitle = Instance.new("TextLabel")
+	modeTitle.Name = "Title"
+	modeTitle.Size = UDim2.new(1, 0, 0, 40)
+	modeTitle.BackgroundTransparency = 1
+	modeTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+	modeTitle.TextSize = 18
+	modeTitle.Font = Enum.Font.GothamBold
+	modeTitle.Text = "SELECT MODE"
+	modeTitle.Parent = modeButtonsFrame
+
+	local modeLayout = Instance.new("UIListLayout")
+	modeLayout.Padding = UDim.new(0, 8)
+	modeLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	modeLayout.Parent = modeButtonsFrame
+
+	local modePadding = Instance.new("UIPadding")
+	modePadding.PaddingTop = UDim.new(0, 45)
+	modePadding.PaddingLeft = UDim.new(0, 10)
+	modePadding.PaddingRight = UDim.new(0, 10)
+	modePadding.Parent = modeButtonsFrame
+
+	-- Create mode buttons
+	local modes = { "Test", "Solo", "Duos", "Trios", "Quads" }
+	local modeColors = {
+		Test = Color3.fromRGB(100, 100, 150),
+		Solo = Color3.fromRGB(150, 100, 50),
+		Duos = Color3.fromRGB(50, 150, 100),
+		Trios = Color3.fromRGB(100, 50, 150),
+		Quads = Color3.fromRGB(150, 50, 100),
+	}
+
+	for i, mode in ipairs(modes) do
+		local modeBtn = Instance.new("TextButton")
+		modeBtn.Name = mode
+		modeBtn.Size = UDim2.new(1, 0, 0, 36)
+		modeBtn.BackgroundColor3 = modeColors[mode] or Color3.fromRGB(80, 80, 80)
+		modeBtn.BorderSizePixel = 0
+		modeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+		modeBtn.TextSize = 14
+		modeBtn.Font = Enum.Font.GothamBold
+		modeBtn.Text = MatchConfig.GetModeDisplayName(mode)
+		modeBtn.LayoutOrder = i
+		modeBtn.Parent = modeButtonsFrame
+
+		local btnCorner = Instance.new("UICorner")
+		btnCorner.CornerRadius = UDim.new(0, 6)
+		btnCorner.Parent = modeBtn
+
+		modeButtons[mode] = modeBtn
+
+		modeBtn.MouseButton1Click:Connect(function()
+			LobbyScreen.SelectMode(mode)
+		end)
+
+		-- Hover effects
+		modeBtn.MouseEnter:Connect(function()
+			if currentMode ~= mode then
+				TweenService:Create(modeBtn, TweenInfo.new(0.15), {
+					BackgroundColor3 = modeColors[mode]:Lerp(Color3.new(1, 1, 1), 0.2)
+				}):Play()
+			end
+		end)
+
+		modeBtn.MouseLeave:Connect(function()
+			if currentMode ~= mode then
+				TweenService:Create(modeBtn, TweenInfo.new(0.15), {
+					BackgroundColor3 = modeColors[mode]
+				}):Play()
+			end
+		end)
+	end
+
+	-- Select default mode
+	LobbyScreen.UpdateModeSelection("Solo")
+
+	-- Start Match button (for test mode or when ready)
+	local startButton = Instance.new("TextButton")
+	startButton.Name = "StartButton"
+	startButton.Size = UDim2.fromOffset(200, 50)
+	startButton.Position = UDim2.fromOffset(50, 520)
+	startButton.BackgroundColor3 = Color3.fromRGB(200, 150, 50)
+	startButton.BorderSizePixel = 0
+	startButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+	startButton.TextSize = 20
+	startButton.Font = Enum.Font.GothamBold
+	startButton.Text = "START MATCH"
+	startButton.Parent = mainFrame
+
+	local startCorner = Instance.new("UICorner")
+	startCorner.CornerRadius = UDim.new(0, 8)
+	startCorner.Parent = startButton
+
+	startButton.MouseButton1Click:Connect(function()
+		LobbyScreen.StartMatch()
+	end)
+
+	startButton.MouseEnter:Connect(function()
+		TweenService:Create(startButton, TweenInfo.new(0.15), {
+			BackgroundColor3 = Color3.fromRGB(230, 180, 80)
+		}):Play()
+	end)
+
+	startButton.MouseLeave:Connect(function()
+		TweenService:Create(startButton, TweenInfo.new(0.15), {
+			BackgroundColor3 = Color3.fromRGB(200, 150, 50)
+		}):Play()
+	end)
+
 	-- Tips at bottom
 	local tipLabel = Instance.new("TextLabel")
 	tipLabel.Name = "Tip"
@@ -237,7 +364,7 @@ function LobbyScreen.CreateUI()
 	tipLabel.TextColor3 = Color3.fromRGB(100, 100, 100)
 	tipLabel.TextSize = 14
 	tipLabel.Font = Enum.Font.Gotham
-	tipLabel.Text = "TIP: Dinosaurs roam the island - they can be dangerous allies or deadly foes!"
+	tipLabel.Text = "TIP: Use TEST MODE for single-player testing. Select SOLO/DUOS/TRIOS/QUADS for multiplayer!"
 	tipLabel.Parent = mainFrame
 end
 
@@ -254,10 +381,22 @@ function LobbyScreen.SetupEventListeners()
 		end
 	end)
 
-	-- Legacy format lobby updates (for backwards compatibility)
+	-- Lobby updates with mode info
 	Events.OnClientEvent("GameState", "LobbyUpdate", function(data)
-		if data and data.players then
-			LobbyScreen.UpdatePlayerList(data.players)
+		if data then
+			if data.players then
+				LobbyScreen.UpdatePlayerList(data.players)
+			end
+			if data.mode then
+				LobbyScreen.UpdateModeSelection(data.mode)
+			end
+		end
+	end)
+
+	-- Mode changed event
+	Events.OnClientEvent("GameState", "ModeChanged", function(data)
+		if data and data.mode then
+			LobbyScreen.UpdateModeSelection(data.mode)
 		end
 	end)
 
@@ -308,6 +447,71 @@ function LobbyScreen.ToggleReady()
 
 	-- Notify server
 	Events.FireServer("GameState", "ToggleReady", { ready = isReady })
+end
+
+--[[
+	Select game mode
+]]
+function LobbyScreen.SelectMode(mode: MatchConfig.GameMode)
+	currentMode = mode
+	LobbyScreen.UpdateModeSelection(mode)
+
+	-- Notify server
+	Events.FireServer("GameState", "SelectMode", { mode = mode })
+
+	print(`[LobbyScreen] Selected mode: {mode}`)
+end
+
+--[[
+	Update mode selection UI
+]]
+function LobbyScreen.UpdateModeSelection(mode: MatchConfig.GameMode)
+	currentMode = mode
+
+	local modeColors = {
+		Test = Color3.fromRGB(100, 100, 150),
+		Solo = Color3.fromRGB(150, 100, 50),
+		Duos = Color3.fromRGB(50, 150, 100),
+		Trios = Color3.fromRGB(100, 50, 150),
+		Quads = Color3.fromRGB(150, 50, 100),
+	}
+
+	-- Update button appearances
+	for modeName, btn in pairs(modeButtons) do
+		if modeName == mode then
+			-- Selected state - brighter with border effect
+			btn.BackgroundColor3 = modeColors[modeName]:Lerp(Color3.new(1, 1, 1), 0.3)
+			btn.TextSize = 16
+		else
+			-- Unselected state
+			btn.BackgroundColor3 = modeColors[modeName]
+			btn.TextSize = 14
+		end
+	end
+
+	-- Update start button text based on mode
+	if mainFrame then
+		local startButton = mainFrame:FindFirstChild("StartButton") :: TextButton?
+		if startButton then
+			if mode == "Test" then
+				startButton.Text = "START TEST"
+				startButton.BackgroundColor3 = Color3.fromRGB(100, 150, 200)
+			else
+				startButton.Text = "START MATCH"
+				startButton.BackgroundColor3 = Color3.fromRGB(200, 150, 50)
+			end
+		end
+	end
+end
+
+--[[
+	Start match (request to server)
+]]
+function LobbyScreen.StartMatch()
+	print(`[LobbyScreen] Requesting match start in {currentMode} mode`)
+
+	-- Fire start match event
+	Events.FireServer("GameState", "StartMatch", {})
 end
 
 --[[

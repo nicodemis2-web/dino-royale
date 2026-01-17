@@ -12,9 +12,11 @@ local RunService = game:GetService("RunService")
 local Constants = require(game.ReplicatedStorage.Shared.Constants)
 local Events = require(game.ReplicatedStorage.Shared.Events)
 local GameConfig = require(game.ReplicatedStorage.Shared.GameConfig)
+local MatchConfig = require(game.ReplicatedStorage.Shared.Config.MatchConfig)
 
 -- Type imports
 type MatchState = "Lobby" | "Loading" | "Deploying" | "Playing" | "Ending" | "Resetting"
+type GameMode = MatchConfig.GameMode
 
 local GameManager = {}
 
@@ -43,6 +45,16 @@ local totalPlayersInMatch = 0
 
 -- Ready state tracking
 local readyPlayers = {} :: { [number]: boolean }
+
+-- Game mode and team tracking
+local currentGameMode: GameMode = "Solo"
+local teams = {} :: { [number]: { players: { Player }, teamId: number } }
+local playerTeams = {} :: { [number]: number } -- playerId -> teamId
+local nextTeamId = 1
+
+-- Lobby state
+local lobbyCountdown = 0
+local isCountdownActive = false
 
 -- Win condition mutex to prevent race conditions
 local isCheckingWinCondition = false
@@ -143,6 +155,171 @@ function GameManager.BroadcastPlayerCount()
 	Events.FireAllClients("GameState", "PlayerCountUpdate", {
 		alivePlayers = aliveCount,
 		totalPlayers = totalPlayersInMatch,
+	})
+end
+
+--------------------------------------------------------------------------------
+-- GAME MODE & TEAM FUNCTIONS
+--------------------------------------------------------------------------------
+
+--[[
+	Set the game mode
+]]
+function GameManager.SetGameMode(mode: GameMode)
+	if currentState ~= "Lobby" then
+		warn("[GameManager] Cannot change mode outside of lobby")
+		return false
+	end
+
+	currentGameMode = mode
+	MatchConfig.SetMode(mode)
+
+	-- Broadcast mode change to all clients
+	Events.FireAllClients("GameState", "ModeChanged", {
+		mode = mode,
+		settings = MatchConfig.GetCurrentSettings(),
+	})
+
+	print(`[GameManager] Game mode set to: {mode}`)
+	return true
+end
+
+--[[
+	Get current game mode
+]]
+function GameManager.GetGameMode(): GameMode
+	return currentGameMode
+end
+
+--[[
+	Assign player to a team
+]]
+function GameManager.AssignPlayerToTeam(player: Player, teamId: number?)
+	local settings = MatchConfig.GetCurrentSettings()
+
+	-- Solo mode - no teams
+	if settings.teamSize == 1 then
+		playerTeams[player.UserId] = player.UserId -- Self-team
+		return player.UserId
+	end
+
+	-- If specific team requested
+	if teamId then
+		local team = teams[teamId]
+		if team and #team.players < settings.teamSize then
+			table.insert(team.players, player)
+			playerTeams[player.UserId] = teamId
+			Events.FireClient("GameState", "TeamAssigned", player, {
+				teamId = teamId,
+				teammates = team.players,
+			})
+			return teamId
+		end
+	end
+
+	-- Find existing team with space
+	if settings.allowFillTeams then
+		for tid, team in pairs(teams) do
+			if #team.players < settings.teamSize then
+				table.insert(team.players, player)
+				playerTeams[player.UserId] = tid
+				Events.FireClient("GameState", "TeamAssigned", player, {
+					teamId = tid,
+					teammates = team.players,
+				})
+				return tid
+			end
+		end
+	end
+
+	-- Create new team
+	local newTeamId = nextTeamId
+	nextTeamId = nextTeamId + 1
+	teams[newTeamId] = {
+		teamId = newTeamId,
+		players = { player },
+	}
+	playerTeams[player.UserId] = newTeamId
+	Events.FireClient("GameState", "TeamAssigned", player, {
+		teamId = newTeamId,
+		teammates = { player },
+	})
+	return newTeamId
+end
+
+--[[
+	Get player's team
+]]
+function GameManager.GetPlayerTeam(player: Player): number?
+	return playerTeams[player.UserId]
+end
+
+--[[
+	Check if two players are on the same team
+]]
+function GameManager.AreTeammates(player1: Player, player2: Player): boolean
+	local team1 = playerTeams[player1.UserId]
+	local team2 = playerTeams[player2.UserId]
+	return team1 ~= nil and team1 == team2
+end
+
+--[[
+	Start the match (manual start from lobby)
+]]
+function GameManager.StartMatch()
+	if currentState ~= "Lobby" then
+		warn("[GameManager] Cannot start match - not in lobby")
+		return false
+	end
+
+	local settings = MatchConfig.GetCurrentSettings()
+	local playerCount = #Players:GetPlayers()
+
+	-- Test mode can start with 1 player
+	if settings.mode == "Test" then
+		print("[GameManager] Starting TEST MODE match")
+		GameManager.TransitionTo("Loading", { testMode = true })
+		return true
+	end
+
+	-- Check minimum players
+	if playerCount < settings.minPlayersToStart then
+		warn(`[GameManager] Not enough players: {playerCount}/{settings.minPlayersToStart}`)
+		return false
+	end
+
+	print(`[GameManager] Starting match with {playerCount} players in {settings.mode} mode`)
+	GameManager.TransitionTo("Loading")
+	return true
+end
+
+--[[
+	Broadcast lobby state to all clients
+]]
+function GameManager.BroadcastLobbyState()
+	local playerList = {}
+	local readyCount = 0
+
+	for _, player in ipairs(Players:GetPlayers()) do
+		local isReady = readyPlayers[player.UserId] or false
+		if isReady then
+			readyCount = readyCount + 1
+		end
+		table.insert(playerList, {
+			userId = player.UserId,
+			name = player.Name,
+			ready = isReady,
+			teamId = playerTeams[player.UserId],
+		})
+	end
+
+	Events.FireAllClients("GameState", "LobbyUpdate", {
+		players = playerList,
+		readyCount = readyCount,
+		totalPlayers = #playerList,
+		mode = currentGameMode,
+		countdown = isCountdownActive and lobbyCountdown or nil,
+		settings = MatchConfig.GetCurrentSettings(),
 	})
 end
 
@@ -320,45 +497,99 @@ stateHandlers.Lobby = {
 		-- Reset player tracking
 		alivePlayers = {}
 		totalPlayersInMatch = 0
-		readyPlayers = {} -- Reset ready states
+		readyPlayers = {}
+		teams = {}
+		playerTeams = {}
+		nextTeamId = 1
+		isCountdownActive = false
+		lobbyCountdown = 0
 
 		print("[GameManager] Entered Lobby state")
 		print("[GameManager] Waiting for players to Ready Up...")
 
+		-- Assign existing players to teams
+		for _, player in ipairs(Players:GetPlayers()) do
+			GameManager.AssignPlayerToTeam(player)
+		end
+
 		-- Notify all clients that lobby is ready
+		local settings = MatchConfig.GetCurrentSettings()
 		Events.FireAllClients("GameState", "LobbyReady", {
-			message = "Click READY to start the match!",
+			message = "Select a mode and click READY to start!",
+			mode = currentGameMode,
+			settings = settings,
 		})
+
+		-- Broadcast initial lobby state
+		GameManager.BroadcastLobbyState()
 	end,
 
-	OnUpdate = function(_dt)
-		-- In debug mode, OnEnter handles the transition
-		if GameConfig.Debug.Enabled and GameConfig.Debug.SoloTestMode then
+	OnUpdate = function(dt)
+		local settings = MatchConfig.GetCurrentSettings()
+		local playerCount = #Players:GetPlayers()
+
+		-- Test mode: can start immediately with 1 player
+		if settings.mode == "Test" then
+			-- Don't auto-start, wait for manual start
 			return
 		end
 
-		local playerCount = #Players:GetPlayers()
-		local minPlayers = Constants.MATCH.MIN_PLAYERS
-		local lobbyWaitTime = Constants.MATCH.LOBBY_WAIT_TIME
+		-- Count ready players
+		local readyCount = 0
+		for _, isReady in pairs(readyPlayers) do
+			if isReady then
+				readyCount = readyCount + 1
+			end
+		end
 
-		-- Normal lobby countdown logic
-		if playerCount >= minPlayers then
-			if not stateData.countdownStarted then
+		-- Check if we should start countdown
+		local shouldCountdown = playerCount >= settings.minPlayersToStart and readyCount >= playerCount
+
+		if shouldCountdown then
+			if not isCountdownActive then
+				-- Start countdown
+				isCountdownActive = true
+				lobbyCountdown = settings.lobbyCountdown
 				stateData.countdownStarted = true
 				stateData.countdownStart = tick()
-				print(`[GameManager] {playerCount} players, starting {lobbyWaitTime}s countdown`)
+				print(`[GameManager] All {playerCount} players ready, starting {lobbyCountdown}s countdown`)
+				Events.FireAllClients("GameState", "CountdownStarted", {
+					duration = lobbyCountdown,
+				})
 			end
 
+			-- Update countdown
 			local elapsed = tick() - stateData.countdownStart
-			local remaining = lobbyWaitTime - elapsed
+			local remaining = math.ceil(lobbyCountdown - elapsed)
+
+			if remaining ~= stateData.lastCountdown then
+				stateData.lastCountdown = remaining
+				Events.FireAllClients("GameState", "CountdownUpdate", {
+					remaining = remaining,
+				})
+			end
 
 			if remaining <= 0 then
 				GameManager.TransitionTo("Loading")
 			end
+		elseif isCountdownActive then
+			-- Cancel countdown if conditions no longer met
+			isCountdownActive = false
+			stateData.countdownStarted = false
+			print("[GameManager] Countdown cancelled - players not ready")
+			Events.FireAllClients("GameState", "CountdownCancelled", {})
+		end
+
+		-- Periodic lobby state broadcast (every 2 seconds)
+		stateData.broadcastTimer = (stateData.broadcastTimer or 0) + dt
+		if stateData.broadcastTimer >= 2 then
+			stateData.broadcastTimer = 0
+			GameManager.BroadcastLobbyState()
 		end
 	end,
 
 	OnExit = function()
+		isCountdownActive = false
 		print("[GameManager] Exiting Lobby state")
 	end,
 }
@@ -705,6 +936,87 @@ function GameManager.Initialize()
 		GameManager.SetPlayerReady(player, isReady)
 	end)
 
+	-- Handle mode selection from clients
+	Events.OnServerEvent("GameState", "SelectMode", function(player, data)
+		if currentState ~= "Lobby" then
+			return
+		end
+
+		-- For now, any player can change mode (could restrict to party leader)
+		local mode = data and data.mode
+		if mode and MatchConfig.Modes[mode] then
+			GameManager.SetGameMode(mode)
+			GameManager.BroadcastLobbyState()
+		end
+	end)
+
+	-- Handle manual match start (for test mode or when all ready)
+	Events.OnServerEvent("GameState", "StartMatch", function(player, _data)
+		if currentState ~= "Lobby" then
+			return
+		end
+
+		local settings = MatchConfig.GetCurrentSettings()
+
+		-- Test mode: anyone can start
+		if settings.mode == "Test" then
+			print(`[GameManager] {player.Name} started TEST MODE`)
+			GameManager.StartMatch()
+			return
+		end
+
+		-- Normal modes: check if player is ready and enough players
+		if readyPlayers[player.UserId] then
+			local readyCount = 0
+			for _, isReady in pairs(readyPlayers) do
+				if isReady then
+					readyCount = readyCount + 1
+				end
+			end
+
+			if readyCount >= settings.minPlayersToStart then
+				print(`[GameManager] {player.Name} initiated match start`)
+				GameManager.StartMatch()
+			end
+		end
+	end)
+
+	-- Handle return to lobby request
+	Events.OnServerEvent("GameState", "ReturnToLobby", function(player, _data)
+		-- Only allow during certain states
+		if currentState == "Ending" or currentState == "Resetting" then
+			return
+		end
+
+		-- In test mode, allow instant return to lobby
+		if MatchConfig.IsTestMode() then
+			print(`[GameManager] {player.Name} returned to lobby (test mode)`)
+			GameManager.Reset()
+		end
+	end)
+
+	-- Handle spawn request
+	Events.OnServerEvent("GameState", "RequestSpawn", function(player, _data)
+		if currentState ~= "Playing" then
+			return
+		end
+
+		local settings = MatchConfig.GetCurrentSettings()
+
+		-- Check if respawn is allowed
+		if not settings.respawnEnabled then
+			return
+		end
+
+		-- Respawn the player (test mode feature)
+		local character = player.Character
+		if not character then
+			player:LoadCharacter()
+			GameManager.RegisterAlivePlayer(player)
+			print(`[GameManager] Respawned {player.Name} (test mode)`)
+		end
+	end)
+
 	-- Note: PlayerJumped event is handled in Main.server.lua to avoid duplicate handlers
 
 	-- Handle existing players
@@ -736,7 +1048,16 @@ function GameManager.Reset()
 	-- Clear player tracking
 	alivePlayers = {}
 	totalPlayersInMatch = 0
-	readyPlayers = {} -- Clear ready states
+	readyPlayers = {}
+
+	-- Clear team tracking
+	teams = {}
+	playerTeams = {}
+	nextTeamId = 1
+
+	-- Reset countdown
+	isCountdownActive = false
+	lobbyCountdown = 0
 
 	-- Trigger Lobby OnEnter
 	local lobbyHandler = stateHandlers.Lobby
