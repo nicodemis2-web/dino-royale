@@ -35,10 +35,14 @@ local connections = {} :: { RBXScriptConnection }
 local stormManager: any = nil
 local deploymentManager: any = nil
 local eliminationManager: any = nil
+local mapManager: any = nil
 
 -- Player tracking
 local alivePlayers = {} :: { [number]: Player }
 local totalPlayersInMatch = 0
+
+-- Ready state tracking
+local readyPlayers = {} :: { [number]: boolean }
 
 -- Win condition mutex to prevent race conditions
 local isCheckingWinCondition = false
@@ -140,6 +144,70 @@ function GameManager.BroadcastPlayerCount()
 		alivePlayers = aliveCount,
 		totalPlayers = totalPlayersInMatch,
 	})
+end
+
+--[[
+	Set player ready state
+]]
+function GameManager.SetPlayerReady(player: Player, ready: boolean)
+	readyPlayers[player.UserId] = ready
+
+	-- Broadcast ready state to all clients
+	Events.FireAllClients("GameState", "PlayerReadyUpdate", {
+		playerId = player.UserId,
+		playerName = player.Name,
+		ready = ready,
+	})
+
+	print(`[GameManager] {player.Name} is {ready and "READY" or "NOT READY"}`)
+
+	-- Check if all players are ready (in Lobby state)
+	if currentState == "Lobby" and ready then
+		GameManager.CheckAllPlayersReady()
+	end
+end
+
+--[[
+	Check if a player is ready
+]]
+function GameManager.IsPlayerReady(player: Player): boolean
+	return readyPlayers[player.UserId] == true
+end
+
+--[[
+	Get count of ready players
+]]
+function GameManager.GetReadyPlayerCount(): number
+	local count = 0
+	for _, isReady in pairs(readyPlayers) do
+		if isReady then
+			count = count + 1
+		end
+	end
+	return count
+end
+
+--[[
+	Check if all players are ready and start game if so
+]]
+function GameManager.CheckAllPlayersReady()
+	local playerCount = #Players:GetPlayers()
+	local readyCount = GameManager.GetReadyPlayerCount()
+
+	print(`[GameManager] Ready check: {readyCount}/{playerCount} players ready`)
+
+	if playerCount > 0 and readyCount >= playerCount then
+		print("[GameManager] All players ready! Starting match...")
+
+		-- Register all players as alive
+		for _, player in ipairs(Players:GetPlayers()) do
+			GameManager.RegisterAlivePlayer(player)
+		end
+		totalPlayersInMatch = playerCount
+
+		-- Transition to Playing
+		GameManager.TransitionTo("Playing", { allReady = true })
+	end
 end
 
 --[[
@@ -245,30 +313,22 @@ end
 
 --[[
 	LOBBY STATE
-	Waiting for players - in debug mode, skip straight to Playing
+	Waiting for players to Ready Up before starting
 ]]
 stateHandlers.Lobby = {
 	OnEnter = function(_data)
 		-- Reset player tracking
 		alivePlayers = {}
 		totalPlayersInMatch = 0
+		readyPlayers = {} -- Reset ready states
 
 		print("[GameManager] Entered Lobby state")
+		print("[GameManager] Waiting for players to Ready Up...")
 
-		-- Debug: Skip straight to Playing state after short delay
-		if GameConfig.Debug.Enabled and GameConfig.Debug.SoloTestMode then
-			print("[GameManager] Debug mode - skipping to Playing state in 2 seconds...")
-			task.delay(2, function()
-				if currentState == "Lobby" then
-					-- Register players and go to Playing
-					for _, player in ipairs(Players:GetPlayers()) do
-						GameManager.RegisterAlivePlayer(player)
-					end
-					totalPlayersInMatch = #Players:GetPlayers()
-					GameManager.TransitionTo("Playing", { quickDeploy = true })
-				end
-			end)
-		end
+		-- Notify all clients that lobby is ready
+		Events.FireAllClients("GameState", "LobbyReady", {
+			message = "Click READY to start the match!",
+		})
 	end,
 
 	OnUpdate = function(_dt)
@@ -407,6 +467,12 @@ stateHandlers.Playing = {
 					end
 				end)
 			end
+		end
+
+		-- Initialize map content (POIs, loot, etc.)
+		if mapManager then
+			mapManager.StartMatch()
+			mapManager.OnMatchPhaseChanged("Playing")
 		end
 
 		-- Start storm if manager available
@@ -555,6 +621,9 @@ end
 	Handle player leaving
 ]]
 local function onPlayerRemoving(player: Player)
+	-- Remove from ready players
+	readyPlayers[player.UserId] = nil
+
 	-- Remove from alive players if in match
 	if alivePlayers[player.UserId] then
 		GameManager.RemoveAlivePlayer(player)
@@ -564,10 +633,16 @@ end
 
 --[[
 	Handle player jump request during deployment
+	Note: Deploying state is currently disabled, but this is kept for future use
 ]]
 function GameManager.OnPlayerJump(player: Player)
 	if currentState ~= "Deploying" then
 		return
+	end
+
+	-- Initialize jumpedPlayers if not already done
+	if not stateData.jumpedPlayers then
+		stateData.jumpedPlayers = {}
 	end
 
 	if stateData.jumpedPlayers[player.UserId] then
@@ -599,6 +674,10 @@ function GameManager.SetEliminationManager(manager: any)
 	eliminationManager = manager
 end
 
+function GameManager.SetMapManager(manager: any)
+	mapManager = manager
+end
+
 --[[
 	Initialize the game manager
 ]]
@@ -615,6 +694,16 @@ function GameManager.Initialize()
 	table.insert(connections, RunService.Heartbeat:Connect(function(dt)
 		GameManager.Update(dt)
 	end))
+
+	-- Handle Ready Up events from clients
+	Events.OnServerEvent("GameState", "ToggleReady", function(player, data)
+		if currentState ~= "Lobby" then
+			return -- Can only toggle ready in lobby
+		end
+
+		local isReady = data and data.ready or false
+		GameManager.SetPlayerReady(player, isReady)
+	end)
 
 	-- Note: PlayerJumped event is handled in Main.server.lua to avoid duplicate handlers
 
@@ -647,6 +736,7 @@ function GameManager.Reset()
 	-- Clear player tracking
 	alivePlayers = {}
 	totalPlayersInMatch = 0
+	readyPlayers = {} -- Clear ready states
 
 	-- Trigger Lobby OnEnter
 	local lobbyHandler = stateHandlers.Lobby

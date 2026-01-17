@@ -53,6 +53,22 @@ local isInitialized = false
 local currentGameState = "Loading"
 
 --[[
+	Safely require a module with error handling
+]]
+local function safeRequire(module, name: string): any
+	local success, result = pcall(function()
+		return require(module)
+	end)
+	if success then
+		print(`[Client] Loaded: {name}`)
+		return result
+	else
+		warn(`[Client] FAILED to load {name}: {result}`)
+		return nil
+	end
+end
+
+--[[
 	Load all client modules
 ]]
 local function loadModules()
@@ -63,43 +79,65 @@ local function loadModules()
 	local Audio = script.Parent.Audio
 
 	-- Controllers
-	WeaponController = require(Controllers.WeaponController)
-	InventoryController = require(Controllers.InventoryController)
-	VehicleController = require(Controllers.VehicleController)
-	DeploymentController = require(Controllers.DeploymentController)
-	MovementController = require(Controllers.MovementController)
-	SpectatorController = require(Controllers.SpectatorController)
-	StormController = require(Controllers.StormController)
+	WeaponController = safeRequire(Controllers.WeaponController, "WeaponController")
+	InventoryController = safeRequire(Controllers.InventoryController, "InventoryController")
+	VehicleController = safeRequire(Controllers.VehicleController, "VehicleController")
+	DeploymentController = safeRequire(Controllers.DeploymentController, "DeploymentController")
+	MovementController = safeRequire(Controllers.MovementController, "MovementController")
+	SpectatorController = safeRequire(Controllers.SpectatorController, "SpectatorController")
+	StormController = safeRequire(Controllers.StormController, "StormController")
 
 	-- UI
-	HUDController = require(UI.HUDController)
-	MinimapController = require(UI.Map.MinimapController)
-	RevivalUI = require(UI.Revival.RevivalUI)
-	LootUI = require(UI.Inventory.LootUI)
-	VictoryScreen = require(UI.Components.VictoryScreen)
-	LobbyScreen = require(UI.Components.LobbyScreen)
-	Compass = require(UI.Components.Compass)
-	BattlePassUI = require(UI.Components.BattlePassUI)
-	ShopUI = require(UI.Components.ShopUI)
-	TutorialUI = require(UI.Components.TutorialUI)
-	PartyUI = require(UI.Components.PartyUI)
-	RankedUI = require(UI.Components.RankedUI)
-	AccessibilityUI = require(UI.Components.AccessibilityUI)
-	DinosaurTargeting = require(UI.Components.DinosaurTargeting)
+	HUDController = safeRequire(UI.HUDController, "HUDController")
+	MinimapController = safeRequire(UI.Map.MinimapController, "MinimapController")
+	RevivalUI = safeRequire(UI.Revival.RevivalUI, "RevivalUI")
+	LootUI = safeRequire(UI.Inventory.LootUI, "LootUI")
+	VictoryScreen = safeRequire(UI.Components.VictoryScreen, "VictoryScreen")
+	LobbyScreen = safeRequire(UI.Components.LobbyScreen, "LobbyScreen")
+	Compass = safeRequire(UI.Components.Compass, "Compass")
+	BattlePassUI = safeRequire(UI.Components.BattlePassUI, "BattlePassUI")
+	ShopUI = safeRequire(UI.Components.ShopUI, "ShopUI")
+	TutorialUI = safeRequire(UI.Components.TutorialUI, "TutorialUI")
+	PartyUI = safeRequire(UI.Components.PartyUI, "PartyUI")
+	RankedUI = safeRequire(UI.Components.RankedUI, "RankedUI")
+	AccessibilityUI = safeRequire(UI.Components.AccessibilityUI, "AccessibilityUI")
+	DinosaurTargeting = safeRequire(UI.Components.DinosaurTargeting, "DinosaurTargeting")
 
 	-- Audio
-	AudioController = require(Audio.AudioController)
+	AudioController = safeRequire(Audio.AudioController, "AudioController")
 
 	-- Effects
 	local Effects = script.Parent.Effects
-	CameraShake = require(Effects.CameraShake)
-	ScreenEffects = require(Effects.ScreenEffects)
+	CameraShake = safeRequire(Effects.CameraShake, "CameraShake")
+	ScreenEffects = safeRequire(Effects.ScreenEffects, "ScreenEffects")
 
 	-- Additional UI components
 	local Components = UI.Components
-	FeedbackNotifications = require(Components.FeedbackNotifications)
+	FeedbackNotifications = safeRequire(Components.FeedbackNotifications, "FeedbackNotifications")
 
 	print("[Client] Modules loaded")
+end
+
+--[[
+	Safely initialize a module with error handling
+]]
+local function safeInit(module: any, name: string)
+	if not module then
+		warn(`[Client] Cannot initialize {name} - module not loaded`)
+		return
+	end
+	if not module.Initialize then
+		warn(`[Client] {name} has no Initialize function`)
+		return
+	end
+	local success, err = pcall(function()
+		module.Initialize()
+	end)
+	if success then
+		print(`[Client] Initialized: {name}`)
+	else
+		warn(`[Client] FAILED to initialize {name}: {err}`)
+	end
 end
 
 --[[
@@ -114,34 +152,34 @@ local function initializeSystems()
 		StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
 	end)
 
-	-- Initialize in order
-	AudioController.Initialize()
-	HUDController.Initialize()
-	MinimapController.Initialize()
-	RevivalUI.Initialize()
-	LootUI.Initialize()
-	VictoryScreen.Initialize()
-	LobbyScreen.Initialize()
-	Compass.Initialize()
-	WeaponController.Initialize()
-	InventoryController.Initialize()
-	VehicleController.Initialize()
-	DeploymentController.Initialize()
-	MovementController.Initialize()
-	SpectatorController.Initialize()
-	StormController.Initialize()
-	BattlePassUI.Initialize()
-	ShopUI.Initialize()
-	TutorialUI.Initialize()
-	PartyUI.Initialize()
-	RankedUI.Initialize()
-	AccessibilityUI.Initialize()
-	DinosaurTargeting.Initialize()
+	-- Initialize in order with error handling
+	safeInit(AudioController, "AudioController")
+	safeInit(HUDController, "HUDController")
+	safeInit(MinimapController, "MinimapController")
+	safeInit(RevivalUI, "RevivalUI")
+	safeInit(LootUI, "LootUI")
+	safeInit(VictoryScreen, "VictoryScreen")
+	safeInit(LobbyScreen, "LobbyScreen")
+	safeInit(Compass, "Compass")
+	safeInit(WeaponController, "WeaponController")
+	safeInit(InventoryController, "InventoryController")
+	safeInit(VehicleController, "VehicleController")
+	safeInit(DeploymentController, "DeploymentController")
+	safeInit(MovementController, "MovementController")
+	safeInit(SpectatorController, "SpectatorController")
+	safeInit(StormController, "StormController")
+	safeInit(BattlePassUI, "BattlePassUI")
+	safeInit(ShopUI, "ShopUI")
+	safeInit(TutorialUI, "TutorialUI")
+	safeInit(PartyUI, "PartyUI")
+	safeInit(RankedUI, "RankedUI")
+	safeInit(AccessibilityUI, "AccessibilityUI")
+	safeInit(DinosaurTargeting, "DinosaurTargeting")
 
 	-- Initialize effects systems
-	CameraShake.Initialize()
-	ScreenEffects.Initialize()
-	FeedbackNotifications.Initialize()
+	safeInit(CameraShake, "CameraShake")
+	safeInit(ScreenEffects, "ScreenEffects")
+	safeInit(FeedbackNotifications, "FeedbackNotifications")
 
 	print("[Client] Systems initialized")
 end
@@ -152,33 +190,33 @@ end
 local function handleStateChange(newState: string)
 	if newState == "Lobby" then
 		-- Show lobby UI
-		HUDController.OnGameStateChanged("Lobby")
+		if HUDController then HUDController.OnGameStateChanged("Lobby") end
 
 	elseif newState == "Loading" then
 		-- Loading screen
-		HUDController.OnGameStateChanged("Loading")
+		if HUDController then HUDController.OnGameStateChanged("Loading") end
 
 	elseif newState == "Deploying" then
 		-- Start deployment
-		HUDController.OnGameStateChanged("Deploying")
-		DeploymentController.Enable()
+		if HUDController then HUDController.OnGameStateChanged("Deploying") end
+		if DeploymentController then DeploymentController.Enable() end
 
 	elseif newState == "Playing" then
 		-- Full gameplay
-		HUDController.OnGameStateChanged("Playing")
-		DeploymentController.Disable()
-		MovementController.Enable()
-		WeaponController.Enable()
+		if HUDController then HUDController.OnGameStateChanged("Playing") end
+		if DeploymentController then DeploymentController.Disable() end
+		if MovementController then MovementController.Enable() end
+		if WeaponController then WeaponController.SetEnabled(true) end
 
 	elseif newState == "Ending" then
 		-- Match results
-		HUDController.OnGameStateChanged("Ending")
-		MovementController.Disable()
-		WeaponController.Disable()
+		if HUDController then HUDController.OnGameStateChanged("Ending") end
+		if MovementController then MovementController.Disable() end
+		if WeaponController then WeaponController.SetEnabled(false) end
 
 	elseif newState == "Spectating" then
 		-- Spectator mode
-		WeaponController.Disable()
+		if WeaponController then WeaponController.SetEnabled(false) end
 		-- Enable spectator camera
 	end
 end
@@ -186,12 +224,12 @@ end
 --[[
 	Handle local player death
 ]]
-local function handleDeath(data: any)
-	WeaponController.Disable()
-	VehicleController.Cleanup()
+local function handleDeath(_data: any)
+	if WeaponController then WeaponController.Disable() end
+	if VehicleController then VehicleController.Cleanup() end
 
 	-- Play death sound
-	AudioController.PlayUISound("Death")
+	if AudioController then AudioController.PlayUISound("Death") end
 
 	-- Show elimination UI
 end
@@ -200,10 +238,10 @@ end
 	Handle local player respawn
 ]]
 local function handleRespawn()
-	WeaponController.Enable()
+	if WeaponController then WeaponController.Enable() end
 
 	-- Play respawn sound
-	AudioController.PlayUISound("Heal")
+	if AudioController then AudioController.PlayUISound("Heal") end
 end
 
 -- Countdown UI reference
@@ -470,19 +508,22 @@ local function setupEventHandlers()
 	-- ===== EFFECTS INTEGRATION =====
 
 	-- Player took damage - trigger screen effects and camera shake
-	Events.OnClientEvent("Combat", "PlayerDamaged", function(data)
-		local damage = data.damage or 10
-		local attacker = data.attacker
+	Events.OnClientEvent("Combat", "DamageTaken", function(data)
+		local damage = data.amount or 10
 
 		-- Screen damage flash
-		ScreenEffects.FlashDamage(math.clamp(damage / 50, 0.2, 1))
+		if ScreenEffects then
+			ScreenEffects.FlashDamage(math.clamp(damage / 50, 0.2, 1))
+		end
 
 		-- Camera shake based on damage
-		CameraShake.ShakeForDamage(damage)
+		if CameraShake then
+			CameraShake.ShakeForDamage(damage)
+		end
 
 		-- Update health for low health effects
-		if data.currentHealth and data.maxHealth then
-			ScreenEffects.UpdateHealth(data.currentHealth, data.maxHealth)
+		if ScreenEffects and data.health and data.maxHealth then
+			ScreenEffects.UpdateHealth(data.health, data.maxHealth)
 		end
 	end)
 
@@ -493,17 +534,19 @@ local function setupEventHandlers()
 		local weaponName = data.weaponName
 		local xpGained = data.xpGained or 100
 
-		FeedbackNotifications.ShowKill(victimName, isHeadshot, weaponName)
-		FeedbackNotifications.ShowXPGain(xpGained, isHeadshot and "Headshot Kill" or "Elimination")
+		if FeedbackNotifications then
+			FeedbackNotifications.ShowKill(victimName, isHeadshot, weaponName)
+			FeedbackNotifications.ShowXPGain(xpGained, isHeadshot and "Headshot Kill" or "Elimination")
+		end
 
 		-- Camera bump for kill confirmation
-		CameraShake.ShakePreset("Bump")
+		if CameraShake then CameraShake.ShakePreset("Bump") end
 	end)
 
 	-- Kill streak notification
 	Events.OnClientEvent("Combat", "KillStreak", function(data)
 		local streakCount = data.count or 2
-		FeedbackNotifications.ShowKillStreak(streakCount)
+		if FeedbackNotifications then FeedbackNotifications.ShowKillStreak(streakCount) end
 	end)
 
 	-- Dinosaur killed
@@ -512,17 +555,21 @@ local function setupEventHandlers()
 		local tier = data.tier or "Common"
 		local xpGained = data.xpGained or 50
 
-		FeedbackNotifications.ShowDinoKill(dinoName, tier, xpGained)
-		FeedbackNotifications.ShowXPGain(xpGained, "Dinosaur Kill")
+		if FeedbackNotifications then
+			FeedbackNotifications.ShowDinoKill(dinoName, tier, xpGained)
+			FeedbackNotifications.ShowXPGain(xpGained, "Dinosaur Kill")
+		end
 	end)
 
 	-- Player healed
 	Events.OnClientEvent("Inventory", "ItemUsed", function(data)
 		local itemType = data.itemType
-		if itemType == "Bandage" or itemType == "MedKit" then
-			ScreenEffects.FlashHeal()
-		elseif itemType == "MiniShield" or itemType == "BigShield" then
-			ScreenEffects.FlashShield()
+		if ScreenEffects then
+			if itemType == "Bandage" or itemType == "MedKit" then
+				ScreenEffects.FlashHeal()
+			elseif itemType == "MiniShield" or itemType == "BigShield" then
+				ScreenEffects.FlashShield()
+			end
 		end
 	end)
 
@@ -532,14 +579,14 @@ local function setupEventHandlers()
 		local rarity = data.rarity
 		local quantity = data.quantity
 
-		FeedbackNotifications.ShowLootPickup(itemName, rarity, quantity)
+		if FeedbackNotifications then FeedbackNotifications.ShowLootPickup(itemName, rarity, quantity) end
 	end)
 
 	-- Explosion nearby
 	Events.OnClientEvent("Combat", "Explosion", function(data)
 		local position = data.position
 		local character = localPlayer.Character
-		if character and position then
+		if character and position and CameraShake then
 			local rootPart = character:FindFirstChild("HumanoidRootPart")
 			if rootPart then
 				local distance = (rootPart.Position - position).Magnitude
@@ -552,7 +599,7 @@ local function setupEventHandlers()
 	Events.OnClientEvent("Dinosaur", "Roar", function(data)
 		local position = data.position
 		local character = localPlayer.Character
-		if character and position then
+		if character and position and CameraShake then
 			local rootPart = character:FindFirstChild("HumanoidRootPart")
 			if rootPart then
 				local distance = (rootPart.Position - position).Magnitude
@@ -565,26 +612,26 @@ local function setupEventHandlers()
 	Events.OnClientEvent("Progression", "AchievementUnlocked", function(data)
 		local achievementName = data.name or "Achievement"
 		local description = data.description
-		FeedbackNotifications.ShowAchievement(achievementName, description)
+		if FeedbackNotifications then FeedbackNotifications.ShowAchievement(achievementName, description) end
 	end)
 
 	-- Level up
 	Events.OnClientEvent("Progression", "LevelUp", function(data)
 		local newLevel = data.level or 2
-		FeedbackNotifications.ShowLevelUp(newLevel)
+		if FeedbackNotifications then FeedbackNotifications.ShowLevelUp(newLevel) end
 	end)
 
 	-- XP gained
 	Events.OnClientEvent("Progression", "XPGained", function(data)
 		local amount = data.amount or 10
 		local reason = data.reason
-		FeedbackNotifications.ShowXPGain(amount, reason)
+		if FeedbackNotifications then FeedbackNotifications.ShowXPGain(amount, reason) end
 	end)
 
 	-- Biome changed - update color grading
 	Events.OnClientEvent("Map", "BiomeChanged", function(data)
 		local biomeName = data.biome or "Plains"
-		ScreenEffects.SetBiomeColorGrade(biomeName)
+		if ScreenEffects then ScreenEffects.SetBiomeColorGrade(biomeName) end
 	end)
 
 	-- Note: MatchStateChanged above handles all state transitions

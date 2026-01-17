@@ -602,7 +602,7 @@ function LootManager.SpawnLootFromCache(player: Player, cache: Model, tier: stri
 	end
 
 	-- Notify the player
-	Events.FireClient(player, "Loot", "CacheOpened", {
+	Events.FireClient("Loot", "CacheOpened", player, {
 		cacheType = cacheType,
 		tier = tier,
 		itemCount = #spawnedItems,
