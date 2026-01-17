@@ -312,6 +312,35 @@ function POIManager.Initialize()
 end
 
 --[[
+	Reset all loot at POIs (without resetting vehicles/dinos)
+	Used by MapManager for between-match resets
+]]
+function POIManager.ResetAllLoot()
+	print("[POIManager] Resetting all POI loot...")
+
+	-- Reset loot state for all POIs
+	for poiName, state in pairs(poiStates) do
+		state.isLooted = false
+		state.lootedChests = 0
+
+		-- Clear spawned loot for this POI
+		if spawnedLoot[poiName] then
+			for _, loot in ipairs(spawnedLoot[poiName]) do
+				loot.isOpened = false
+				loot.isPickedUp = false
+			end
+		end
+	end
+
+	-- Respawn loot at all POIs
+	for poiName, _ in pairs(POIData.POIs) do
+		POIManager.SpawnLootAtPOI(poiName)
+	end
+
+	print("[POIManager] All POI loot reset")
+end
+
+--[[
 	Reset for new match
 ]]
 function POIManager.Reset()

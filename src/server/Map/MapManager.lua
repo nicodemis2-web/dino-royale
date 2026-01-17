@@ -41,6 +41,10 @@ local BiomeManager = require(script.Parent.BiomeManager)
 local POIManager = require(script.Parent.POIManager)
 local EnvironmentalEventManager = require(script.Parent.EnvironmentalEventManager)
 local FloraGenerator = require(script.Parent.FloraGenerator)
+local LootManager = require(script.Parent.Parent.Loot.LootManager)
+
+-- Configuration module (all hardcoded values extracted here)
+local MapConfig = require(script.Parent.MapConfig)
 
 -- Shared data modules (read-only configuration)
 local BiomeData = require(ReplicatedStorage.Shared.BiomeData)
@@ -64,6 +68,12 @@ local isInitialized = false
 -- Values: "Lobby", "Deploying", "Playing", "Ending"
 local currentMatchPhase = "Lobby"
 
+-- Height cache to reduce raycast usage
+local heightCache: { [string]: number } = {}
+
+-- Generation results tracking
+local generationResults: { [string]: boolean } = {}
+
 --------------------------------------------------------------------------------
 -- CONSTANTS
 --------------------------------------------------------------------------------
@@ -83,6 +93,155 @@ local MAP_INFO = {
 	biomeCount = 6,
 	poiCount = 0, -- Set during init
 }
+
+--------------------------------------------------------------------------------
+-- ERROR HANDLING & LOGGING HELPERS
+--------------------------------------------------------------------------------
+
+--[[
+	Execute a function with error handling and logging.
+	Replaces silent pcall failures with proper error logging.
+
+	@param phaseName The name of the phase being executed
+	@param func The function to execute
+	@return boolean Whether the function executed successfully
+]]
+local function safeExecute(phaseName: string, func: () -> ()): boolean
+	local success, err = pcall(func)
+	if not success then
+		warn(`[MapManager] {phaseName} FAILED: {err}`)
+		generationResults[phaseName] = false
+		return false
+	end
+	print(`[MapManager] {phaseName} completed`)
+	generationResults[phaseName] = true
+	return true
+end
+
+--[[
+	Print a summary of the generation process.
+]]
+local function printGenerationSummary()
+	print("===========================================")
+	print("[MapManager] GENERATION SUMMARY")
+	local allSucceeded = true
+	for phase, success in pairs(generationResults) do
+		local status = success and "OK" or "FAILED"
+		print(`  {phase}: {status}`)
+		if not success then
+			allSucceeded = false
+		end
+	end
+	if allSucceeded then
+		print("  All phases completed successfully!")
+	else
+		warn("  Some phases failed - map may be incomplete")
+	end
+	print("===========================================")
+end
+
+--------------------------------------------------------------------------------
+-- FOLDER MANAGEMENT
+--------------------------------------------------------------------------------
+
+--[[
+	Get or create a folder in workspace for organizing objects.
+	Improves cleanup and organization.
+
+	@param name The name of the folder
+	@return Folder The folder instance
+]]
+local function getOrCreateFolder(name: string): Folder
+	local existing = workspace:FindFirstChild(name)
+	if existing and existing:IsA("Folder") then
+		return existing :: Folder
+	end
+
+	local folder = Instance.new("Folder")
+	folder.Name = name
+	folder.Parent = workspace
+	return folder
+end
+
+-- Pre-create folders for organization
+local foldersCreated = false
+local function ensureFoldersExist()
+	if foldersCreated then return end
+	getOrCreateFolder("Trees")
+	getOrCreateFolder("Bushes")
+	getOrCreateFolder("Ferns")
+	getOrCreateFolder("Flowers")
+	getOrCreateFolder("Rocks")
+	getOrCreateFolder("Buildings")
+	getOrCreateFolder("Structures")
+	getOrCreateFolder("LootCaches")
+	foldersCreated = true
+end
+
+--------------------------------------------------------------------------------
+-- HEIGHT CACHING
+--------------------------------------------------------------------------------
+
+--[[
+	Cache terrain height to reduce raycast usage.
+
+	@param x World X coordinate
+	@param z World Z coordinate
+	@param height The height at this position
+]]
+local function cacheTerrainHeight(x: number, z: number, height: number)
+	local key = `{math.floor(x / 32)}_{math.floor(z / 32)}`
+	heightCache[key] = height
+end
+
+--[[
+	Get cached height or perform raycast.
+
+	@param x World X coordinate
+	@param z World Z coordinate
+	@param defaultY Fallback height if not found
+	@return number The height at this position
+]]
+local function getCachedHeight(x: number, z: number, defaultY: number?): number
+	local key = `{math.floor(x / 32)}_{math.floor(z / 32)}`
+	if heightCache[key] then
+		return heightCache[key]
+	end
+	return getGroundLevel(x, z, defaultY or 25)
+end
+
+--[[
+	Clear the height cache (for match reset).
+]]
+local function clearHeightCache()
+	heightCache = {}
+end
+
+--------------------------------------------------------------------------------
+-- GROUND LEVEL HELPER FUNCTIONS
+--------------------------------------------------------------------------------
+
+-- Raycast to find ground level at a position
+function getGroundLevel(x: number, z: number, defaultY: number?): number
+	local rayOrigin = Vector3.new(x, 500, z)
+	local rayResult = workspace:Raycast(rayOrigin, Vector3.new(0, -600, 0))
+	if rayResult then
+		local height = rayResult.Position.Y
+		cacheTerrainHeight(x, z, height)
+		return height
+	end
+	return defaultY or 25
+end
+
+-- Place object at ground level
+local function placeAtGroundLevel(position: Vector3, offsetY: number?): Vector3
+	local groundY = getCachedHeight(position.X, position.Z, position.Y)
+	return Vector3.new(position.X, groundY + (offsetY or 0), position.Z)
+end
+
+--------------------------------------------------------------------------------
+-- PUBLIC API: MAP INFO
+--------------------------------------------------------------------------------
 
 --[[
 	Get map information
@@ -231,55 +390,150 @@ local function setupEventHandlers()
 	end)
 end
 
+--------------------------------------------------------------------------------
+-- BIOME HELPERS
+--------------------------------------------------------------------------------
+
 --[[
-	Terrain configuration (per GDD Section 3.3: 4km x 4km map)
-
-	GDD Map Layout:
-	- NORTH: Volcanic Region (High Danger) - Geothermal Plant, Lava Caves, T-Rex Paddock
-	- CENTER: Jungle & Research (Main POIs) - Visitor Center, Research Complex, Hammond Villa
-	- EAST: Swamplands (Medium Danger) - River Delta, Research Outpost, Boat Dock
-	- WEST: Open Plains (Beginner Friendly) - Herbivore Valley, Safari Lodge
-	- SOUTH: Coastal Area (Mixed) - Harbor, Lighthouse, Beach Resort
+	Get biome at world position based on GDD layout
+	Uses quadrant-based system with smooth transitions
 ]]
-local TERRAIN_CONFIG = {
-	mapSize = 4000, -- 4km x 4km (4000 studs)
-	resolution = 48, -- Cell size for balance of detail vs performance
-	baseHeight = 15,
-	waterLevel = -2,
-}
+local function getBiomeAtPosition(x: number, z: number): string
+	local halfSize = MapConfig.MapSize / 2
 
--- =============================================
--- GROUND LEVEL HELPER FUNCTIONS
--- =============================================
+	-- Normalize to -1 to 1 range
+	local nx = x / halfSize
+	local nz = z / halfSize
 
--- Raycast to find ground level at a position
-local function getGroundLevel(x: number, z: number, defaultY: number?): number
-	local rayOrigin = Vector3.new(x, 500, z)
-	local rayResult = workspace:Raycast(rayOrigin, Vector3.new(0, -600, 0))
-	if rayResult then
-		return rayResult.Position.Y
+	-- Distance from center for coastal detection
+	local distFromCenter = math.sqrt(nx * nx + nz * nz)
+
+	-- SOUTH (z > 0.5): Coastal Area
+	if nz > 0.4 and distFromCenter > 0.5 then
+		return "coastal"
 	end
-	return defaultY or 25
+
+	-- NORTH (z < -0.4): Volcanic Region
+	if nz < -0.4 then
+		return "volcanic"
+	end
+
+	-- EAST (x > 0.4): Swamplands
+	if nx > 0.4 then
+		return "swamp"
+	end
+
+	-- WEST (x < -0.4): Open Plains
+	if nx < -0.4 then
+		return "plains"
+	end
+
+	-- CENTER: Jungle (default for main play area)
+	return "jungle"
 end
 
--- Place object at ground level
-local function placeAtGroundLevel(position: Vector3, offsetY: number?): Vector3
-	local groundY = getGroundLevel(position.X, position.Z, position.Y)
-	return Vector3.new(position.X, groundY + (offsetY or 0), position.Z)
+--[[
+	Get terrain height at position based on biome
+]]
+local function getHeightAtPosition(x: number, z: number, biome: string): number
+	local base = MapConfig.BaseHeight
+
+	-- Multi-octave noise for natural terrain
+	local noise1 = math.noise(x / 300, z / 300, 1) * 20  -- Large features
+	local noise2 = math.noise(x / 100, z / 100, 2) * 10  -- Medium features
+	local noise3 = math.noise(x / 40, z / 40, 3) * 5     -- Small details
+
+	if biome == "jungle" then
+		local jungleBase = math.noise(x / 150, z / 150, 4) * 15
+		return base + noise1 + noise2 + noise3 + jungleBase + 10
+
+	elseif biome == "plains" then
+		local plainNoise = math.noise(x / 200, z / 200, 5) * 8
+		return base + plainNoise + noise3 * 0.5
+
+	elseif biome == "volcanic" then
+		local volcanoBase = math.noise(x / 120, z / 120, 6) * 40
+		local peaks = math.max(0, math.noise(x / 60, z / 60, 7)) * 35
+		local ridges = math.abs(math.noise(x / 80, z / 80, 8)) * 20
+		return base + volcanoBase + peaks + ridges + 15
+
+	elseif biome == "swamp" then
+		local swampBase = math.noise(x / 100, z / 100, 9) * 8
+		local channels = math.abs(math.noise(x / 50, z / 50, 10)) * 5
+		return base + swampBase - channels - 5
+
+	elseif biome == "coastal" then
+		local distFromCenter = math.sqrt(x * x + z * z)
+		local normalizedDist = distFromCenter / (MapConfig.MapSize / 2)
+		local coastSlope = (1 - normalizedDist) * 15
+		local dunes = math.noise(x / 80, z / 80, 11) * 5
+		return math.max(0, coastSlope + dunes)
+	end
+
+	return base + noise1
 end
 
--- =============================================
+--[[
+	Get terrain material based on biome and height
+]]
+local function getMaterialAtPosition(biome: string, height: number): Enum.Material
+	if biome == "jungle" then
+		if height > 40 then
+			return Enum.Material.Rock
+		elseif height > 25 then
+			return Enum.Material.LeafyGrass
+		else
+			return Enum.Material.Grass
+		end
+
+	elseif biome == "plains" then
+		if height > 20 then
+			return Enum.Material.Grass
+		else
+			return Enum.Material.Ground
+		end
+
+	elseif biome == "volcanic" then
+		if height > 70 then
+			return Enum.Material.CrackedLava
+		elseif height > 50 then
+			return Enum.Material.Basalt
+		elseif height > 35 then
+			return Enum.Material.Slate
+		else
+			return Enum.Material.Rock
+		end
+
+	elseif biome == "swamp" then
+		if height > 15 then
+			return Enum.Material.LeafyGrass
+		elseif height > 8 then
+			return Enum.Material.Mud
+		else
+			return Enum.Material.Ground
+		end
+
+	elseif biome == "coastal" then
+		if height > 10 then
+			return Enum.Material.Grass
+		else
+			return Enum.Material.Sand
+		end
+	end
+
+	return Enum.Material.Grass
+end
+
+--------------------------------------------------------------------------------
 -- BUILDING AND STRUCTURE CREATION HELPERS
--- =============================================
+--------------------------------------------------------------------------------
 
 -- Create a simple building structure (anchored at ground level)
 local function createBuilding(name: string, position: Vector3, size: Vector3, color: BrickColor, material: Enum.Material?): Model
 	local building = Instance.new("Model")
 	building.Name = name
 
-	-- Raycast to find actual ground level
 	local groundPos = placeAtGroundLevel(position, 0)
-
 	local mat = material or Enum.Material.Concrete
 
 	-- Floor
@@ -355,7 +609,7 @@ local function createBuilding(name: string, position: Vector3, size: Vector3, co
 	roof.Parent = building
 
 	building.PrimaryPart = floor
-	building.Parent = workspace
+	building.Parent = getOrCreateFolder("Buildings")
 
 	return building
 end
@@ -365,7 +619,6 @@ local function createHouse(name: string, position: Vector3, size: number): Model
 	local house = Instance.new("Model")
 	house.Name = name
 
-	-- Raycast to find actual ground level
 	local groundPos = placeAtGroundLevel(position, 0)
 
 	-- Base/Foundation
@@ -388,7 +641,7 @@ local function createHouse(name: string, position: Vector3, size: number): Model
 	main.Material = Enum.Material.Wood
 	main.Parent = house
 
-	-- Roof (wedge-shaped using two parts)
+	-- Roof
 	local roofLeft = Instance.new("Part")
 	roofLeft.Name = "RoofLeft"
 	roofLeft.Size = Vector3.new(size + 2, 1, size * 0.6)
@@ -433,47 +686,9 @@ local function createHouse(name: string, position: Vector3, size: number): Model
 	end
 
 	house.PrimaryPart = foundation
-	house.Parent = workspace
+	house.Parent = getOrCreateFolder("Buildings")
 
 	return house
-end
-
--- Create a tree (anchored at ground level)
-local function createTree(position: Vector3, height: number, treeType: string?): Model
-	local tree = Instance.new("Model")
-	tree.Name = "Tree"
-
-	-- Raycast to find actual ground level
-	local groundPos = placeAtGroundLevel(position, 0)
-
-	local trunkHeight = height * 0.4
-	local canopySize = height * 0.8
-
-	-- Trunk
-	local trunk = Instance.new("Part")
-	trunk.Name = "Trunk"
-	trunk.Size = Vector3.new(height * 0.15, trunkHeight, height * 0.15)
-	trunk.Position = groundPos + Vector3.new(0, trunkHeight / 2, 0)
-	trunk.Anchored = true
-	trunk.BrickColor = BrickColor.new("Reddish brown")
-	trunk.Material = Enum.Material.Wood
-	trunk.Parent = tree
-
-	-- Canopy
-	local canopy = Instance.new("Part")
-	canopy.Name = "Canopy"
-	canopy.Shape = Enum.PartType.Ball
-	canopy.Size = Vector3.new(canopySize, canopySize, canopySize)
-	canopy.Position = groundPos + Vector3.new(0, trunkHeight + canopySize * 0.3, 0)
-	canopy.Anchored = true
-	canopy.BrickColor = treeType == "palm" and BrickColor.new("Bright green") or BrickColor.new("Forest green")
-	canopy.Material = Enum.Material.Grass
-	canopy.Parent = tree
-
-	tree.PrimaryPart = trunk
-	tree.Parent = workspace
-
-	return tree
 end
 
 -- Create a rock formation
@@ -485,19 +700,18 @@ local function createRock(position: Vector3, size: number, material: Enum.Materi
 	rock.Anchored = true
 	rock.BrickColor = BrickColor.new("Dark stone grey")
 	rock.Material = material or Enum.Material.Rock
-	rock.Parent = workspace
+	rock.Parent = getOrCreateFolder("Rocks")
 	return rock
 end
 
--- Create a watchtower/observation tower (anchored at ground level)
+-- Create a watchtower/observation tower
 local function createTower(name: string, position: Vector3, height: number): Model
 	local tower = Instance.new("Model")
 	tower.Name = name
 
-	-- Raycast to find actual ground level
 	local groundPos = placeAtGroundLevel(position, 0)
 
-	-- Support legs (4 corners)
+	-- Support legs
 	local legSize = 2
 	for x = -1, 1, 2 do
 		for z = -1, 1, 2 do
@@ -549,17 +763,16 @@ local function createTower(name: string, position: Vector3, height: number): Mod
 	roof.Parent = tower
 
 	tower.PrimaryPart = platform
-	tower.Parent = workspace
+	tower.Parent = getOrCreateFolder("Structures")
 
 	return tower
 end
 
--- Create industrial structure (for geothermal plant, anchored at ground level)
+-- Create industrial structure
 local function createIndustrialBuilding(name: string, position: Vector3): Model
 	local building = Instance.new("Model")
 	building.Name = name
 
-	-- Raycast to find actual ground level
 	local groundPos = placeAtGroundLevel(position, 0)
 
 	-- Main structure
@@ -608,17 +821,16 @@ local function createIndustrialBuilding(name: string, position: Vector3): Model
 	end
 
 	building.PrimaryPart = main
-	building.Parent = workspace
+	building.Parent = getOrCreateFolder("Buildings")
 
 	return building
 end
 
--- Create lighthouse (anchored at ground level)
+-- Create lighthouse
 local function createLighthouse(position: Vector3): Model
 	local lighthouse = Instance.new("Model")
 	lighthouse.Name = "Lighthouse"
 
-	-- Raycast to find actual ground level
 	local groundPos = placeAtGroundLevel(position, 0)
 
 	-- Base
@@ -631,14 +843,14 @@ local function createLighthouse(position: Vector3): Model
 	base.Material = Enum.Material.Concrete
 	base.Parent = lighthouse
 
-	-- Tower (multiple sections with alternating colors)
+	-- Tower sections
 	local towerHeight = 60
 	local sections = 6
 	for i = 1, sections do
 		local section = Instance.new("Part")
 		section.Name = "Section" .. i
 		local sectionHeight = towerHeight / sections
-		local sectionWidth = 12 - (i * 1.2) -- Tapers up
+		local sectionWidth = 12 - (i * 1.2)
 		section.Size = Vector3.new(sectionWidth, sectionHeight, sectionWidth)
 		section.Position = groundPos + Vector3.new(0, 5 + (i - 0.5) * sectionHeight, 0)
 		section.Anchored = true
@@ -679,17 +891,16 @@ local function createLighthouse(position: Vector3): Model
 	roof.Parent = lighthouse
 
 	lighthouse.PrimaryPart = base
-	lighthouse.Parent = workspace
+	lighthouse.Parent = getOrCreateFolder("Structures")
 
 	return lighthouse
 end
 
--- Create dock/pier (anchored at ground level)
+-- Create dock/pier
 local function createDock(position: Vector3, length: number): Model
 	local dock = Instance.new("Model")
 	dock.Name = "Dock"
 
-	-- Raycast to find actual ground level
 	local groundPos = placeAtGroundLevel(position, 0)
 
 	-- Main platform
@@ -716,494 +927,22 @@ local function createDock(position: Vector3, length: number): Model
 	end
 
 	dock.PrimaryPart = platform
-	dock.Parent = workspace
+	dock.Parent = getOrCreateFolder("Structures")
 
 	return dock
 end
 
--- =============================================
--- ENHANCED TREE VARIETY FUNCTIONS
--- =============================================
-
--- Create a pine tree (conical shape, for volcanic/mountain areas)
-local function createPineTree(position: Vector3, height: number): Model
-	local tree = Instance.new("Model")
-	tree.Name = "PineTree"
-
-	-- Raycast to find actual ground level
-	local groundPos = placeAtGroundLevel(position, 0)
-
-	local trunkHeight = height * 0.7
-	local trunkWidth = height * 0.08
-
-	-- Trunk
-	local trunk = Instance.new("Part")
-	trunk.Name = "Trunk"
-	trunk.Size = Vector3.new(trunkWidth, trunkHeight, trunkWidth)
-	trunk.Position = groundPos + Vector3.new(0, trunkHeight / 2, 0)
-	trunk.Anchored = true
-	trunk.BrickColor = BrickColor.new("Reddish brown")
-	trunk.Material = Enum.Material.Wood
-	trunk.Parent = tree
-
-	-- Conical layers (3 cone-like sections)
-	for i = 1, 3 do
-		local layerHeight = height * 0.25
-		local layerWidth = height * (0.5 - i * 0.1)
-		local layer = Instance.new("Part")
-		layer.Name = "Foliage" .. i
-		layer.Size = Vector3.new(layerWidth, layerHeight, layerWidth)
-		layer.Position = groundPos + Vector3.new(0, trunkHeight * 0.3 + i * (height * 0.2), 0)
-		layer.Anchored = true
-		layer.BrickColor = BrickColor.new("Dark green")
-		layer.Material = Enum.Material.Grass
-		layer.Parent = tree
-	end
-
-	tree.PrimaryPart = trunk
-	tree.Parent = workspace
-	return tree
-end
-
--- Create an oak tree (wide spreading canopy, anchored at ground level)
-local function createOakTree(position: Vector3, height: number): Model
-	local tree = Instance.new("Model")
-	tree.Name = "OakTree"
-
-	-- Raycast to find actual ground level
-	local groundPos = placeAtGroundLevel(position, 0)
-
-	local trunkHeight = height * 0.5
-	local canopyWidth = height * 1.2
-
-	-- Trunk
-	local trunk = Instance.new("Part")
-	trunk.Name = "Trunk"
-	trunk.Size = Vector3.new(height * 0.18, trunkHeight, height * 0.18)
-	trunk.Position = groundPos + Vector3.new(0, trunkHeight / 2, 0)
-	trunk.Anchored = true
-	trunk.BrickColor = BrickColor.new("Brown")
-	trunk.Material = Enum.Material.Wood
-	trunk.Parent = tree
-
-	-- Wide spreading canopy (multiple overlapping spheres)
-	local canopyPositions = {
-		Vector3.new(0, 0, 0),
-		Vector3.new(canopyWidth * 0.3, -height * 0.05, 0),
-		Vector3.new(-canopyWidth * 0.3, -height * 0.05, 0),
-		Vector3.new(0, -height * 0.05, canopyWidth * 0.3),
-		Vector3.new(0, -height * 0.05, -canopyWidth * 0.3),
-	}
-
-	for i, offset in ipairs(canopyPositions) do
-		local canopy = Instance.new("Part")
-		canopy.Name = "Canopy" .. i
-		canopy.Shape = Enum.PartType.Ball
-		local size = height * (0.6 - math.abs(offset.X + offset.Z) * 0.001)
-		canopy.Size = Vector3.new(size, size * 0.7, size)
-		canopy.Position = groundPos + Vector3.new(0, trunkHeight + height * 0.25, 0) + offset
-		canopy.Anchored = true
-		canopy.BrickColor = BrickColor.new("Forest green")
-		canopy.Material = Enum.Material.Grass
-		canopy.Parent = tree
-	end
-
-	tree.PrimaryPart = trunk
-	tree.Parent = workspace
-	return tree
-end
-
--- Create a birch tree (white bark, smaller leaves, anchored at ground level)
-local function createBirchTree(position: Vector3, height: number): Model
-	local tree = Instance.new("Model")
-	tree.Name = "BirchTree"
-
-	-- Raycast to find actual ground level
-	local groundPos = placeAtGroundLevel(position, 0)
-
-	local trunkHeight = height * 0.65
-	local canopySize = height * 0.5
-
-	-- White trunk
-	local trunk = Instance.new("Part")
-	trunk.Name = "Trunk"
-	trunk.Size = Vector3.new(height * 0.08, trunkHeight, height * 0.08)
-	trunk.Position = groundPos + Vector3.new(0, trunkHeight / 2, 0)
-	trunk.Anchored = true
-	trunk.BrickColor = BrickColor.new("Institutional white")
-	trunk.Material = Enum.Material.Wood
-	trunk.Parent = tree
-
-	-- Small clustered canopy
-	for i = 1, 4 do
-		local canopy = Instance.new("Part")
-		canopy.Name = "Canopy" .. i
-		canopy.Shape = Enum.PartType.Ball
-		canopy.Size = Vector3.new(canopySize * 0.6, canopySize * 0.5, canopySize * 0.6)
-		local angle = (i / 4) * math.pi * 2
-		canopy.Position = groundPos + Vector3.new(
-			math.cos(angle) * canopySize * 0.2,
-			trunkHeight + canopySize * 0.2 + (i % 2) * canopySize * 0.15,
-			math.sin(angle) * canopySize * 0.2
-		)
-		canopy.Anchored = true
-		canopy.BrickColor = BrickColor.new("Bright green")
-		canopy.Material = Enum.Material.Grass
-		canopy.Parent = tree
-	end
-
-	tree.PrimaryPart = trunk
-	tree.Parent = workspace
-	return tree
-end
-
--- Create a jungle tree (large, with vines, anchored at ground level)
-local function createJungleTree(position: Vector3, height: number): Model
-	local tree = Instance.new("Model")
-	tree.Name = "JungleTree"
-
-	-- Raycast to find actual ground level
-	local groundPos = placeAtGroundLevel(position, 0)
-
-	local trunkHeight = height * 0.55
-	local canopySize = height * 0.9
-
-	-- Thick trunk
-	local trunk = Instance.new("Part")
-	trunk.Name = "Trunk"
-	trunk.Size = Vector3.new(height * 0.2, trunkHeight, height * 0.2)
-	trunk.Position = groundPos + Vector3.new(0, trunkHeight / 2, 0)
-	trunk.Anchored = true
-	trunk.BrickColor = BrickColor.new("Reddish brown")
-	trunk.Material = Enum.Material.Wood
-	trunk.Parent = tree
-
-	-- Buttress roots
-	for i = 1, 4 do
-		local root = Instance.new("Part")
-		root.Name = "Root" .. i
-		local rootLength = height * 0.25
-		root.Size = Vector3.new(height * 0.1, rootLength, height * 0.08)
-		local angle = (i / 4) * math.pi * 2
-
-		-- Use CFrame to properly position and angle roots outward from trunk base
-		local rootCF = CFrame.new(groundPos)
-			* CFrame.Angles(0, angle, 0) -- Rotate around Y to face outward
-			* CFrame.new(0, rootLength * 0.3, height * 0.12) -- Offset outward from trunk
-			* CFrame.Angles(math.rad(-30), 0, 0) -- Tilt outward
-
-		root.CFrame = rootCF
-		root.Anchored = true
-		root.BrickColor = BrickColor.new("Reddish brown")
-		root.Material = Enum.Material.Wood
-		root.Parent = tree
-	end
-
-	-- Large canopy
-	local mainCanopy = Instance.new("Part")
-	mainCanopy.Name = "MainCanopy"
-	mainCanopy.Shape = Enum.PartType.Ball
-	mainCanopy.Size = Vector3.new(canopySize, canopySize * 0.6, canopySize)
-	mainCanopy.Position = groundPos + Vector3.new(0, trunkHeight + canopySize * 0.25, 0)
-	mainCanopy.Anchored = true
-	mainCanopy.BrickColor = BrickColor.new("Dark green")
-	mainCanopy.Material = Enum.Material.Grass
-	mainCanopy.Parent = tree
-
-	-- Hanging vines (positioned to hang from canopy edge)
-	for i = 1, 6 do
-		local vine = Instance.new("Part")
-		vine.Name = "Vine" .. i
-		local vineLength = height * 0.35
-		vine.Size = Vector3.new(0.4, vineLength, 0.4)
-		local angle = (i / 6) * math.pi * 2
-		-- Position vine so it hangs from the bottom edge of canopy
-		local vineTop = groundPos + Vector3.new(
-			math.cos(angle) * canopySize * 0.35,
-			trunkHeight + canopySize * 0.05, -- At bottom of canopy
-			math.sin(angle) * canopySize * 0.35
-		)
-		vine.Position = vineTop - Vector3.new(0, vineLength * 0.5, 0) -- Hang downward from that point
-		vine.Anchored = true
-		vine.BrickColor = BrickColor.new("Bright green")
-		vine.Material = Enum.Material.Grass
-		vine.Parent = tree
-	end
-
-	tree.PrimaryPart = trunk
-	tree.Parent = workspace
-	return tree
-end
-
--- Create palm tree (enhanced version, anchored at ground level)
-local function createPalmTree(position: Vector3, height: number): Model
-	local tree = Instance.new("Model")
-	tree.Name = "PalmTree"
-
-	-- Raycast to find actual ground level
-	local groundPos = placeAtGroundLevel(position, 0)
-
-	local trunkHeight = height * 0.8
-
-	-- Curved trunk (multiple segments)
-	local segments = 5
-	for i = 1, segments do
-		local segment = Instance.new("Part")
-		segment.Name = "TrunkSegment" .. i
-		local segmentHeight = trunkHeight / segments
-		local curve = math.sin((i / segments) * math.pi * 0.3) * height * 0.1
-		segment.Size = Vector3.new(height * 0.1, segmentHeight, height * 0.1)
-		segment.Position = groundPos + Vector3.new(curve, (i - 0.5) * segmentHeight, 0)
-		segment.Anchored = true
-		segment.BrickColor = BrickColor.new("Brown")
-		segment.Material = Enum.Material.Wood
-		segment.Parent = tree
-	end
-
-	-- Palm fronds (8 radiating leaves)
-	local frondLength = height * 0.4
-	for i = 1, 8 do
-		local frond = Instance.new("Part")
-		frond.Name = "Frond" .. i
-		frond.Size = Vector3.new(frondLength * 0.15, frondLength, frondLength * 0.05)
-		local angle = (i / 8) * math.pi * 2
-
-		-- Use CFrame to properly position and rotate fronds radiating outward
-		local basePos = groundPos + Vector3.new(0, trunkHeight, 0)
-		local outwardDir = Vector3.new(math.cos(angle), 0, math.sin(angle))
-		local tiltAngle = math.rad(50) -- Tilt outward from vertical
-
-		-- Position frond so it originates from trunk top and extends outward/downward
-		local frondCF = CFrame.new(basePos)
-			* CFrame.Angles(0, angle, 0) -- Rotate around Y to face outward
-			* CFrame.Angles(tiltAngle, 0, 0) -- Tilt outward
-			* CFrame.new(0, frondLength * 0.5, 0) -- Offset so base is at trunk top
-
-		frond.CFrame = frondCF
-		frond.Anchored = true
-		frond.BrickColor = BrickColor.new("Bright green")
-		frond.Material = Enum.Material.Grass
-		frond.Parent = tree
-	end
-
-	-- Coconuts cluster
-	local coconuts = Instance.new("Part")
-	coconuts.Name = "Coconuts"
-	coconuts.Shape = Enum.PartType.Ball
-	coconuts.Size = Vector3.new(height * 0.15, height * 0.12, height * 0.15)
-	coconuts.Position = groundPos + Vector3.new(0, trunkHeight, 0)
-	coconuts.Anchored = true
-	coconuts.BrickColor = BrickColor.new("Brown")
-	coconuts.Material = Enum.Material.Wood
-	coconuts.Parent = tree
-
-	tree.Parent = workspace
-	return tree
-end
-
--- Create dead/swamp tree (anchored at ground level)
-local function createDeadTree(position: Vector3, height: number): Model
-	local tree = Instance.new("Model")
-	tree.Name = "DeadTree"
-
-	-- Raycast to find actual ground level
-	local groundPos = placeAtGroundLevel(position, 0)
-
-	-- Gnarled trunk (slight random tilt using CFrame)
-	local trunk = Instance.new("Part")
-	trunk.Name = "Trunk"
-	trunk.Size = Vector3.new(height * 0.12, height * 0.6, height * 0.12)
-	local trunkTiltX = math.rad(math.random(-5, 5))
-	local trunkTiltZ = math.rad(math.random(-5, 5))
-	trunk.CFrame = CFrame.new(groundPos + Vector3.new(0, height * 0.3, 0))
-		* CFrame.Angles(trunkTiltX, 0, trunkTiltZ)
-	trunk.Anchored = true
-	trunk.BrickColor = BrickColor.new("Dark taupe")
-	trunk.Material = Enum.Material.Wood
-	trunk.Parent = tree
-
-	-- Dead branches (no leaves) - properly attached to trunk using CFrame
-	local branchCount = math.random(3, 5)
-	for i = 1, branchCount do
-		local branch = Instance.new("Part")
-		branch.Name = "Branch" .. i
-		local branchLength = height * (0.2 + math.random() * 0.2)
-		branch.Size = Vector3.new(height * 0.04, branchLength, height * 0.04)
-		local angle = (i / branchCount) * math.pi * 2
-		local branchHeight = height * (0.35 + i * 0.08)
-		local tiltOut = math.rad(math.random(40, 70)) -- Tilt outward from trunk
-
-		-- Use CFrame to attach branch to trunk and angle it outward
-		local branchCF = CFrame.new(groundPos + Vector3.new(0, branchHeight, 0))
-			* CFrame.Angles(0, angle, 0) -- Face outward direction
-			* CFrame.Angles(tiltOut, 0, math.rad(math.random(-15, 15))) -- Tilt out and slight twist
-			* CFrame.new(0, branchLength * 0.5, 0) -- Offset so base is at trunk
-
-		branch.CFrame = branchCF
-		branch.Anchored = true
-		branch.BrickColor = BrickColor.new("Dark taupe")
-		branch.Material = Enum.Material.Wood
-		branch.Parent = tree
-	end
-
-	tree.PrimaryPart = trunk
-	tree.Parent = workspace
-	return tree
-end
-
--- =============================================
--- MULTI-STORY BUILDING FUNCTIONS
--- =============================================
-
--- Helper: Create a statue decoration
-local function createStatue(parent: Model, position: Vector3, statueType: string)
-	local statue = Instance.new("Model")
-	statue.Name = "Statue"
-
-	if statueType == "dinosaur" then
-		-- Dinosaur statue (T-Rex silhouette)
-		local body = Instance.new("Part")
-		body.Name = "Body"
-		body.Size = Vector3.new(3, 4, 6)
-		body.Position = position + Vector3.new(0, 2, 0)
-		body.Anchored = true
-		body.BrickColor = BrickColor.new("Dark stone grey")
-		body.Material = Enum.Material.Rock
-		body.Parent = statue
-
-		local head = Instance.new("Part")
-		head.Name = "Head"
-		head.Size = Vector3.new(2, 2.5, 3)
-		head.Position = position + Vector3.new(0, 4.5, 3.5)
-		head.Anchored = true
-		head.BrickColor = BrickColor.new("Dark stone grey")
-		head.Material = Enum.Material.Rock
-		head.Parent = statue
-
-		local tail = Instance.new("Part")
-		tail.Name = "Tail"
-		tail.Size = Vector3.new(1.5, 1.5, 5)
-		tail.Position = position + Vector3.new(0, 2.5, -4)
-		tail.Anchored = true
-		tail.BrickColor = BrickColor.new("Dark stone grey")
-		tail.Material = Enum.Material.Rock
-		tail.Parent = statue
-	elseif statueType == "pillar" then
-		-- Decorative pillar
-		local base = Instance.new("Part")
-		base.Name = "Base"
-		base.Size = Vector3.new(3, 1, 3)
-		base.Position = position + Vector3.new(0, 0.5, 0)
-		base.Anchored = true
-		base.BrickColor = BrickColor.new("Medium stone grey")
-		base.Material = Enum.Material.Marble
-		base.Parent = statue
-
-		local column = Instance.new("Part")
-		column.Name = "Column"
-		column.Size = Vector3.new(2, 6, 2)
-		column.Position = position + Vector3.new(0, 4, 0)
-		column.Anchored = true
-		column.BrickColor = BrickColor.new("White")
-		column.Material = Enum.Material.Marble
-		column.Parent = statue
-
-		local top = Instance.new("Part")
-		top.Name = "Top"
-		top.Size = Vector3.new(3.5, 1, 3.5)
-		top.Position = position + Vector3.new(0, 7.5, 0)
-		top.Anchored = true
-		top.BrickColor = BrickColor.new("Medium stone grey")
-		top.Material = Enum.Material.Marble
-		top.Parent = statue
-	else
-		-- Explorer statue
-		local pedestal = Instance.new("Part")
-		pedestal.Name = "Pedestal"
-		pedestal.Size = Vector3.new(4, 2, 4)
-		pedestal.Position = position + Vector3.new(0, 1, 0)
-		pedestal.Anchored = true
-		pedestal.BrickColor = BrickColor.new("Dark stone grey")
-		pedestal.Material = Enum.Material.Concrete
-		pedestal.Parent = statue
-
-		local figure = Instance.new("Part")
-		figure.Name = "Figure"
-		figure.Size = Vector3.new(2, 5, 2)
-		figure.Position = position + Vector3.new(0, 4.5, 0)
-		figure.Anchored = true
-		figure.BrickColor = BrickColor.new("Medium stone grey")
-		figure.Material = Enum.Material.Rock
-		figure.Parent = statue
-	end
-
-	statue.Parent = parent
-	return statue
-end
-
--- Helper: Create a loot chest
-local function createChest(parent: Model, position: Vector3)
-	local chest = Instance.new("Model")
-	chest.Name = "LootChest"
-
-	-- Chest body
-	local body = Instance.new("Part")
-	body.Name = "Body"
-	body.Size = Vector3.new(4, 3, 3)
-	body.Position = position + Vector3.new(0, 1.5, 0)
-	body.Anchored = true
-	body.BrickColor = BrickColor.new("Reddish brown")
-	body.Material = Enum.Material.Wood
-	body.Parent = chest
-
-	-- Chest lid
-	local lid = Instance.new("Part")
-	lid.Name = "Lid"
-	lid.Size = Vector3.new(4.2, 1.5, 3.2)
-	lid.Position = position + Vector3.new(0, 3.5, 0)
-	lid.Anchored = true
-	lid.BrickColor = BrickColor.new("Brown")
-	lid.Material = Enum.Material.Wood
-	lid.Parent = chest
-
-	-- Metal bands
-	for i = -1, 1, 2 do
-		local band = Instance.new("Part")
-		band.Name = "Band"
-		band.Size = Vector3.new(0.3, 3.5, 3.2)
-		band.Position = position + Vector3.new(i * 1.5, 2, 0)
-		band.Anchored = true
-		band.BrickColor = BrickColor.new("Dark stone grey")
-		band.Material = Enum.Material.Metal
-		band.Parent = chest
-	end
-
-	-- Lock
-	local lock = Instance.new("Part")
-	lock.Name = "Lock"
-	lock.Size = Vector3.new(0.8, 0.8, 0.5)
-	lock.Position = position + Vector3.new(0, 2.5, -1.6)
-	lock.Anchored = true
-	lock.BrickColor = BrickColor.new("Bright yellow")
-	lock.Material = Enum.Material.Metal
-	lock.Parent = chest
-
-	chest.Parent = parent
-	return chest
-end
-
--- Create a multi-story building with full interior (anchored at ground level)
+-- Create multi-story building with interior
 local function createMultiStoryBuilding(
 	name: string,
 	position: Vector3,
 	floors: number,
-	footprint: Vector3, -- width, floorHeight, depth
+	footprint: Vector3,
 	style: string
 ): Model
 	local building = Instance.new("Model")
 	building.Name = name
 
-	-- Raycast to find actual ground level
 	local groundPos = placeAtGroundLevel(position, 0)
 
 	local width = footprint.X
@@ -1212,28 +951,11 @@ local function createMultiStoryBuilding(
 	local wallThickness = 2
 
 	-- Style-based colors
-	local wallColor, roofColor, windowColor, interiorWallColor
-	if style == "residential" then
-		wallColor = BrickColor.new("Brick yellow")
-		roofColor = BrickColor.new("Brown")
-		windowColor = BrickColor.new("Cyan")
-		interiorWallColor = BrickColor.new("Institutional white")
-	elseif style == "commercial" then
-		wallColor = BrickColor.new("Medium stone grey")
-		roofColor = BrickColor.new("Dark stone grey")
-		windowColor = BrickColor.new("Light blue")
-		interiorWallColor = BrickColor.new("White")
-	elseif style == "industrial" then
-		wallColor = BrickColor.new("Dark stone grey")
-		roofColor = BrickColor.new("Really black")
-		windowColor = BrickColor.new("Medium stone grey")
-		interiorWallColor = BrickColor.new("Medium stone grey")
-	else
-		wallColor = BrickColor.new("White")
-		roofColor = BrickColor.new("Dark stone grey")
-		windowColor = BrickColor.new("Cyan")
-		interiorWallColor = BrickColor.new("Institutional white")
-	end
+	local styleConfig = MapConfig.POIStyles[style] or MapConfig.POIStyles.Commercial
+	local wallColor = styleConfig.WallColor
+	local roofColor = styleConfig.RoofColor
+	local windowColor = styleConfig.WindowColor
+	local interiorWallColor = styleConfig.InteriorWallColor
 
 	-- Foundation
 	local foundation = Instance.new("Part")
@@ -1259,12 +981,11 @@ local function createMultiStoryBuilding(
 		slab.Material = Enum.Material.Concrete
 		slab.Parent = building
 
-		-- Walls for this floor
+		-- Walls
 		local wallHeight = floorHeight - 1
 
-		-- Front wall with door/windows (split for door opening)
+		-- Front wall with door on ground floor
 		if floor == 1 then
-			-- Ground floor: door gap
 			local frontLeft = Instance.new("Part")
 			frontLeft.Name = "FrontWallLeft" .. floor
 			frontLeft.Size = Vector3.new((width - 8) / 2, wallHeight, wallThickness)
@@ -1283,7 +1004,6 @@ local function createMultiStoryBuilding(
 			frontRight.Material = Enum.Material.Concrete
 			frontRight.Parent = building
 
-			-- Door frame header
 			local doorHeader = Instance.new("Part")
 			doorHeader.Name = "DoorHeader" .. floor
 			doorHeader.Size = Vector3.new(8, wallHeight - 8, wallThickness)
@@ -1332,11 +1052,7 @@ local function createMultiStoryBuilding(
 		rightWall.Material = Enum.Material.Concrete
 		rightWall.Parent = building
 
-		-- =============================================
-		-- INTERIOR ROOMS
-		-- =============================================
-
-		-- Interior dividing wall (creates 2 rooms per floor)
+		-- Interior walls
 		local interiorWall = Instance.new("Part")
 		interiorWall.Name = "InteriorWall" .. floor
 		interiorWall.Size = Vector3.new(1, wallHeight - 2, depth - 10)
@@ -1346,22 +1062,11 @@ local function createMultiStoryBuilding(
 		interiorWall.Material = Enum.Material.SmoothPlastic
 		interiorWall.Parent = building
 
-		-- Interior cross wall for hallway
-		local hallwayWall = Instance.new("Part")
-		hallwayWall.Name = "HallwayWall" .. floor
-		hallwayWall.Size = Vector3.new(width / 3, wallHeight - 2, 1)
-		hallwayWall.Position = groundPos + Vector3.new(width / 4, floorY + 1 + (wallHeight - 2) / 2, depth / 4)
-		hallwayWall.Anchored = true
-		hallwayWall.BrickColor = interiorWallColor
-		hallwayWall.Material = Enum.Material.SmoothPlastic
-		hallwayWall.Parent = building
-
-		-- Windows on front and back
+		-- Windows
 		local windowsPerSide = math.max(2, math.floor(width / 12))
 		for w = 1, windowsPerSide do
 			local windowX = -width / 2 + w * (width / (windowsPerSide + 1))
 
-			-- Front window
 			local frontWindow = Instance.new("Part")
 			frontWindow.Name = "FrontWindow" .. floor .. "_" .. w
 			frontWindow.Size = Vector3.new(4, 5, 1)
@@ -1372,7 +1077,6 @@ local function createMultiStoryBuilding(
 			frontWindow.Transparency = 0.5
 			frontWindow.Parent = building
 
-			-- Back window
 			local backWindow = Instance.new("Part")
 			backWindow.Name = "BackWindow" .. floor .. "_" .. w
 			backWindow.Size = Vector3.new(4, 5, 1)
@@ -1384,32 +1088,16 @@ local function createMultiStoryBuilding(
 			backWindow.Parent = building
 		end
 
-		-- =============================================
-		-- STAIRS (Proper stepped staircase)
-		-- =============================================
+		-- Stairs between floors
 		if floor < floors then
 			local stairWidth = 5
 			local stairDepth = 10
 			local stepCount = 10
 			local stepHeight = floorHeight / stepCount
 
-			-- Stairwell location (back-right corner)
 			local stairBaseX = width / 2 - stairWidth - 2
 			local stairBaseZ = depth / 2 - stairDepth - 2
 
-			-- Floor opening for stairs (hole in floor above)
-			local stairOpening = Instance.new("Part")
-			stairOpening.Name = "StairOpening" .. floor
-			stairOpening.Size = Vector3.new(stairWidth + 4, 1, stairDepth + 2)
-			stairOpening.Position = groundPos + Vector3.new(stairBaseX, floorY + floorHeight + 0.5, stairBaseZ + stairDepth / 2)
-			stairOpening.Anchored = true
-			stairOpening.BrickColor = BrickColor.new("Dark stone grey")
-			stairOpening.Material = Enum.Material.Concrete
-			stairOpening.Transparency = 1 -- Invisible, just for collision
-			stairOpening.CanCollide = false
-			stairOpening.Parent = building
-
-			-- Create individual steps
 			for step = 1, stepCount do
 				local stepPart = Instance.new("Part")
 				stepPart.Name = "Step" .. floor .. "_" .. step
@@ -1423,47 +1111,6 @@ local function createMultiStoryBuilding(
 				stepPart.BrickColor = BrickColor.new("Medium stone grey")
 				stepPart.Material = Enum.Material.Concrete
 				stepPart.Parent = building
-			end
-
-			-- Stair railings
-			local leftRailing = Instance.new("Part")
-			leftRailing.Name = "StairRailingLeft" .. floor
-			leftRailing.Size = Vector3.new(0.5, 3, stairDepth)
-			leftRailing.Position = groundPos + Vector3.new(stairBaseX - stairWidth / 2 - 0.25, floorY + floorHeight / 2 + 2, stairBaseZ + stairDepth / 2)
-			leftRailing.Anchored = true
-			leftRailing.BrickColor = BrickColor.new("Brown")
-			leftRailing.Material = Enum.Material.Wood
-			leftRailing.Parent = building
-
-			local rightRailing = Instance.new("Part")
-			rightRailing.Name = "StairRailingRight" .. floor
-			rightRailing.Size = Vector3.new(0.5, 3, stairDepth)
-			rightRailing.Position = groundPos + Vector3.new(stairBaseX + stairWidth / 2 + 0.25, floorY + floorHeight / 2 + 2, stairBaseZ + stairDepth / 2)
-			rightRailing.Anchored = true
-			rightRailing.BrickColor = BrickColor.new("Brown")
-			rightRailing.Material = Enum.Material.Wood
-			rightRailing.Parent = building
-		end
-
-		-- =============================================
-		-- DECORATIONS (Statues and Chests)
-		-- =============================================
-
-		-- Add statue on ground floor lobby
-		if floor == 1 then
-			local statueTypes = { "dinosaur", "pillar", "explorer" }
-			local statueType = statueTypes[math.random(1, #statueTypes)]
-			createStatue(building, groundPos + Vector3.new(-width / 4, floorY + 1, -depth / 4), statueType)
-		end
-
-		-- Add chest in each room (2 per floor)
-		local chestPositions = {
-			groundPos + Vector3.new(-width / 3, floorY + 1, depth / 4),
-			groundPos + Vector3.new(width / 4, floorY + 1, -depth / 4 + 2),
-		}
-		for _, chestPos in ipairs(chestPositions) do
-			if math.random() > 0.3 then -- 70% chance of chest
-				createChest(building, chestPos)
 			end
 		end
 	end
@@ -1479,45 +1126,23 @@ local function createMultiStoryBuilding(
 	roof.Material = Enum.Material.Slate
 	roof.Parent = building
 
-	-- Roof access structure
-	local roofAccess = Instance.new("Part")
-	roofAccess.Name = "RoofAccess"
-	roofAccess.Size = Vector3.new(8, 10, 8)
-	roofAccess.Position = groundPos + Vector3.new(width / 2 - 6, roofY + 6, depth / 2 - 6)
-	roofAccess.Anchored = true
-	roofAccess.BrickColor = wallColor
-	roofAccess.Material = Enum.Material.Concrete
-	roofAccess.Parent = building
-
-	-- Roof door opening
-	local roofDoor = Instance.new("Part")
-	roofDoor.Name = "RoofDoor"
-	roofDoor.Size = Vector3.new(4, 7, 0.5)
-	roofDoor.Position = groundPos + Vector3.new(width / 2 - 6, roofY + 5.5, depth / 2 - 10)
-	roofDoor.Anchored = true
-	roofDoor.BrickColor = BrickColor.new("Dark orange")
-	roofDoor.Material = Enum.Material.Wood
-	roofDoor.Parent = building
-
 	building.PrimaryPart = foundation
-	building.Parent = workspace
+	building.Parent = getOrCreateFolder("Buildings")
 	return building
 end
 
--- Create apartment building (specialized multi-story)
+-- Create apartment building
 local function createApartmentBuilding(name: string, position: Vector3, floors: number): Model
-	return createMultiStoryBuilding(name, position, floors, Vector3.new(30, 12, 20), "residential")
+	return createMultiStoryBuilding(name, position, floors, Vector3.new(30, 12, 20), "Residential")
 end
 
--- Create warehouse (single story but tall, anchored at ground level)
+-- Create warehouse
 local function createWarehouse(name: string, position: Vector3): Model
 	local warehouse = Instance.new("Model")
 	warehouse.Name = name
 
-	-- Raycast to find actual ground level
 	local groundPos = placeAtGroundLevel(position, 0)
 
-	-- Main structure
 	local main = Instance.new("Part")
 	main.Name = "Main"
 	main.Size = Vector3.new(60, 25, 45)
@@ -1550,19 +1175,17 @@ local function createWarehouse(name: string, position: Vector3): Model
 	office.Parent = warehouse
 
 	warehouse.PrimaryPart = main
-	warehouse.Parent = workspace
+	warehouse.Parent = getOrCreateFolder("Buildings")
 	return warehouse
 end
 
--- Create small shed (anchored at ground level)
+-- Create small shed
 local function createShed(name: string, position: Vector3, size: number): Model
 	local shed = Instance.new("Model")
 	shed.Name = name
 
-	-- Raycast to find actual ground level
 	local groundPos = placeAtGroundLevel(position, 0)
 
-	-- Floor
 	local floor = Instance.new("Part")
 	floor.Name = "Floor"
 	floor.Size = Vector3.new(size, 0.5, size)
@@ -1572,7 +1195,6 @@ local function createShed(name: string, position: Vector3, size: number): Model
 	floor.Material = Enum.Material.WoodPlanks
 	floor.Parent = shed
 
-	-- Walls
 	local wallHeight = size * 0.6
 	local walls = {
 		{Vector3.new(size, wallHeight, 0.5), Vector3.new(0, wallHeight / 2 + 0.5, -size / 2)},
@@ -1592,7 +1214,6 @@ local function createShed(name: string, position: Vector3, size: number): Model
 		wall.Parent = shed
 	end
 
-	-- Roof
 	local roof = Instance.new("Part")
 	roof.Name = "Roof"
 	roof.Size = Vector3.new(size + 1, 0.5, size + 1)
@@ -1603,19 +1224,17 @@ local function createShed(name: string, position: Vector3, size: number): Model
 	roof.Parent = shed
 
 	shed.PrimaryPart = floor
-	shed.Parent = workspace
+	shed.Parent = getOrCreateFolder("Buildings")
 	return shed
 end
 
--- Create ruins/destroyed building (anchored at ground level)
+-- Create ruins
 local function createRuins(name: string, position: Vector3, size: number): Model
 	local ruins = Instance.new("Model")
 	ruins.Name = name
 
-	-- Raycast to find actual ground level
 	local groundPos = placeAtGroundLevel(position, 0)
 
-	-- Broken foundation
 	local foundation = Instance.new("Part")
 	foundation.Name = "Foundation"
 	foundation.Size = Vector3.new(size, 2, size)
@@ -1667,33 +1286,28 @@ local function createRuins(name: string, position: Vector3, size: number): Model
 	end
 
 	ruins.PrimaryPart = foundation
-	ruins.Parent = workspace
+	ruins.Parent = getOrCreateFolder("Structures")
 	return ruins
 end
 
--- =============================================
+--------------------------------------------------------------------------------
 -- WATER AND CAVE FUNCTIONS
--- =============================================
+--------------------------------------------------------------------------------
 
--- Create a river segment with bed
 local function createRiverSegment(terrain: Terrain, startPos: Vector3, endPos: Vector3, width: number, depth: number)
 	local segments = math.ceil((endPos - startPos).Magnitude / 50)
 
 	for i = 0, segments do
 		local t = i / segments
 		local pos = startPos:Lerp(endPos, t)
-
-		-- Add some noise to position for natural curves
 		local noiseOffset = math.noise(pos.X / 100, pos.Z / 100, 5) * width * 0.3
 
-		-- River bed (solid bottom)
 		terrain:FillBlock(
 			CFrame.new(pos.X + noiseOffset, -depth - 5, pos.Z),
 			Vector3.new(width + 10, 10, 60),
 			Enum.Material.Sand
 		)
 
-		-- Mud/gravel on bed edges
 		terrain:FillBlock(
 			CFrame.new(pos.X + noiseOffset - width / 2 - 5, -depth - 3, pos.Z),
 			Vector3.new(10, 6, 60),
@@ -1705,7 +1319,6 @@ local function createRiverSegment(terrain: Terrain, startPos: Vector3, endPos: V
 			Enum.Material.Mud
 		)
 
-		-- Water
 		terrain:FillBlock(
 			CFrame.new(pos.X + noiseOffset, -depth / 2, pos.Z),
 			Vector3.new(width, depth, 60),
@@ -1714,16 +1327,13 @@ local function createRiverSegment(terrain: Terrain, startPos: Vector3, endPos: V
 	end
 end
 
--- Create a lake with bed
 local function createLake(terrain: Terrain, centerPos: Vector3, radius: number, depth: number)
-	-- Solid lake bed
 	terrain:FillBlock(
 		CFrame.new(centerPos.X, -depth - 8, centerPos.Z),
 		Vector3.new(radius * 2 + 20, 15, radius * 2 + 20),
 		Enum.Material.Sand
 	)
 
-	-- Gravel/mud patches on bed
 	for i = 1, 8 do
 		local angle = (i / 8) * math.pi * 2
 		local dist = radius * 0.6
@@ -1738,14 +1348,12 @@ local function createLake(terrain: Terrain, centerPos: Vector3, radius: number, 
 		)
 	end
 
-	-- Water body
 	terrain:FillBlock(
 		CFrame.new(centerPos.X, -depth / 2, centerPos.Z),
 		Vector3.new(radius * 2, depth, radius * 2),
 		Enum.Material.Water
 	)
 
-	-- Shallow edges
 	terrain:FillBlock(
 		CFrame.new(centerPos.X, -2, centerPos.Z),
 		Vector3.new(radius * 2.2, 4, radius * 2.2),
@@ -1753,23 +1361,19 @@ local function createLake(terrain: Terrain, centerPos: Vector3, radius: number, 
 	)
 end
 
--- Create a cave entrance
 local function createCave(terrain: Terrain, entrancePos: Vector3, caveDepth: number, width: number, height: number)
-	-- Cave entrance (hollow out terrain)
 	terrain:FillBlock(
 		CFrame.new(entrancePos.X, entrancePos.Y, entrancePos.Z - caveDepth / 2),
 		Vector3.new(width, height, caveDepth),
 		Enum.Material.Air
 	)
 
-	-- Cave walls (darker rock)
 	terrain:FillBlock(
 		CFrame.new(entrancePos.X, entrancePos.Y - height / 2 - 2, entrancePos.Z - caveDepth / 2),
 		Vector3.new(width + 4, 4, caveDepth),
 		Enum.Material.Slate
 	)
 
-	-- Cave ceiling
 	terrain:FillBlock(
 		CFrame.new(entrancePos.X, entrancePos.Y + height / 2 + 2, entrancePos.Z - caveDepth / 2),
 		Vector3.new(width + 4, 4, caveDepth),
@@ -1777,42 +1381,13 @@ local function createCave(terrain: Terrain, entrancePos: Vector3, caveDepth: num
 	)
 end
 
--- =============================================
--- FOLIAGE CLUSTER FUNCTIONS (Using FloraGenerator)
--- =============================================
+--------------------------------------------------------------------------------
+-- VEGETATION HELPERS
+--------------------------------------------------------------------------------
 
--- Map old tree type names to FloraGenerator tree types
-local TREE_TYPE_MAP = {
-	pine = "CoastalPine",
-	oak = "Oak",
-	birch = "Birch",
-	jungle = "JungleGiant",
-	jungleMedium = "JungleMedium",
-	palm = "Palm",
-	dead = "DeadTree",
-	cypress = "Cypress",
-	charred = "CharredTree",
-	heatResistant = "HeatResistant",
-}
-
--- Map tree types to biomes for proper coloring
-local TREE_BIOME_MAP = {
-	pine = "Coastal",
-	oak = "Plains",
-	birch = "Plains",
-	jungle = "Jungle",
-	jungleMedium = "Jungle",
-	palm = "Coastal",
-	dead = "Swamp",
-	cypress = "Swamp",
-	charred = "Volcanic",
-	heatResistant = "Volcanic",
-}
-
--- Create a cluster of trees using FloraGenerator
 local function createTreeCluster(centerPos: Vector3, radius: number, count: number, treeType: string, baseHeight: number)
-	local floraType = TREE_TYPE_MAP[treeType] or "Oak"
-	local biome = TREE_BIOME_MAP[treeType] or "Plains"
+	local floraType = MapConfig.TreeTypeMap[treeType] or "Oak"
+	local biome = MapConfig.TreeBiomeMap[treeType] or "Plains"
 
 	for i = 1, count do
 		local angle = math.random() * math.pi * 2
@@ -1822,31 +1397,26 @@ local function createTreeCluster(centerPos: Vector3, radius: number, count: numb
 
 		local treePos = Vector3.new(x, centerPos.Y, z)
 
-		-- Use FloraGenerator for proper tree creation
 		pcall(function()
 			FloraGenerator.CreateTree(treePos, floraType, biome)
 		end)
 
-		-- Yield periodically to prevent lag
-		if i % 5 == 0 then
+		if i % MapConfig.TreeClusterYieldInterval == 0 then
 			task.wait()
 		end
 	end
 end
 
--- Create a single tree using FloraGenerator
 local function createFloraTree(position: Vector3, treeType: string)
-	local floraType = TREE_TYPE_MAP[treeType] or "Oak"
-	local biome = TREE_BIOME_MAP[treeType] or "Plains"
+	local floraType = MapConfig.TreeTypeMap[treeType] or "Oak"
+	local biome = MapConfig.TreeBiomeMap[treeType] or "Plains"
 
 	pcall(function()
 		FloraGenerator.CreateTree(position, floraType, biome)
 	end)
 end
 
--- Create a rock formation cluster using FloraGenerator
 local function createRockFormation(centerPos: Vector3, rockCount: number, minSize: number, maxSize: number, material: Enum.Material?)
-	-- Use FloraGenerator for rock clusters
 	local biome = "Plains"
 	if material == Enum.Material.Basalt then
 		biome = "Volcanic"
@@ -1859,16 +1429,13 @@ local function createRockFormation(centerPos: Vector3, rockCount: number, minSiz
 	end)
 end
 
--- Create grass patch using FloraGenerator
 local function createGrassPatch(terrain: Terrain, centerPos: Vector3, radius: number)
-	-- Use terrain for base grass
 	terrain:FillBlock(
 		CFrame.new(centerPos.X, centerPos.Y + 1, centerPos.Z),
 		Vector3.new(radius * 2, 3, radius * 2),
 		Enum.Material.LeafyGrass
 	)
 
-	-- Add detailed grass clusters using FloraGenerator
 	if math.random() > 0.5 then
 		pcall(function()
 			FloraGenerator.CreateGrassCluster(centerPos, radius * 0.5, "Plains")
@@ -1876,153 +1443,851 @@ local function createGrassPatch(terrain: Terrain, centerPos: Vector3, radius: nu
 	end
 end
 
+local function createBush(position: Vector3, size: number): Model
+	local bush = Instance.new("Model")
+	bush.Name = "Bush"
+
+	local groundPos = placeAtGroundLevel(position, 0)
+
+	for i = 1, 3 do
+		local part = Instance.new("Part")
+		part.Name = "Foliage" .. i
+		part.Shape = Enum.PartType.Ball
+		local partSize = size * (0.6 + math.random() * 0.3)
+		part.Size = Vector3.new(partSize, partSize * 0.8, partSize)
+		local offsetX = (math.random() - 0.5) * size * 0.4
+		local offsetZ = (math.random() - 0.5) * size * 0.4
+		part.Position = groundPos + Vector3.new(offsetX, partSize * 0.35, offsetZ)
+		part.Anchored = true
+		part.BrickColor = BrickColor.new("Forest green")
+		part.Material = Enum.Material.Grass
+		part.Parent = bush
+	end
+
+	bush.Parent = getOrCreateFolder("Bushes")
+	return bush
+end
+
+local function createFern(position: Vector3): Model
+	local fern = Instance.new("Model")
+	fern.Name = "Fern"
+
+	local groundPos = placeAtGroundLevel(position, 0)
+
+	for i = 1, 6 do
+		local frond = Instance.new("Part")
+		frond.Name = "Frond" .. i
+		frond.Size = Vector3.new(0.3, 2.5, 0.8)
+		local angle = (i / 6) * math.pi * 2
+		frond.Position = groundPos + Vector3.new(math.cos(angle) * 0.3, 1.2, math.sin(angle) * 0.3)
+		frond.Rotation = Vector3.new(30, math.deg(angle), 0)
+		frond.Anchored = true
+		frond.BrickColor = BrickColor.new("Bright green")
+		frond.Material = Enum.Material.Grass
+		frond.Parent = fern
+	end
+
+	fern.Parent = getOrCreateFolder("Ferns")
+	return fern
+end
+
+local function createFlowerPatch(position: Vector3, count: number): Model
+	local patch = Instance.new("Model")
+	patch.Name = "FlowerPatch"
+
+	local groundPos = placeAtGroundLevel(position, 0)
+	local colors = { "Bright red", "Bright yellow", "Magenta", "Bright orange", "White" }
+
+	for i = 1, count do
+		local flower = Instance.new("Part")
+		flower.Name = "Flower" .. i
+		flower.Shape = Enum.PartType.Ball
+		flower.Size = Vector3.new(0.8, 0.8, 0.8)
+		local offsetX = (math.random() - 0.5) * 4
+		local offsetZ = (math.random() - 0.5) * 4
+		flower.Position = groundPos + Vector3.new(offsetX, 0.5, offsetZ)
+		flower.Anchored = true
+		flower.BrickColor = BrickColor.new(colors[math.random(1, #colors)])
+		flower.Material = Enum.Material.SmoothPlastic
+		flower.Parent = patch
+
+		local stem = Instance.new("Part")
+		stem.Name = "Stem" .. i
+		stem.Size = Vector3.new(0.1, 0.6, 0.1)
+		stem.Position = groundPos + Vector3.new(offsetX, 0.2, offsetZ)
+		stem.Anchored = true
+		stem.BrickColor = BrickColor.new("Bright green")
+		stem.Material = Enum.Material.Grass
+		stem.Parent = patch
+	end
+
+	patch.Parent = getOrCreateFolder("Flowers")
+	return patch
+end
+
+--------------------------------------------------------------------------------
+-- LOOT CACHE CREATION (with LootManager integration)
+--------------------------------------------------------------------------------
+
+local function createLootCache(position: Vector3, cacheType: string): Model
+	local cache = Instance.new("Model")
+	cache.Name = "LootCache_" .. cacheType
+
+	local groundPos = placeAtGroundLevel(position, 0)
+
+	-- Determine tier based on cache type
+	local tier = "Medium"
+	if cacheType == "weapon_crate" then
+		tier = "High"
+	elseif cacheType == "ammo_box" then
+		tier = "Low"
+	elseif cacheType == "medkit" then
+		tier = "Medium"
+	elseif cacheType == "supply_drop" then
+		tier = "Medium"
+	end
+
+	-- Add loot data attributes for LootManager integration
+	cache:SetAttribute("LootTier", tier)
+	cache:SetAttribute("CacheType", cacheType)
+	cache:SetAttribute("IsLooted", false)
+	cache:SetAttribute("SpawnTime", tick())
+
+	local base: Part
+
+	if cacheType == "weapon_crate" then
+		local crate = Instance.new("Part")
+		crate.Name = "Crate"
+		crate.Size = Vector3.new(5, 3, 3)
+		crate.Position = groundPos + Vector3.new(0, 1.5, 0)
+		crate.Anchored = true
+		crate.BrickColor = BrickColor.new("Dark green")
+		crate.Material = Enum.Material.Metal
+		crate.Parent = cache
+		base = crate
+
+		local lid = Instance.new("Part")
+		lid.Name = "Lid"
+		lid.Size = Vector3.new(5.2, 0.5, 3.2)
+		lid.Position = groundPos + Vector3.new(0, 3.25, 0)
+		lid.Anchored = true
+		lid.BrickColor = BrickColor.new("Dark green")
+		lid.Material = Enum.Material.Metal
+		lid.Parent = cache
+
+		local stripe = Instance.new("Part")
+		stripe.Name = "Stripe"
+		stripe.Size = Vector3.new(4, 0.5, 0.1)
+		stripe.Position = groundPos + Vector3.new(0, 2, -1.55)
+		stripe.Anchored = true
+		stripe.BrickColor = BrickColor.new("White")
+		stripe.Material = Enum.Material.SmoothPlastic
+		stripe.Parent = cache
+
+	elseif cacheType == "ammo_box" then
+		local box = Instance.new("Part")
+		box.Name = "Box"
+		box.Size = Vector3.new(2.5, 2, 2)
+		box.Position = groundPos + Vector3.new(0, 1, 0)
+		box.Anchored = true
+		box.BrickColor = BrickColor.new("Olive")
+		box.Material = Enum.Material.Metal
+		box.Parent = cache
+		base = box
+
+		local handle = Instance.new("Part")
+		handle.Name = "Handle"
+		handle.Size = Vector3.new(1.5, 0.3, 0.3)
+		handle.Position = groundPos + Vector3.new(0, 2.15, 0)
+		handle.Anchored = true
+		handle.BrickColor = BrickColor.new("Dark stone grey")
+		handle.Material = Enum.Material.Metal
+		handle.Parent = cache
+
+	elseif cacheType == "medkit" then
+		local kit = Instance.new("Part")
+		kit.Name = "Kit"
+		kit.Size = Vector3.new(3, 2, 2)
+		kit.Position = groundPos + Vector3.new(0, 1, 0)
+		kit.Anchored = true
+		kit.BrickColor = BrickColor.new("White")
+		kit.Material = Enum.Material.SmoothPlastic
+		kit.Parent = cache
+		base = kit
+
+		local crossH = Instance.new("Part")
+		crossH.Name = "CrossH"
+		crossH.Size = Vector3.new(1.2, 0.3, 0.1)
+		crossH.Position = groundPos + Vector3.new(0, 1.5, -1.05)
+		crossH.Anchored = true
+		crossH.BrickColor = BrickColor.new("Bright red")
+		crossH.Material = Enum.Material.SmoothPlastic
+		crossH.Parent = cache
+
+		local crossV = Instance.new("Part")
+		crossV.Name = "CrossV"
+		crossV.Size = Vector3.new(0.3, 1.2, 0.1)
+		crossV.Position = groundPos + Vector3.new(0, 1.5, -1.05)
+		crossV.Anchored = true
+		crossV.BrickColor = BrickColor.new("Bright red")
+		crossV.Material = Enum.Material.SmoothPlastic
+		crossV.Parent = cache
+
+	else -- supply_drop
+		local crate = Instance.new("Part")
+		crate.Name = "Crate"
+		crate.Size = Vector3.new(4, 4, 4)
+		crate.Position = groundPos + Vector3.new(0, 2, 0)
+		crate.Anchored = true
+		crate.BrickColor = BrickColor.new("Reddish brown")
+		crate.Material = Enum.Material.Wood
+		crate.Parent = cache
+		base = crate
+
+		for i = -1, 1, 2 do
+			local strap = Instance.new("Part")
+			strap.Name = "Strap"
+			strap.Size = Vector3.new(4.2, 0.5, 0.3)
+			strap.Position = groundPos + Vector3.new(0, 2, i * 1.5)
+			strap.Anchored = true
+			strap.BrickColor = BrickColor.new("Dark stone grey")
+			strap.Material = Enum.Material.Metal
+			strap.Parent = cache
+		end
+	end
+
+	-- Create ProximityPrompt for interaction
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ActionText = "Open"
+	prompt.ObjectText = tier .. " Cache"
+	prompt.HoldDuration = 0.5
+	prompt.MaxActivationDistance = 8
+	prompt.Parent = base
+
+	-- Connect to LootManager for loot spawning
+	prompt.Triggered:Connect(function(player)
+		if not cache:GetAttribute("IsLooted") then
+			LootManager.SpawnLootFromCache(player, cache, tier)
+
+			-- Visual feedback: change cache appearance after looting
+			for _, part in ipairs(cache:GetDescendants()) do
+				if part:IsA("BasePart") then
+					part.Transparency = 0.5
+				end
+			end
+
+			-- Disable the prompt after use
+			prompt.Enabled = false
+		end
+	end)
+
+	cache.Parent = getOrCreateFolder("LootCaches")
+	return cache
+end
+
+--------------------------------------------------------------------------------
+-- TERRAIN GENERATION PHASES (Split from monolithic createBaseTerrain)
+--------------------------------------------------------------------------------
+
 --[[
-	Get biome at world position based on GDD layout
-	Uses quadrant-based system with smooth transitions
+	Phase 1: Create solid base layer to prevent gaps
 ]]
-local function getBiomeAtPosition(x: number, z: number): string
-	local halfSize = TERRAIN_CONFIG.mapSize / 2
-
-	-- Normalize to -1 to 1 range
-	local nx = x / halfSize
-	local nz = z / halfSize
-
-	-- Distance from center for coastal detection
-	local distFromCenter = math.sqrt(nx * nx + nz * nz)
-
-	-- SOUTH (z > 0.5): Coastal Area
-	if nz > 0.4 and distFromCenter > 0.5 then
-		return "coastal"
-	end
-
-	-- NORTH (z < -0.4): Volcanic Region
-	if nz < -0.4 then
-		return "volcanic"
-	end
-
-	-- EAST (x > 0.4): Swamplands
-	if nx > 0.4 then
-		return "swamp"
-	end
-
-	-- WEST (x < -0.4): Open Plains
-	if nx < -0.4 then
-		return "plains"
-	end
-
-	-- CENTER: Jungle (default for main play area)
-	return "jungle"
+local function createBaseLayer(terrain: Terrain, config: typeof(MapConfig)): boolean
+	return safeExecute("Phase 1: Base Layer", function()
+		terrain:FillBlock(
+			CFrame.new(0, -15, 0),
+			Vector3.new(config.MapSize + 200, 40, config.MapSize + 200),
+			Enum.Material.Rock
+		)
+	end)
 end
 
 --[[
-	Get terrain height at position based on biome
+	Phase 2: Create spawn area
 ]]
-local function getHeightAtPosition(x: number, z: number, biome: string): number
-	local base = TERRAIN_CONFIG.baseHeight
-
-	-- Multi-octave noise for natural terrain
-	local noise1 = math.noise(x / 300, z / 300, 1) * 20  -- Large features
-	local noise2 = math.noise(x / 100, z / 100, 2) * 10  -- Medium features
-	local noise3 = math.noise(x / 40, z / 40, 3) * 5     -- Small details
-
-	if biome == "jungle" then
-		-- Jungle: Rolling hills with dense variation (15-45 height)
-		local jungleBase = math.noise(x / 150, z / 150, 4) * 15
-		return base + noise1 + noise2 + noise3 + jungleBase + 10
-
-	elseif biome == "plains" then
-		-- Plains: Mostly flat with gentle rolling hills (10-25 height)
-		local plainNoise = math.noise(x / 200, z / 200, 5) * 8
-		return base + plainNoise + noise3 * 0.5
-
-	elseif biome == "volcanic" then
-		-- Volcanic: Dramatic peaks and valleys (20-100 height)
-		local volcanoBase = math.noise(x / 120, z / 120, 6) * 40
-		local peaks = math.max(0, math.noise(x / 60, z / 60, 7)) * 35
-		local ridges = math.abs(math.noise(x / 80, z / 80, 8)) * 20
-		return base + volcanoBase + peaks + ridges + 15
-
-	elseif biome == "swamp" then
-		-- Swamp: Low-lying with water channels (5-20 height)
-		local swampBase = math.noise(x / 100, z / 100, 9) * 8
-		local channels = math.abs(math.noise(x / 50, z / 50, 10)) * 5
-		return base + swampBase - channels - 5
-
-	elseif biome == "coastal" then
-		-- Coastal: Beach sloping to water (0-15 height)
-		local distFromCenter = math.sqrt(x * x + z * z)
-		local normalizedDist = distFromCenter / (TERRAIN_CONFIG.mapSize / 2)
-		local coastSlope = (1 - normalizedDist) * 15
-		local dunes = math.noise(x / 80, z / 80, 11) * 5
-		return math.max(0, coastSlope + dunes)
-	end
-
-	return base + noise1
+local function createSpawnArea(terrain: Terrain, config: typeof(MapConfig)): boolean
+	return safeExecute("Phase 2: Spawn Area", function()
+		local spawnPos = config.SpawnPosition
+		terrain:FillBlock(
+			CFrame.new(spawnPos.X, config.SpawnHeight / 2, spawnPos.Z),
+			Vector3.new(config.SpawnAreaSize, config.SpawnHeight, config.SpawnAreaSize),
+			Enum.Material.Grass
+		)
+	end)
 end
 
 --[[
-	Get terrain material based on biome and height
+	Phase 3: Generate terrain cells
 ]]
-local function getMaterialAtPosition(biome: string, height: number): Enum.Material
-	if biome == "jungle" then
-		if height > 40 then
-			return Enum.Material.Rock
-		elseif height > 25 then
-			return Enum.Material.LeafyGrass
-		else
-			return Enum.Material.Grass
-		end
+local function generateTerrainCells(terrain: Terrain, config: typeof(MapConfig)): (boolean, { [string]: number })
+	local totalCells = 0
+	local biomeCounts = { jungle = 0, plains = 0, volcanic = 0, swamp = 0, coastal = 0 }
 
-	elseif biome == "plains" then
-		if height > 20 then
-			return Enum.Material.Grass
-		else
-			return Enum.Material.Ground
-		end
+	local success = safeExecute("Phase 3: Terrain Cells", function()
+		local halfSize = config.MapSize / 2
+		local resolution = config.Resolution
+		local spawnPos = config.SpawnPosition
 
-	elseif biome == "volcanic" then
-		if height > 70 then
-			return Enum.Material.CrackedLava
-		elseif height > 50 then
-			return Enum.Material.Basalt
-		elseif height > 35 then
-			return Enum.Material.Slate
-		else
-			return Enum.Material.Rock
-		end
+		for x = -halfSize, halfSize, resolution do
+			for z = -halfSize, halfSize, resolution do
+				local distFromSpawn = math.sqrt((x - spawnPos.X)^2 + (z - spawnPos.Z)^2)
+				if distFromSpawn > config.SpawnAreaSize * 0.7 then
+					local biome = getBiomeAtPosition(x, z)
+					local height = getHeightAtPosition(x, z, biome)
+					local material = getMaterialAtPosition(biome, height)
 
-	elseif biome == "swamp" then
-		if height > 15 then
-			return Enum.Material.LeafyGrass
-		elseif height > 8 then
-			return Enum.Material.Mud
-		else
-			return Enum.Material.Ground
-		end
+					height = math.max(height, 8)
 
-	elseif biome == "coastal" then
-		if height > 10 then
-			return Enum.Material.Grass
-		elseif height > 3 then
-			return Enum.Material.Sand
-		else
-			return Enum.Material.Sand
-		end
-	end
+					-- Cache the height
+					cacheTerrainHeight(x, z, height)
 
-	return Enum.Material.Grass
+					terrain:FillBlock(
+						CFrame.new(x, height / 2, z),
+						Vector3.new(resolution + 2, height + 10, resolution + 2),
+						material
+					)
+
+					totalCells = totalCells + 1
+					biomeCounts[biome] = (biomeCounts[biome] or 0) + 1
+				end
+			end
+
+			if totalCells % config.TerrainYieldInterval == 0 then
+				task.wait()
+			end
+		end
+	end)
+
+	return success, biomeCounts
 end
+
+--[[
+	Phase 4: Create water system (ocean, rivers, lakes)
+]]
+local function createWaterSystem(terrain: Terrain, config: typeof(MapConfig)): boolean
+	return safeExecute("Phase 4: Water System", function()
+		local halfSize = config.MapSize / 2
+
+		-- Ocean
+		terrain:FillBlock(
+			CFrame.new(0, -25, halfSize * 0.85),
+			Vector3.new(config.MapSize + 100, 20, config.MapSize * 0.35),
+			Enum.Material.Sand
+		)
+		terrain:FillBlock(
+			CFrame.new(0, -5, halfSize * 0.85),
+			Vector3.new(config.MapSize + 100, 15, config.MapSize * 0.35),
+			Enum.Material.Water
+		)
+
+		-- Rivers
+		for _, river in ipairs(config.Water.Rivers) do
+			createRiverSegment(terrain, river.Start, river.End, river.Width, river.Depth)
+		end
+
+		-- Lakes
+		for _, lake in ipairs(config.Water.Lakes) do
+			createLake(terrain, lake.Position, lake.Radius, lake.Depth)
+		end
+
+		-- Swamp water channels
+		terrain:FillBlock(
+			CFrame.new(halfSize * 0.55, -8, 0),
+			Vector3.new(config.MapSize * 0.25, 12, config.MapSize * 0.4),
+			Enum.Material.Sand
+		)
+		terrain:FillBlock(
+			CFrame.new(halfSize * 0.55, -3, 0),
+			Vector3.new(config.MapSize * 0.25, 8, config.MapSize * 0.4),
+			Enum.Material.Water
+		)
+	end)
+end
+
+--[[
+	Phase 5: Create cave systems
+]]
+local function createCaveSystems(terrain: Terrain, config: typeof(MapConfig)): boolean
+	return safeExecute("Phase 5: Cave Systems", function()
+		for _, cave in ipairs(config.Caves) do
+			createCave(terrain, cave.Position, cave.Depth, cave.Width, cave.Height)
+		end
+	end)
+end
+
+--[[
+	Phase 6: Create volcanic features
+]]
+local function createVolcanicFeatures(terrain: Terrain, config: typeof(MapConfig)): boolean
+	return safeExecute("Phase 6: Volcanic Features", function()
+		local halfSize = config.MapSize / 2
+		for i = 1, config.LavaPoolCount do
+			local lavaX = math.random(-600, 600)
+			local lavaZ = -halfSize + math.random(100, 700)
+			terrain:FillBlock(
+				CFrame.new(lavaX, 35, lavaZ),
+				Vector3.new(math.random(30, 70), 8, math.random(30, 70)),
+				Enum.Material.CrackedLava
+			)
+		end
+	end)
+end
+
+--[[
+	Phase 7: Create POI buildings
+]]
+local function createPOIBuildings(config: typeof(MapConfig)): boolean
+	return safeExecute("Phase 7: POI Buildings", function()
+		local terrain = workspace.Terrain
+		local biomes = config.BiomeCenters
+
+		-- JUNGLE BIOME
+		local visitorCenterPos = Vector3.new(0, 30, -200)
+		createBuilding("VisitorCenter_Main", visitorCenterPos, Vector3.new(80, 20, 60), BrickColor.new("Brick yellow"), Enum.Material.Concrete)
+		createBuilding("VisitorCenter_GiftShop", visitorCenterPos + Vector3.new(-60, 0, 0), Vector3.new(30, 12, 25), BrickColor.new("Bright blue"), Enum.Material.Concrete)
+		createBuilding("VisitorCenter_Restaurant", visitorCenterPos + Vector3.new(60, 0, 0), Vector3.new(35, 12, 30), BrickColor.new("Bright red"), Enum.Material.Concrete)
+		createTower("VisitorCenter_Tower", visitorCenterPos + Vector3.new(0, 0, -50), 30)
+
+		-- Hammond's Villa
+		local hammondPos = Vector3.new(-300, 60, 100)
+		terrain:FillBlock(CFrame.new(hammondPos.X, hammondPos.Y / 2, hammondPos.Z), Vector3.new(150, hammondPos.Y, 150), Enum.Material.Grass)
+		createMultiStoryBuilding("HammondVilla_Main", hammondPos + Vector3.new(0, 5, 0), 3, Vector3.new(40, 12, 35), "Residential")
+		createBuilding("HammondVilla_Garage", hammondPos + Vector3.new(40, 5, 20), Vector3.new(25, 10, 20), BrickColor.new("Medium stone grey"), Enum.Material.Concrete)
+		createHouse("HammondVilla_GuestHouse", hammondPos + Vector3.new(-50, 5, 30), 18)
+
+		-- Raptor Paddock
+		local raptorPaddockPos = Vector3.new(300, 25, -100)
+		createTower("RaptorPaddock_WatchTower1", raptorPaddockPos + Vector3.new(-40, 0, -40), 25)
+		createTower("RaptorPaddock_WatchTower2", raptorPaddockPos + Vector3.new(40, 0, 40), 25)
+		createBuilding("RaptorPaddock_ControlRoom", raptorPaddockPos, Vector3.new(25, 12, 20), BrickColor.new("Dark stone grey"), Enum.Material.Metal)
+
+		-- PLAINS BIOME
+		local plainsCenter = biomes.Plains
+		createBuilding("SafariLodge_Main", plainsCenter, Vector3.new(60, 15, 45), BrickColor.new("Reddish brown"), Enum.Material.Wood)
+		createBuilding("SafariLodge_Reception", plainsCenter + Vector3.new(-50, 0, 0), Vector3.new(25, 10, 20), BrickColor.new("Brown"), Enum.Material.Wood)
+		createTower("SafariLodge_ViewingTower", plainsCenter + Vector3.new(60, 0, 30), 35)
+		for i = 1, config.Buildings.SafariCabinCount do
+			local cabinX = plainsCenter.X + 100 + (i * 40)
+			local cabinZ = plainsCenter.Z + math.random(-50, 50)
+			createHouse("SafariCabin" .. i, Vector3.new(cabinX, 15, cabinZ), 12)
+		end
+
+		-- VOLCANIC BIOME
+		local volcanicCenter = biomes.Volcanic
+		createIndustrialBuilding("GeothermalPlant", volcanicCenter)
+		local observatoryPos = volcanicCenter + Vector3.new(300, 30, 200)
+		terrain:FillBlock(CFrame.new(observatoryPos.X, observatoryPos.Y, observatoryPos.Z), Vector3.new(80, 60, 80), Enum.Material.Basalt)
+		createMultiStoryBuilding("Observatory", observatoryPos + Vector3.new(0, 30, 0), 2, Vector3.new(30, 15, 30), "Industrial")
+		local trexPaddockPos = volcanicCenter + Vector3.new(-400, 0, 300)
+		createTower("TRexPaddock_Tower", trexPaddockPos, 40)
+		createBuilding("TRexPaddock_Bunker", trexPaddockPos + Vector3.new(60, 0, 0), Vector3.new(30, 8, 25), BrickColor.new("Dark stone grey"), Enum.Material.Concrete)
+
+		-- SWAMP BIOME
+		local swampCenter = biomes.Swamp
+		createMultiStoryBuilding("ResearchOutpost_Main", swampCenter, 2, Vector3.new(40, 12, 30), "Commercial")
+		createBuilding("ResearchOutpost_Lab", swampCenter + Vector3.new(40, 0, -30), Vector3.new(30, 10, 25), BrickColor.new("White"), Enum.Material.SmoothPlastic)
+		createTower("ResearchOutpost_Tower", swampCenter + Vector3.new(-50, 0, 20), 20)
+		local boatDockPos = swampCenter + Vector3.new(200, 0, 100)
+		createDock(boatDockPos, 80)
+		createBuilding("BoatDock_Shed", boatDockPos + Vector3.new(-30, 0, 0), Vector3.new(20, 10, 15), BrickColor.new("Brown"), Enum.Material.Wood)
+
+		-- COASTAL BIOME
+		local coastalCenter = biomes.Coastal
+		createLighthouse(coastalCenter + Vector3.new(-400, 0, 200))
+		local harborPos = coastalCenter + Vector3.new(0, 0, -100)
+		createDock(harborPos, 120)
+		createWarehouse("Harbor_Warehouse", harborPos + Vector3.new(-60, 0, -50))
+		createBuilding("Harbor_Office", harborPos + Vector3.new(50, 0, -30), Vector3.new(25, 12, 20), BrickColor.new("Brick yellow"), Enum.Material.Concrete)
+		local resortPos = coastalCenter + Vector3.new(400, 0, 0)
+		createMultiStoryBuilding("BeachResort_Main", resortPos, 4, Vector3.new(50, 12, 40), "Commercial")
+		createBuilding("BeachResort_Restaurant", resortPos + Vector3.new(-60, 0, 30), Vector3.new(35, 12, 30), BrickColor.new("Bright blue"), Enum.Material.Concrete)
+
+		-- Beach cabanas
+		for i = 1, config.Buildings.CabanaCount do
+			local cabanaPos = resortPos + Vector3.new(-200 + (i * 50), 0, 80)
+			local cabana = Instance.new("Model")
+			cabana.Name = "Cabana" .. i
+			local floor = Instance.new("Part")
+			floor.Name = "Floor"
+			floor.Size = Vector3.new(10, 1, 10)
+			floor.Position = cabanaPos + Vector3.new(0, 0.5, 0)
+			floor.Anchored = true
+			floor.BrickColor = BrickColor.new("Brown")
+			floor.Material = Enum.Material.WoodPlanks
+			floor.Parent = cabana
+			local roof = Instance.new("Part")
+			roof.Name = "Roof"
+			roof.Size = Vector3.new(12, 1, 12)
+			roof.Position = cabanaPos + Vector3.new(0, 8, 0)
+			roof.Anchored = true
+			roof.BrickColor = BrickColor.new("Brick yellow")
+			roof.Material = Enum.Material.Fabric
+			roof.Parent = cabana
+			for x = -1, 1, 2 do
+				for z = -1, 1, 2 do
+					local pole = Instance.new("Part")
+					pole.Name = "Pole"
+					pole.Size = Vector3.new(1, 8, 1)
+					pole.Position = cabanaPos + Vector3.new(x * 4, 4, z * 4)
+					pole.Anchored = true
+					pole.BrickColor = BrickColor.new("Brown")
+					pole.Material = Enum.Material.Wood
+					pole.Parent = cabana
+				end
+			end
+			cabana.Parent = getOrCreateFolder("Structures")
+		end
+	end)
+end
+
+--[[
+	Phase 8: Create vegetation
+]]
+local function createVegetation(config: typeof(MapConfig)): boolean
+	return safeExecute("Phase 8: Vegetation", function()
+		local terrain = workspace.Terrain
+		local biomes = config.BiomeCenters
+		local veg = config.Vegetation
+		local yieldInterval = config.VegetationYieldInterval
+		local itemsCreated = 0
+
+		-- JUNGLE VEGETATION
+		for i = 1, veg.JungleTreeClusters do
+			local clusterX = math.random(-500, 500)
+			local clusterZ = math.random(-500, 400)
+			if math.abs(clusterX) > 120 or math.abs(clusterZ - (-200)) > 100 then
+				createTreeCluster(Vector3.new(clusterX, 25, clusterZ), 80, math.random(4, 8), "jungle", 28)
+			end
+			itemsCreated = itemsCreated + 1
+			if itemsCreated % yieldInterval == 0 then task.wait() end
+		end
+
+		for i = 1, veg.JungleIndividualTrees do
+			local treeX = math.random(-600, 600)
+			local treeZ = math.random(-600, 500)
+			if math.abs(treeX) > 100 or math.abs(treeZ - (-200)) > 80 then
+				createFloraTree(Vector3.new(treeX, 25, treeZ), math.random() > 0.5 and "jungle" or "jungleMedium")
+			end
+			itemsCreated = itemsCreated + 1
+			if itemsCreated % yieldInterval == 0 then task.wait() end
+		end
+
+		for i = 1, veg.JungleGrassPatches do
+			createGrassPatch(terrain, Vector3.new(math.random(-500, 500), 25, math.random(-500, 400)), math.random(20, 50))
+		end
+
+		for i = 1, veg.JungleFlowerPatches do
+			pcall(function()
+				FloraGenerator.CreateFlowerPatch(
+					Vector3.new(math.random(-500, 500), 25, math.random(-500, 400)),
+					math.random(5, 15),
+					"Jungle"
+				)
+			end)
+		end
+
+		-- PLAINS VEGETATION
+		local plainsCenter = biomes.Plains
+		for i = 1, veg.PlainsTreeClusters do
+			local clusterX = plainsCenter.X + math.random(-600, 600)
+			local clusterZ = plainsCenter.Z + math.random(-600, 600)
+			createTreeCluster(Vector3.new(clusterX, 18, clusterZ), 60, math.random(2, 4), "oak", 18)
+			itemsCreated = itemsCreated + 1
+			if itemsCreated % yieldInterval == 0 then task.wait() end
+		end
+
+		for i = 1, veg.PlainsBirchTrees do
+			local treeX = plainsCenter.X + math.random(-700, 700)
+			local treeZ = plainsCenter.Z + math.random(-700, 700)
+			createFloraTree(Vector3.new(treeX, 15, treeZ), "birch")
+			itemsCreated = itemsCreated + 1
+			if itemsCreated % yieldInterval == 0 then task.wait() end
+		end
+
+		for i = 1, veg.PlainsGrassPatches do
+			createGrassPatch(terrain, Vector3.new(plainsCenter.X + math.random(-600, 600), 18, plainsCenter.Z + math.random(-600, 600)), math.random(30, 80))
+		end
+
+		for i = 1, veg.PlainsRockFormations do
+			createRockFormation(Vector3.new(plainsCenter.X + math.random(-500, 500), 18, plainsCenter.Z + math.random(-500, 500)), math.random(4, 8), 3, 10)
+		end
+
+		for i = 1, veg.PlainsFlowerPatches do
+			pcall(function()
+				FloraGenerator.CreateFlowerPatch(
+					Vector3.new(plainsCenter.X + math.random(-600, 600), 18, plainsCenter.Z + math.random(-600, 600)),
+					math.random(8, 20),
+					"Plains"
+				)
+			end)
+		end
+
+		-- VOLCANIC VEGETATION
+		local volcanicCenter = biomes.Volcanic
+		for i = 1, veg.VolcanicTrees do
+			local treeX = volcanicCenter.X + math.random(-700, 700)
+			local treeZ = volcanicCenter.Z + math.random(-400, 500)
+			createFloraTree(Vector3.new(treeX, 45, treeZ), math.random() > 0.6 and "charred" or "heatResistant")
+			itemsCreated = itemsCreated + 1
+			if itemsCreated % yieldInterval == 0 then task.wait() end
+		end
+
+		for i = 1, veg.VolcanicRockFormations do
+			createRockFormation(
+				Vector3.new(volcanicCenter.X + math.random(-600, 600), 45, volcanicCenter.Z + math.random(-400, 400)),
+				math.random(5, 12), 5, 20, Enum.Material.Basalt
+			)
+		end
+
+		for i = 1, veg.VolcanicScatteredRocks do
+			local rockX = volcanicCenter.X + math.random(-800, 800)
+			local rockZ = volcanicCenter.Z + math.random(-500, 500)
+			createRock(Vector3.new(rockX, 45, rockZ), math.random(4, 15), Enum.Material.Basalt)
+		end
+
+		-- Volcanic ruins
+		for _, ruin in ipairs(config.Buildings.Ruins) do
+			createRuins(ruin.Name, volcanicCenter + ruin.Position, ruin.Size)
+		end
+
+		-- SWAMP VEGETATION
+		local swampCenter = biomes.Swamp
+		for i = 1, veg.SwampTreeClusters do
+			local clusterX = swampCenter.X + math.random(-500, 500)
+			local clusterZ = swampCenter.Z + math.random(-500, 500)
+			createTreeCluster(Vector3.new(clusterX, 12, clusterZ), 50, math.random(3, 6), "dead", 15)
+			itemsCreated = itemsCreated + 1
+			if itemsCreated % yieldInterval == 0 then task.wait() end
+		end
+
+		for i = 1, veg.SwampIndividualTrees do
+			local treeX = swampCenter.X + math.random(-600, 600)
+			local treeZ = swampCenter.Z + math.random(-600, 600)
+			createFloraTree(Vector3.new(treeX, 12, treeZ), math.random() > 0.4 and "dead" or "cypress")
+			itemsCreated = itemsCreated + 1
+			if itemsCreated % yieldInterval == 0 then task.wait() end
+		end
+
+		-- Swamp stilt houses
+		for i = 1, config.Buildings.StiltHouseCount do
+			local housePos = swampCenter + Vector3.new(math.random(-400, 400), 8, math.random(-400, 400))
+			local stilts = Instance.new("Model")
+			stilts.Name = "StiltHouse" .. i
+			for x = -1, 1, 2 do
+				for z = -1, 1, 2 do
+					local stilt = Instance.new("Part")
+					stilt.Name = "Stilt"
+					stilt.Size = Vector3.new(2, 15, 2)
+					stilt.Position = housePos + Vector3.new(x * 5, 7.5, z * 5)
+					stilt.Anchored = true
+					stilt.BrickColor = BrickColor.new("Brown")
+					stilt.Material = Enum.Material.Wood
+					stilt.Parent = stilts
+				end
+			end
+			stilts.Parent = getOrCreateFolder("Structures")
+			createHouse("SwampHouse" .. i, housePos + Vector3.new(0, 15, 0), math.random(12, 16))
+		end
+
+		-- COASTAL VEGETATION
+		local coastalCenter = biomes.Coastal
+		for i = 1, veg.CoastalTreeClusters do
+			local clusterX = coastalCenter.X + math.random(-700, 700)
+			local clusterZ = coastalCenter.Z + math.random(-300, 200)
+			createTreeCluster(Vector3.new(clusterX, 10, clusterZ), 60, math.random(4, 7), "palm", 18)
+			itemsCreated = itemsCreated + 1
+			if itemsCreated % yieldInterval == 0 then task.wait() end
+		end
+
+		for i = 1, veg.CoastalIndividualTrees do
+			local palmX = coastalCenter.X + math.random(-800, 800)
+			local palmZ = coastalCenter.Z + math.random(-400, 300)
+			createFloraTree(Vector3.new(palmX, 8, palmZ), math.random() > 0.3 and "palm" or "pine")
+			itemsCreated = itemsCreated + 1
+			if itemsCreated % yieldInterval == 0 then task.wait() end
+		end
+
+		for i = 1, veg.CoastalRockFormations do
+			createRockFormation(
+				Vector3.new(coastalCenter.X + math.random(-600, 600), 8, coastalCenter.Z + math.random(0, 300)),
+				math.random(3, 7), 2, 8, Enum.Material.Sandstone
+			)
+		end
+	end)
+end
+
+--[[
+	Phase 9: Create scattered buildings
+]]
+local function createScatteredBuildings(config: typeof(MapConfig)): boolean
+	return safeExecute("Phase 9: Scattered Buildings", function()
+		-- Apartments
+		for _, apt in ipairs(config.Buildings.Apartments) do
+			createApartmentBuilding(apt.Name, apt.Position, apt.Floors)
+		end
+
+		-- Warehouses
+		for _, wh in ipairs(config.Buildings.Warehouses) do
+			createWarehouse(wh.Name, wh.Position)
+		end
+
+		-- Scattered houses
+		for i, loc in ipairs(config.Buildings.Houses) do
+			createHouse("ScatteredHouse" .. i, loc.Position, loc.Size)
+		end
+
+		-- Sheds
+		for i = 1, config.Buildings.ShedCount do
+			local shedX = math.random(-1500, 1500)
+			local shedZ = math.random(-1200, 1200)
+			local shedY = 15
+			if shedZ < -800 then shedY = 45 end
+			if shedX > 800 then shedY = 12 end
+			if shedZ > 800 then shedY = 10 end
+			createShed("Shed" .. i, Vector3.new(shedX, shedY, shedZ), math.random(8, 14))
+		end
+
+		-- Guard towers
+		for _, tower in ipairs(config.Buildings.GuardTowers) do
+			createTower(tower.Name, tower.Position, tower.Height)
+		end
+
+		-- Research buildings
+		for _, research in ipairs(config.Buildings.ResearchBuildings) do
+			createMultiStoryBuilding(research.Name, research.Position, research.Floors, research.Footprint, "Commercial")
+		end
+	end)
+end
+
+--[[
+	Phase 10: Create loot caches
+]]
+local function createLootCaches(config: typeof(MapConfig)): boolean
+	return safeExecute("Phase 10: Loot Caches", function()
+		local spawnCenter = config.GetSpawnCenter()
+		local cacheTypes = config.LootCacheTypes
+		local lootCacheCount = 16
+
+		-- Ring pattern around spawn
+		for i = 1, lootCacheCount do
+			local ring = math.ceil(i / 8)
+			local angleOffset = (ring - 1) * 0.25
+			local angle = ((i - 1) / 8) * math.pi * 2 + angleOffset
+			local distance = config.LootRingDistances.Inner + (ring - 1) * (config.LootRingDistances.Outer - config.LootRingDistances.Inner) + math.random(-20, 20)
+
+			local cacheX = spawnCenter.X + math.cos(angle) * distance
+			local cacheZ = spawnCenter.Z + math.sin(angle) * distance
+
+			local cacheType = cacheTypes[math.random(1, #cacheTypes)]
+			createLootCache(Vector3.new(cacheX, spawnCenter.Y, cacheZ), cacheType)
+		end
+
+		-- Additional random loot
+		for i = 1, 20 do
+			local angle = math.random() * math.pi * 2
+			local distance = 50 + math.random() * 250
+			local lootX = spawnCenter.X + math.cos(angle) * distance
+			local lootZ = spawnCenter.Z + math.sin(angle) * distance
+
+			local cacheType = cacheTypes[math.random(1, #cacheTypes)]
+			createLootCache(Vector3.new(lootX, spawnCenter.Y, lootZ), cacheType)
+		end
+	end)
+end
+
+--[[
+	Phase 11: Create foliage details (bushes, ferns, flowers)
+]]
+local function createFoliageDetails(config: typeof(MapConfig)): boolean
+	return safeExecute("Phase 11: Foliage Details", function()
+		local veg = config.Vegetation
+		local biomes = config.BiomeCenters
+		local spawnCenter = config.GetSpawnCenter()
+
+		-- Bushes
+		for i = 1, veg.TotalBushes do
+			local bushX = math.random(-1800, 1800)
+			local bushZ = math.random(-1500, 1500)
+			local bushY = 20
+			if bushZ < -800 then bushY = 45 end
+			if bushX > 800 then bushY = 12 end
+			if bushZ > 800 then bushY = 10 end
+			createBush(Vector3.new(bushX, bushY, bushZ), math.random(2, 5))
+		end
+
+		-- Jungle ferns
+		for i = 1, veg.JungleFerns do
+			local fernX = math.random(-600, 600)
+			local fernZ = math.random(-500, 400)
+			createFern(Vector3.new(fernX, 25, fernZ))
+		end
+
+		-- Swamp ferns
+		local swampCenter = biomes.Swamp
+		for i = 1, veg.SwampFerns do
+			local fernX = swampCenter.X + math.random(-500, 500)
+			local fernZ = swampCenter.Z + math.random(-500, 500)
+			createFern(Vector3.new(fernX, 12, fernZ))
+		end
+
+		-- Plains flowers
+		local plainsCenter = biomes.Plains
+		for i = 1, veg.PlainsDetailFlowers do
+			local flowerX = plainsCenter.X + math.random(-600, 600)
+			local flowerZ = plainsCenter.Z + math.random(-600, 600)
+			createFlowerPatch(Vector3.new(flowerX, 18, flowerZ), math.random(5, 12))
+		end
+
+		-- Coastal flowers
+		local coastalCenter = biomes.Coastal
+		for i = 1, veg.CoastalDetailFlowers do
+			local flowerX = coastalCenter.X + math.random(-600, 600)
+			local flowerZ = coastalCenter.Z + math.random(-200, 200)
+			createFlowerPatch(Vector3.new(flowerX, 10, flowerZ), math.random(4, 8))
+		end
+
+		-- Spawn area bushes
+		for i = 1, veg.SpawnAreaBushes do
+			local angle = math.random() * math.pi * 2
+			local dist = 50 + math.random() * 150
+			local bushX = spawnCenter.X + math.cos(angle) * dist
+			local bushZ = spawnCenter.Z + math.sin(angle) * dist
+			createBush(Vector3.new(bushX, spawnCenter.Y, bushZ), math.random(3, 6))
+		end
+	end)
+end
+
+--[[
+	Phase 12: Create final rock details
+]]
+local function createRockDetails(config: typeof(MapConfig)): boolean
+	return safeExecute("Phase 12: Rock Details", function()
+		for i = 1, config.Vegetation.FinalRockDetails do
+			local x = math.random(-1800, 1800)
+			local z = math.random(-1600, 1600)
+			local y = 20
+			if z < -800 then y = 45 end
+			if x > 900 then y = 12 end
+			if z > 900 then y = 10 end
+			createRock(Vector3.new(x, y, z), math.random(2, 8))
+		end
+	end)
+end
+
+--------------------------------------------------------------------------------
+-- MAIN TERRAIN GENERATION
+--------------------------------------------------------------------------------
 
 --[[
 	Create the full 4km x 4km multi-biome terrain
-	Enhanced with:
-	- Gap-filling base layer
-	- 30% water coverage with solid bottoms
-	- 30% foliage/structures
-	- Varied trees, caves, multi-story buildings
+	Split into separate phases for maintainability and error tracking
 ]]
 local function createBaseTerrain()
 	local terrain = workspace.Terrain
+	local config = MapConfig
+
+	-- Reset generation results
+	generationResults = {}
 
 	print("===========================================")
 	print("[MapManager] GENERATING ISLA PRIMORDIAL")
@@ -2031,6 +2296,9 @@ local function createBaseTerrain()
 	print("  Features: Rivers, Lakes, Caves, Dense Foliage")
 	print("  Coverage: 30% Water, 30% Foliage/Structures")
 	print("===========================================")
+
+	-- Ensure folders exist
+	ensureFoldersExist()
 
 	-- Clean up existing objects
 	local cleanupNames = {
@@ -2044,865 +2312,57 @@ local function createBaseTerrain()
 		end
 	end
 
-	-- Clear existing terrain
+	-- Clear existing terrain and height cache
 	print("[MapManager] Clearing existing terrain...")
 	terrain:Clear()
-
-	local mapSize = TERRAIN_CONFIG.mapSize
-	local halfSize = mapSize / 2
-
-	-- =============================================
-	-- PHASE 1: SOLID BASE LAYER (Gap Prevention)
-	-- =============================================
-	print("[MapManager] Phase 1: Creating solid base layer...")
-
-	pcall(function()
-		-- Create a massive solid rock layer to prevent any fall-through
-		terrain:FillBlock(
-			CFrame.new(0, -15, 0),
-			Vector3.new(mapSize + 200, 40, mapSize + 200),
-			Enum.Material.Rock
-		)
-	end)
-	print("[MapManager] Base layer complete - no gaps possible")
-
-	-- =============================================
-	-- PHASE 2: Create spawn area
-	-- =============================================
-	local spawnX, spawnZ = 200, 200
-	local spawnAreaSize = 200
-	local spawnHeight = 30
-
-	print("[MapManager] Phase 2: Creating spawn area...")
-
-	pcall(function()
-		terrain:FillBlock(
-			CFrame.new(spawnX, spawnHeight / 2, spawnZ),
-			Vector3.new(spawnAreaSize, spawnHeight, spawnAreaSize),
-			Enum.Material.Grass
-		)
-	end)
-
-	-- =============================================
-	-- PHASE 3: Generate terrain (finer resolution)
-	-- =============================================
-	print("[MapManager] Phase 3: Generating terrain...")
-
-	local resolution = 32 -- Finer resolution for better detail
-	local totalCells = 0
-	local biomeCounts = { jungle = 0, plains = 0, volcanic = 0, swamp = 0, coastal = 0 }
-
-	pcall(function()
-		for x = -halfSize, halfSize, resolution do
-			for z = -halfSize, halfSize, resolution do
-				local distFromSpawn = math.sqrt((x - spawnX)^2 + (z - spawnZ)^2)
-				if distFromSpawn > spawnAreaSize * 0.7 then
-					local biome = getBiomeAtPosition(x, z)
-					local height = getHeightAtPosition(x, z, biome)
-					local material = getMaterialAtPosition(biome, height)
-
-					height = math.max(height, 8)
-
-					terrain:FillBlock(
-						CFrame.new(x, height / 2, z),
-						Vector3.new(resolution + 2, height + 10, resolution + 2),
-						material
-					)
-
-					totalCells = totalCells + 1
-					biomeCounts[biome] = (biomeCounts[biome] or 0) + 1
-				end
-			end
-
-			if totalCells % 150 == 0 then
-				task.wait()
-			end
-		end
-	end)
-	print(`[MapManager] Generated {totalCells} terrain cells`)
-
-	-- =============================================
-	-- PHASE 4: WATER SYSTEM (30% Coverage)
-	-- Rivers, Lakes, Ocean with solid bottoms
-	-- =============================================
-	print("[MapManager] Phase 4: Creating water system (30% coverage)...")
-
-	-- === OCEAN (South - ~10% coverage) ===
-	-- Ocean bed (solid bottom)
-	terrain:FillBlock(
-		CFrame.new(0, -25, halfSize * 0.85),
-		Vector3.new(mapSize + 100, 20, mapSize * 0.35),
-		Enum.Material.Sand
-	)
-	-- Ocean water
-	terrain:FillBlock(
-		CFrame.new(0, -5, halfSize * 0.85),
-		Vector3.new(mapSize + 100, 15, mapSize * 0.35),
-		Enum.Material.Water
-	)
-
-	-- === MAJOR RIVERS (~8% coverage) ===
-	print("[MapManager] Creating rivers with solid beds...")
-
-	-- River 1: Volcanic to Swamp (North to East)
-	createRiverSegment(terrain, Vector3.new(-200, 0, -1200), Vector3.new(1000, 0, 0), 60, 12)
-
-	-- River 2: Jungle to Coast (Center to South)
-	createRiverSegment(terrain, Vector3.new(0, 0, -400), Vector3.new(200, 0, 1200), 50, 10)
-
-	-- River 3: Plains to Coast (West to South)
-	createRiverSegment(terrain, Vector3.new(-1200, 0, -200), Vector3.new(-400, 0, 1000), 45, 10)
-
-	-- River 4: Swamp delta channels
-	createRiverSegment(terrain, Vector3.new(800, 0, -300), Vector3.new(1400, 0, 200), 40, 8)
-	createRiverSegment(terrain, Vector3.new(1000, 0, 100), Vector3.new(1500, 0, 400), 35, 8)
-
-	-- === LAKES (~8% coverage) ===
-	print("[MapManager] Creating lakes with solid beds...")
-
-	-- Central Lake (large)
-	createLake(terrain, Vector3.new(0, 0, 0), 200, 15)
-
-	-- Jungle Lakes
-	createLake(terrain, Vector3.new(-400, 0, -300), 120, 12)
-	createLake(terrain, Vector3.new(350, 0, -150), 100, 10)
-
-	-- Plains Lakes
-	createLake(terrain, Vector3.new(-1000, 0, 200), 150, 12)
-	createLake(terrain, Vector3.new(-800, 0, -400), 80, 8)
-
-	-- Swamp Lakes (shallow)
-	createLake(terrain, Vector3.new(900, 0, -200), 100, 6)
-	createLake(terrain, Vector3.new(1100, 0, 300), 120, 7)
-	createLake(terrain, Vector3.new(1300, 0, -100), 90, 5)
-
-	-- Volcanic Crater Lake
-	createLake(terrain, Vector3.new(200, 0, -1500), 100, 20)
-
-	-- Coastal Lagoons
-	createLake(terrain, Vector3.new(-600, 0, 1100), 130, 8)
-	createLake(terrain, Vector3.new(500, 0, 1000), 110, 8)
-
-	-- === SWAMP WATER CHANNELS (~4% coverage) ===
-	terrain:FillBlock(
-		CFrame.new(halfSize * 0.55, -8, 0),
-		Vector3.new(mapSize * 0.25, 12, mapSize * 0.4),
-		Enum.Material.Sand
-	)
-	terrain:FillBlock(
-		CFrame.new(halfSize * 0.55, -3, 0),
-		Vector3.new(mapSize * 0.25, 8, mapSize * 0.4),
-		Enum.Material.Water
-	)
-
-	print("[MapManager] Water system complete (~30% coverage)")
-
-	-- =============================================
-	-- PHASE 5: CAVE SYSTEMS
-	-- =============================================
-	print("[MapManager] Phase 5: Creating cave systems...")
-
-	-- Volcanic caves (lava caves)
-	createCave(terrain, Vector3.new(-300, 45, -1300), 80, 25, 15)
-	createCave(terrain, Vector3.new(100, 50, -1400), 60, 20, 12)
-	createCave(terrain, Vector3.new(400, 40, -1200), 70, 22, 14)
-	createCave(terrain, Vector3.new(-500, 55, -1500), 50, 18, 10)
-
-	-- Jungle hillside caves
-	createCave(terrain, Vector3.new(-200, 35, -100), 50, 18, 12)
-	createCave(terrain, Vector3.new(250, 30, 100), 45, 16, 10)
-	createCave(terrain, Vector3.new(-350, 40, 200), 55, 20, 12)
-
-	print("[MapManager] Created 7 accessible caves")
-
-	-- =============================================
-	-- PHASE 6: VOLCANIC FEATURES
-	-- =============================================
-	print("[MapManager] Phase 6: Adding volcanic features...")
-
-	for i = 1, 8 do
-		local lavaX = math.random(-600, 600)
-		local lavaZ = -halfSize + math.random(100, 700)
-		terrain:FillBlock(
-			CFrame.new(lavaX, 35, lavaZ),
-			Vector3.new(math.random(30, 70), 8, math.random(30, 70)),
-			Enum.Material.CrackedLava
-		)
-	end
-
-	-- =============================================
-	-- PHASE 7: Create POI Buildings & Structures
-	-- =============================================
-	print("[MapManager] Phase 7: Creating POI buildings...")
-
-	-- === JUNGLE BIOME (CENTER) ===
-	local visitorCenterPos = Vector3.new(0, 30, -200)
-	createBuilding("VisitorCenter_Main", visitorCenterPos, Vector3.new(80, 20, 60), BrickColor.new("Brick yellow"), Enum.Material.Concrete)
-	createBuilding("VisitorCenter_GiftShop", visitorCenterPos + Vector3.new(-60, 0, 0), Vector3.new(30, 12, 25), BrickColor.new("Bright blue"), Enum.Material.Concrete)
-	createBuilding("VisitorCenter_Restaurant", visitorCenterPos + Vector3.new(60, 0, 0), Vector3.new(35, 12, 30), BrickColor.new("Bright red"), Enum.Material.Concrete)
-	createTower("VisitorCenter_Tower", visitorCenterPos + Vector3.new(0, 0, -50), 30)
-
-	-- Hammond's Villa
-	local hammondPos = Vector3.new(-300, 60, 100)
-	terrain:FillBlock(CFrame.new(hammondPos.X, hammondPos.Y / 2, hammondPos.Z), Vector3.new(150, hammondPos.Y, 150), Enum.Material.Grass)
-	createMultiStoryBuilding("HammondVilla_Main", hammondPos + Vector3.new(0, 5, 0), 3, Vector3.new(40, 12, 35), "residential")
-	createBuilding("HammondVilla_Garage", hammondPos + Vector3.new(40, 5, 20), Vector3.new(25, 10, 20), BrickColor.new("Medium stone grey"), Enum.Material.Concrete)
-	createHouse("HammondVilla_GuestHouse", hammondPos + Vector3.new(-50, 5, 30), 18)
-
-	-- Raptor Paddock
-	local raptorPaddockPos = Vector3.new(300, 25, -100)
-	createTower("RaptorPaddock_WatchTower1", raptorPaddockPos + Vector3.new(-40, 0, -40), 25)
-	createTower("RaptorPaddock_WatchTower2", raptorPaddockPos + Vector3.new(40, 0, 40), 25)
-	createBuilding("RaptorPaddock_ControlRoom", raptorPaddockPos, Vector3.new(25, 12, 20), BrickColor.new("Dark stone grey"), Enum.Material.Metal)
-	for i = 1, 8 do
-		local angle = (i / 8) * math.pi * 2
-		local fenceX = raptorPaddockPos.X + math.cos(angle) * 60
-		local fenceZ = raptorPaddockPos.Z + math.sin(angle) * 60
-		local post = Instance.new("Part")
-		post.Name = "FencePost" .. i
-		post.Size = Vector3.new(3, 15, 3)
-		post.Position = Vector3.new(fenceX, 32, fenceZ)
-		post.Anchored = true
-		post.BrickColor = BrickColor.new("Medium stone grey")
-		post.Material = Enum.Material.Metal
-		post.Parent = workspace
-	end
-
-	-- === PLAINS BIOME (WEST) ===
-	print("[MapManager] Creating plains POIs...")
-	local plainsCenter = Vector3.new(-1200, 20, 0)
-	createBuilding("SafariLodge_Main", plainsCenter, Vector3.new(60, 15, 45), BrickColor.new("Reddish brown"), Enum.Material.Wood)
-	createBuilding("SafariLodge_Reception", plainsCenter + Vector3.new(-50, 0, 0), Vector3.new(25, 10, 20), BrickColor.new("Brown"), Enum.Material.Wood)
-	createTower("SafariLodge_ViewingTower", plainsCenter + Vector3.new(60, 0, 30), 35)
-	for i = 1, 5 do
-		local cabinX = plainsCenter.X + 100 + (i * 40)
-		local cabinZ = plainsCenter.Z + math.random(-50, 50)
-		createHouse("SafariCabin" .. i, Vector3.new(cabinX, 15, cabinZ), 12)
-	end
-
-	-- === VOLCANIC BIOME (NORTH) ===
-	print("[MapManager] Creating volcanic POIs...")
-	local volcanicCenter = Vector3.new(0, 50, -1400)
-	createIndustrialBuilding("GeothermalPlant", volcanicCenter)
-	local observatoryPos = volcanicCenter + Vector3.new(300, 30, 200)
-	terrain:FillBlock(CFrame.new(observatoryPos.X, observatoryPos.Y, observatoryPos.Z), Vector3.new(80, 60, 80), Enum.Material.Basalt)
-	createMultiStoryBuilding("Observatory", observatoryPos + Vector3.new(0, 30, 0), 2, Vector3.new(30, 15, 30), "industrial")
-	local trexPaddockPos = volcanicCenter + Vector3.new(-400, 0, 300)
-	createTower("TRexPaddock_Tower", trexPaddockPos, 40)
-	createBuilding("TRexPaddock_Bunker", trexPaddockPos + Vector3.new(60, 0, 0), Vector3.new(30, 8, 25), BrickColor.new("Dark stone grey"), Enum.Material.Concrete)
-
-	-- === SWAMP BIOME (EAST) ===
-	print("[MapManager] Creating swamp POIs...")
-	local swampCenter = Vector3.new(1200, 12, 0)
-	createMultiStoryBuilding("ResearchOutpost_Main", swampCenter, 2, Vector3.new(40, 12, 30), "commercial")
-	createBuilding("ResearchOutpost_Lab", swampCenter + Vector3.new(40, 0, -30), Vector3.new(30, 10, 25), BrickColor.new("White"), Enum.Material.SmoothPlastic)
-	createTower("ResearchOutpost_Tower", swampCenter + Vector3.new(-50, 0, 20), 20)
-	local boatDockPos = swampCenter + Vector3.new(200, 0, 100)
-	createDock(boatDockPos, 80)
-	createBuilding("BoatDock_Shed", boatDockPos + Vector3.new(-30, 0, 0), Vector3.new(20, 10, 15), BrickColor.new("Brown"), Enum.Material.Wood)
-
-	-- === COASTAL BIOME (SOUTH) ===
-	print("[MapManager] Creating coastal POIs...")
-	local coastalCenter = Vector3.new(0, 10, 1400)
-	createLighthouse(coastalCenter + Vector3.new(-400, 0, 200))
-	local harborPos = coastalCenter + Vector3.new(0, 0, -100)
-	createDock(harborPos, 120)
-	createWarehouse("Harbor_Warehouse", harborPos + Vector3.new(-60, 0, -50))
-	createBuilding("Harbor_Office", harborPos + Vector3.new(50, 0, -30), Vector3.new(25, 12, 20), BrickColor.new("Brick yellow"), Enum.Material.Concrete)
-	local resortPos = coastalCenter + Vector3.new(400, 0, 0)
-	createMultiStoryBuilding("BeachResort_Main", resortPos, 4, Vector3.new(50, 12, 40), "commercial")
-	createBuilding("BeachResort_Restaurant", resortPos + Vector3.new(-60, 0, 30), Vector3.new(35, 12, 30), BrickColor.new("Bright blue"), Enum.Material.Concrete)
-
-	-- Beach cabanas
-	for i = 1, 6 do
-		local cabanaPos = resortPos + Vector3.new(-200 + (i * 50), 0, 80)
-		local cabana = Instance.new("Model")
-		cabana.Name = "Cabana" .. i
-		local floor = Instance.new("Part")
-		floor.Name = "Floor"
-		floor.Size = Vector3.new(10, 1, 10)
-		floor.Position = cabanaPos + Vector3.new(0, 0.5, 0)
-		floor.Anchored = true
-		floor.BrickColor = BrickColor.new("Brown")
-		floor.Material = Enum.Material.WoodPlanks
-		floor.Parent = cabana
-		local roof = Instance.new("Part")
-		roof.Name = "Roof"
-		roof.Size = Vector3.new(12, 1, 12)
-		roof.Position = cabanaPos + Vector3.new(0, 8, 0)
-		roof.Anchored = true
-		roof.BrickColor = BrickColor.new("Brick yellow")
-		roof.Material = Enum.Material.Fabric
-		roof.Parent = cabana
-		for x = -1, 1, 2 do
-			for z = -1, 1, 2 do
-				local pole = Instance.new("Part")
-				pole.Name = "Pole"
-				pole.Size = Vector3.new(1, 8, 1)
-				pole.Position = cabanaPos + Vector3.new(x * 4, 4, z * 4)
-				pole.Anchored = true
-				pole.BrickColor = BrickColor.new("Brown")
-				pole.Material = Enum.Material.Wood
-				pole.Parent = cabana
-			end
-		end
-		cabana.Parent = workspace
-	end
-
-	-- =============================================
-	-- PHASE 8: DENSE FOLIAGE (30% Coverage)
-	-- =============================================
-	print("[MapManager] Phase 8: Creating dense foliage (30% coverage)...")
-
-	-- === JUNGLE DENSE VEGETATION (many varied trees) ===
-	print("[MapManager] Adding jungle vegetation...")
-	-- Dense jungle tree clusters
-	for i = 1, 25 do
-		local clusterX = math.random(-500, 500)
-		local clusterZ = math.random(-500, 400)
-		-- Avoid POI areas
-		if math.abs(clusterX) > 120 or math.abs(clusterZ - (-200)) > 100 then
-			createTreeCluster(Vector3.new(clusterX, 25, clusterZ), 80, math.random(4, 8), "jungle", 28)
-		end
-	end
-	-- Individual jungle trees for filling
-	for i = 1, 80 do
-		local treeX = math.random(-600, 600)
-		local treeZ = math.random(-600, 500)
-		if math.abs(treeX) > 100 or math.abs(treeZ - (-200)) > 80 then
-			createFloraTree(Vector3.new(treeX, 25, treeZ), math.random() > 0.5 and "jungle" or "jungleMedium")
-		end
-		if i % 10 == 0 then task.wait() end
-	end
-	-- Grass patches in jungle
-	for i = 1, 20 do
-		createGrassPatch(terrain, Vector3.new(math.random(-500, 500), 25, math.random(-500, 400)), math.random(20, 50))
-	end
-	-- Jungle flower patches (tropical flowers)
-	for i = 1, 15 do
-		pcall(function()
-			FloraGenerator.CreateFlowerPatch(
-				Vector3.new(math.random(-500, 500), 25, math.random(-500, 400)),
-				math.random(5, 15),
-				"Jungle"
-			)
-		end)
-	end
-
-	-- === PLAINS VEGETATION (sparse trees, grass) ===
-	print("[MapManager] Adding plains vegetation...")
-	-- Oak tree clusters (sparse)
-	for i = 1, 15 do
-		local clusterX = plainsCenter.X + math.random(-600, 600)
-		local clusterZ = plainsCenter.Z + math.random(-600, 600)
-		createTreeCluster(Vector3.new(clusterX, 18, clusterZ), 60, math.random(2, 4), "oak", 18)
-	end
-	-- Birch trees scattered
-	for i = 1, 30 do
-		local treeX = plainsCenter.X + math.random(-700, 700)
-		local treeZ = plainsCenter.Z + math.random(-700, 700)
-		createFloraTree(Vector3.new(treeX, 15, treeZ), "birch")
-		if i % 10 == 0 then task.wait() end
-	end
-	-- Large grass patches
-	for i = 1, 30 do
-		createGrassPatch(terrain, Vector3.new(plainsCenter.X + math.random(-600, 600), 18, plainsCenter.Z + math.random(-600, 600)), math.random(30, 80))
-	end
-	-- Rock formations
-	for i = 1, 8 do
-		createRockFormation(Vector3.new(plainsCenter.X + math.random(-500, 500), 18, plainsCenter.Z + math.random(-500, 500)), math.random(4, 8), 3, 10)
-	end
-	-- Plains flower patches (wildflowers)
-	for i = 1, 25 do
-		pcall(function()
-			FloraGenerator.CreateFlowerPatch(
-				Vector3.new(plainsCenter.X + math.random(-600, 600), 18, plainsCenter.Z + math.random(-600, 600)),
-				math.random(8, 20),
-				"Plains"
-			)
-		end)
-	end
-
-	-- === VOLCANIC VEGETATION (sparse charred trees, many rocks) ===
-	print("[MapManager] Adding volcanic vegetation...")
-	-- Sparse charred/heat-resistant trees on slopes
-	for i = 1, 25 do
-		local treeX = volcanicCenter.X + math.random(-700, 700)
-		local treeZ = volcanicCenter.Z + math.random(-400, 500)
-		createFloraTree(Vector3.new(treeX, 45, treeZ), math.random() > 0.6 and "charred" or "heatResistant")
-		if i % 10 == 0 then task.wait() end
-	end
-	-- Many rock formations
-	for i = 1, 20 do
-		createRockFormation(
-			Vector3.new(volcanicCenter.X + math.random(-600, 600), 45, volcanicCenter.Z + math.random(-400, 400)),
-			math.random(5, 12), 5, 20, Enum.Material.Basalt
-		)
-	end
-	-- Scattered individual rocks
-	for i = 1, 60 do
-		local rockX = volcanicCenter.X + math.random(-800, 800)
-		local rockZ = volcanicCenter.Z + math.random(-500, 500)
-		createRock(Vector3.new(rockX, 45, rockZ), math.random(4, 15), Enum.Material.Basalt)
-	end
-	-- Ruins in volcanic area
-	createRuins("VolcanicRuins1", volcanicCenter + Vector3.new(-600, 0, 100), 30)
-	createRuins("VolcanicRuins2", volcanicCenter + Vector3.new(500, 0, -200), 25)
-	createRuins("VolcanicRuins3", volcanicCenter + Vector3.new(200, 0, 400), 35)
-
-	-- === SWAMP VEGETATION (dead trees, murky) ===
-	print("[MapManager] Adding swamp vegetation...")
-	-- Dead tree clusters
-	for i = 1, 20 do
-		local clusterX = swampCenter.X + math.random(-500, 500)
-		local clusterZ = swampCenter.Z + math.random(-500, 500)
-		createTreeCluster(Vector3.new(clusterX, 12, clusterZ), 50, math.random(3, 6), "dead", 15)
-	end
-	-- Individual dead and cypress trees
-	for i = 1, 40 do
-		local treeX = swampCenter.X + math.random(-600, 600)
-		local treeZ = swampCenter.Z + math.random(-600, 600)
-		createFloraTree(Vector3.new(treeX, 12, treeZ), math.random() > 0.4 and "dead" or "cypress")
-		if i % 10 == 0 then task.wait() end
-	end
-	-- Swamp stilt houses
-	for i = 1, 6 do
-		local housePos = swampCenter + Vector3.new(math.random(-400, 400), 8, math.random(-400, 400))
-		local stilts = Instance.new("Model")
-		stilts.Name = "StiltHouse" .. i
-		for x = -1, 1, 2 do
-			for z = -1, 1, 2 do
-				local stilt = Instance.new("Part")
-				stilt.Name = "Stilt"
-				stilt.Size = Vector3.new(2, 15, 2)
-				stilt.Position = housePos + Vector3.new(x * 5, 7.5, z * 5)
-				stilt.Anchored = true
-				stilt.BrickColor = BrickColor.new("Brown")
-				stilt.Material = Enum.Material.Wood
-				stilt.Parent = stilts
-			end
-		end
-		stilts.Parent = workspace
-		createHouse("SwampHouse" .. i, housePos + Vector3.new(0, 15, 0), math.random(12, 16))
-	end
-
-	-- === COASTAL VEGETATION (palm trees, beach) ===
-	print("[MapManager] Adding coastal vegetation...")
-	-- Dense palm tree clusters
-	for i = 1, 15 do
-		local clusterX = coastalCenter.X + math.random(-700, 700)
-		local clusterZ = coastalCenter.Z + math.random(-300, 200)
-		createTreeCluster(Vector3.new(clusterX, 10, clusterZ), 60, math.random(4, 7), "palm", 18)
-	end
-	-- Individual palms and coastal pines
-	for i = 1, 50 do
-		local palmX = coastalCenter.X + math.random(-800, 800)
-		local palmZ = coastalCenter.Z + math.random(-400, 300)
-		createFloraTree(Vector3.new(palmX, 8, palmZ), math.random() > 0.3 and "palm" or "pine")
-		if i % 10 == 0 then task.wait() end
-	end
-	-- Beach rocks and formations
-	for i = 1, 12 do
-		createRockFormation(
-			Vector3.new(coastalCenter.X + math.random(-600, 600), 8, coastalCenter.Z + math.random(0, 300)),
-			math.random(3, 7), 2, 8, Enum.Material.Sandstone
-		)
-	end
-
-	-- =============================================
-	-- PHASE 9: SCATTERED BUILDINGS (Between POIs)
-	-- =============================================
-	print("[MapManager] Phase 9: Adding scattered buildings...")
-
-	-- Multi-story apartments in various locations
-	createApartmentBuilding("Apartments_Jungle1", Vector3.new(-150, 25, 350), 3)
-	createApartmentBuilding("Apartments_Plains1", Vector3.new(-900, 18, 300), 2)
-	createApartmentBuilding("Apartments_Coast1", Vector3.new(-200, 10, 1100), 4)
-	createApartmentBuilding("Apartments_Coast2", Vector3.new(600, 10, 900), 3)
-
-	-- Warehouses
-	createWarehouse("Warehouse_Jungle1", Vector3.new(450, 25, 200))
-	createWarehouse("Warehouse_Swamp1", Vector3.new(800, 12, -300))
-
-	-- Scattered houses across the map
-	local houseLocations = {
-		{Vector3.new(-500, 25, -400), 16},
-		{Vector3.new(400, 25, 300), 14},
-		{Vector3.new(-700, 18, -300), 12},
-		{Vector3.new(-1400, 18, 400), 15},
-		{Vector3.new(-1000, 18, -500), 14},
-		{Vector3.new(700, 12, 400), 13},
-		{Vector3.new(1000, 12, -400), 12},
-		{Vector3.new(-300, 10, 900), 14},
-		{Vector3.new(300, 10, 800), 15},
-		{Vector3.new(-600, 10, 1200), 13},
-	}
-	for i, loc in ipairs(houseLocations) do
-		createHouse("ScatteredHouse" .. i, loc[1], loc[2])
-	end
-
-	-- Small sheds scattered around
-	for i = 1, 15 do
-		local shedX = math.random(-1500, 1500)
-		local shedZ = math.random(-1200, 1200)
-		local shedY = 15
-		if shedZ < -800 then shedY = 45 end -- Volcanic
-		if shedX > 800 then shedY = 12 end -- Swamp
-		if shedZ > 800 then shedY = 10 end -- Coastal
-		createShed("Shed" .. i, Vector3.new(shedX, shedY, shedZ), math.random(8, 14))
-	end
-
-	-- Guard posts/small towers
-	createTower("GuardTower1", Vector3.new(-600, 25, 0), 20)
-	createTower("GuardTower2", Vector3.new(600, 25, -400), 22)
-	createTower("GuardTower3", Vector3.new(-1500, 18, -200), 18)
-	createTower("GuardTower4", Vector3.new(0, 10, 800), 20)
-
-	-- Research buildings
-	createMultiStoryBuilding("Research1", Vector3.new(-100, 25, -500), 2, Vector3.new(30, 12, 25), "commercial")
-	createMultiStoryBuilding("Research2", Vector3.new(500, 25, -350), 2, Vector3.new(25, 12, 20), "commercial")
-
-	-- =============================================
-	-- PHASE 10: LOOT CACHES NEAR SPAWN
-	-- =============================================
-	print("[MapManager] Phase 10: Adding loot caches near spawn...")
-
-	-- Spawn area is at (200, 30, 200) with 200 stud radius
-	-- Add loot caches within 300 studs (~100 yards) of spawn
-	local spawnCenter = Vector3.new(200, 30, 200)
-	local lootRadius = 300
-
-	-- Create floor loot cache (weapon crate)
-	local function createLootCache(position: Vector3, cacheType: string): Model
-		local cache = Instance.new("Model")
-		cache.Name = "LootCache_" .. cacheType
-
-		local groundPos = placeAtGroundLevel(position, 0)
-
-		if cacheType == "weapon_crate" then
-			-- Military-style weapon crate
-			local crate = Instance.new("Part")
-			crate.Name = "Crate"
-			crate.Size = Vector3.new(5, 3, 3)
-			crate.Position = groundPos + Vector3.new(0, 1.5, 0)
-			crate.Anchored = true
-			crate.BrickColor = BrickColor.new("Dark green")
-			crate.Material = Enum.Material.Metal
-			crate.Parent = cache
-
-			local lid = Instance.new("Part")
-			lid.Name = "Lid"
-			lid.Size = Vector3.new(5.2, 0.5, 3.2)
-			lid.Position = groundPos + Vector3.new(0, 3.25, 0)
-			lid.Anchored = true
-			lid.BrickColor = BrickColor.new("Dark green")
-			lid.Material = Enum.Material.Metal
-			lid.Parent = cache
-
-			-- Stencil markings (white stripe)
-			local stripe = Instance.new("Part")
-			stripe.Name = "Stripe"
-			stripe.Size = Vector3.new(4, 0.5, 0.1)
-			stripe.Position = groundPos + Vector3.new(0, 2, -1.55)
-			stripe.Anchored = true
-			stripe.BrickColor = BrickColor.new("White")
-			stripe.Material = Enum.Material.SmoothPlastic
-			stripe.Parent = cache
-
-		elseif cacheType == "ammo_box" then
-			-- Ammo box (smaller)
-			local box = Instance.new("Part")
-			box.Name = "Box"
-			box.Size = Vector3.new(2.5, 2, 2)
-			box.Position = groundPos + Vector3.new(0, 1, 0)
-			box.Anchored = true
-			box.BrickColor = BrickColor.new("Olive")
-			box.Material = Enum.Material.Metal
-			box.Parent = cache
-
-			local handle = Instance.new("Part")
-			handle.Name = "Handle"
-			handle.Size = Vector3.new(1.5, 0.3, 0.3)
-			handle.Position = groundPos + Vector3.new(0, 2.15, 0)
-			handle.Anchored = true
-			handle.BrickColor = BrickColor.new("Dark stone grey")
-			handle.Material = Enum.Material.Metal
-			handle.Parent = cache
-
-		elseif cacheType == "medkit" then
-			-- Medical supply kit
-			local kit = Instance.new("Part")
-			kit.Name = "Kit"
-			kit.Size = Vector3.new(3, 2, 2)
-			kit.Position = groundPos + Vector3.new(0, 1, 0)
-			kit.Anchored = true
-			kit.BrickColor = BrickColor.new("White")
-			kit.Material = Enum.Material.SmoothPlastic
-			kit.Parent = cache
-
-			-- Red cross
-			local crossH = Instance.new("Part")
-			crossH.Name = "CrossH"
-			crossH.Size = Vector3.new(1.2, 0.3, 0.1)
-			crossH.Position = groundPos + Vector3.new(0, 1.5, -1.05)
-			crossH.Anchored = true
-			crossH.BrickColor = BrickColor.new("Bright red")
-			crossH.Material = Enum.Material.SmoothPlastic
-			crossH.Parent = cache
-
-			local crossV = Instance.new("Part")
-			crossV.Name = "CrossV"
-			crossV.Size = Vector3.new(0.3, 1.2, 0.1)
-			crossV.Position = groundPos + Vector3.new(0, 1.5, -1.05)
-			crossV.Anchored = true
-			crossV.BrickColor = BrickColor.new("Bright red")
-			crossV.Material = Enum.Material.SmoothPlastic
-			crossV.Parent = cache
-
-		else -- supply_drop
-			-- General supply crate
-			local crate = Instance.new("Part")
-			crate.Name = "Crate"
-			crate.Size = Vector3.new(4, 4, 4)
-			crate.Position = groundPos + Vector3.new(0, 2, 0)
-			crate.Anchored = true
-			crate.BrickColor = BrickColor.new("Reddish brown")
-			crate.Material = Enum.Material.Wood
-			crate.Parent = cache
-
-			-- Metal straps
-			for i = -1, 1, 2 do
-				local strap = Instance.new("Part")
-				strap.Name = "Strap"
-				strap.Size = Vector3.new(4.2, 0.5, 0.3)
-				strap.Position = groundPos + Vector3.new(0, 2, i * 1.5)
-				strap.Anchored = true
-				strap.BrickColor = BrickColor.new("Dark stone grey")
-				strap.Material = Enum.Material.Metal
-				strap.Parent = cache
-			end
-		end
-
-		cache.Parent = workspace
-		return cache
-	end
-
-	-- Place loot caches around spawn in a ring pattern
-	local lootCacheCount = 16 -- 16 caches = good coverage within 300 studs
-	local cacheTypes = { "weapon_crate", "weapon_crate", "ammo_box", "ammo_box", "medkit", "supply_drop" }
-
-	for i = 1, lootCacheCount do
-		-- Distribute caches in rings
-		local ring = math.ceil(i / 8) -- 2 rings
-		local angleOffset = (ring - 1) * 0.25 -- Offset second ring
-		local angle = ((i - 1) / 8) * math.pi * 2 + angleOffset
-		local distance = 80 + (ring - 1) * 120 + math.random(-20, 20) -- 80-100 studs, then 200-220 studs
-
-		local cacheX = spawnCenter.X + math.cos(angle) * distance
-		local cacheZ = spawnCenter.Z + math.sin(angle) * distance
-
-		local cacheType = cacheTypes[math.random(1, #cacheTypes)]
-		createLootCache(Vector3.new(cacheX, spawnCenter.Y, cacheZ), cacheType)
-	end
-
-	-- Add additional random floor loot scattered around spawn
-	for i = 1, 20 do
-		local angle = math.random() * math.pi * 2
-		local distance = 50 + math.random() * 250 -- 50-300 studs from spawn
-		local lootX = spawnCenter.X + math.cos(angle) * distance
-		local lootZ = spawnCenter.Z + math.sin(angle) * distance
-
-		local cacheType = cacheTypes[math.random(1, #cacheTypes)]
-		createLootCache(Vector3.new(lootX, spawnCenter.Y, lootZ), cacheType)
-	end
-
-	print("[MapManager] Created 36 loot caches near spawn (within 300 studs)")
-
-	-- =============================================
-	-- PHASE 11: ADDITIONAL FOLIAGE DETAILS
-	-- =============================================
-	print("[MapManager] Phase 11: Adding foliage details...")
-
-	-- Create bush decoration
-	local function createBush(position: Vector3, size: number): Model
-		local bush = Instance.new("Model")
-		bush.Name = "Bush"
-
-		local groundPos = placeAtGroundLevel(position, 0)
-
-		-- Main bush body (cluster of spheres)
-		for i = 1, 3 do
-			local part = Instance.new("Part")
-			part.Name = "Foliage" .. i
-			part.Shape = Enum.PartType.Ball
-			local partSize = size * (0.6 + math.random() * 0.3)
-			part.Size = Vector3.new(partSize, partSize * 0.8, partSize)
-			local offsetX = (math.random() - 0.5) * size * 0.4
-			local offsetZ = (math.random() - 0.5) * size * 0.4
-			part.Position = groundPos + Vector3.new(offsetX, partSize * 0.35, offsetZ)
-			part.Anchored = true
-			part.BrickColor = BrickColor.new("Forest green")
-			part.Material = Enum.Material.Grass
-			part.Parent = bush
-		end
-
-		bush.Parent = workspace
-		return bush
-	end
-
-	-- Create fern
-	local function createFern(position: Vector3): Model
-		local fern = Instance.new("Model")
-		fern.Name = "Fern"
-
-		local groundPos = placeAtGroundLevel(position, 0)
-
-		-- Fern fronds radiating outward
-		for i = 1, 6 do
-			local frond = Instance.new("Part")
-			frond.Name = "Frond" .. i
-			frond.Size = Vector3.new(0.3, 2.5, 0.8)
-			local angle = (i / 6) * math.pi * 2
-			frond.Position = groundPos + Vector3.new(math.cos(angle) * 0.3, 1.2, math.sin(angle) * 0.3)
-			frond.Rotation = Vector3.new(30, math.deg(angle), 0)
-			frond.Anchored = true
-			frond.BrickColor = BrickColor.new("Bright green")
-			frond.Material = Enum.Material.Grass
-			frond.Parent = fern
-		end
-
-		fern.Parent = workspace
-		return fern
-	end
-
-	-- Create flower patch
-	local function createFlowerPatch(position: Vector3, count: number): Model
-		local patch = Instance.new("Model")
-		patch.Name = "FlowerPatch"
-
-		local groundPos = placeAtGroundLevel(position, 0)
-		local colors = { "Bright red", "Bright yellow", "Magenta", "Bright orange", "White" }
-
-		for i = 1, count do
-			local flower = Instance.new("Part")
-			flower.Name = "Flower" .. i
-			flower.Shape = Enum.PartType.Ball
-			flower.Size = Vector3.new(0.8, 0.8, 0.8)
-			local offsetX = (math.random() - 0.5) * 4
-			local offsetZ = (math.random() - 0.5) * 4
-			flower.Position = groundPos + Vector3.new(offsetX, 0.5, offsetZ)
-			flower.Anchored = true
-			flower.BrickColor = BrickColor.new(colors[math.random(1, #colors)])
-			flower.Material = Enum.Material.SmoothPlastic
-			flower.Parent = patch
-
-			-- Stem
-			local stem = Instance.new("Part")
-			stem.Name = "Stem" .. i
-			stem.Size = Vector3.new(0.1, 0.6, 0.1)
-			stem.Position = groundPos + Vector3.new(offsetX, 0.2, offsetZ)
-			stem.Anchored = true
-			stem.BrickColor = BrickColor.new("Bright green")
-			stem.Material = Enum.Material.Grass
-			stem.Parent = patch
-		end
-
-		patch.Parent = workspace
-		return patch
-	end
-
-	-- Add bushes throughout the map
-	print("[MapManager] Adding bushes...")
-	for i = 1, 100 do
-		local bushX = math.random(-1800, 1800)
-		local bushZ = math.random(-1500, 1500)
-		local bushY = 20
-		if bushZ < -800 then bushY = 45 end
-		if bushX > 800 then bushY = 12 end
-		if bushZ > 800 then bushY = 10 end
-		createBush(Vector3.new(bushX, bushY, bushZ), math.random(2, 5))
-	end
-
-	-- Add ferns in jungle and swamp areas
-	print("[MapManager] Adding ferns...")
-	for i = 1, 60 do
-		-- Jungle ferns
-		local fernX = math.random(-600, 600)
-		local fernZ = math.random(-500, 400)
-		createFern(Vector3.new(fernX, 25, fernZ))
-	end
-	for i = 1, 40 do
-		-- Swamp ferns
-		local fernX = swampCenter.X + math.random(-500, 500)
-		local fernZ = swampCenter.Z + math.random(-500, 500)
-		createFern(Vector3.new(fernX, 12, fernZ))
-	end
-
-	-- Add flower patches in plains and coastal
-	print("[MapManager] Adding flower patches...")
-	for i = 1, 30 do
-		-- Plains flowers
-		local flowerX = plainsCenter.X + math.random(-600, 600)
-		local flowerZ = plainsCenter.Z + math.random(-600, 600)
-		createFlowerPatch(Vector3.new(flowerX, 18, flowerZ), math.random(5, 12))
-	end
-	for i = 1, 20 do
-		-- Coastal flowers
-		local flowerX = coastalCenter.X + math.random(-600, 600)
-		local flowerZ = coastalCenter.Z + math.random(-200, 200)
-		createFlowerPatch(Vector3.new(flowerX, 10, flowerZ), math.random(4, 8))
-	end
-
-	-- Add dense bushes around spawn for early cover
-	for i = 1, 15 do
-		local angle = math.random() * math.pi * 2
-		local dist = 50 + math.random() * 150
-		local bushX = spawnCenter.X + math.cos(angle) * dist
-		local bushZ = spawnCenter.Z + math.sin(angle) * dist
-		createBush(Vector3.new(bushX, spawnCenter.Y, bushZ), math.random(3, 6))
-	end
-
-	print("[MapManager] Added 100 bushes, 100 ferns, 50 flower patches")
-
-	-- =============================================
-	-- PHASE 12: FINAL ROCK DETAILS
-	-- =============================================
-	print("[MapManager] Phase 12: Adding final rock details...")
-
-	-- Additional rock clusters everywhere
-	for i = 1, 40 do
-		local x = math.random(-1800, 1800)
-		local z = math.random(-1600, 1600)
-		local y = 20
-		if z < -800 then y = 45 end
-		if x > 900 then y = 12 end
-		if z > 900 then y = 10 end
-		createRock(Vector3.new(x, y, z), math.random(2, 8))
-	end
+	clearHeightCache()
+
+	-- Execute all phases
+	createBaseLayer(terrain, config)
+	createSpawnArea(terrain, config)
+
+	local terrainSuccess, biomeCounts = generateTerrainCells(terrain, config)
+
+	createWaterSystem(terrain, config)
+	createCaveSystems(terrain, config)
+	createVolcanicFeatures(terrain, config)
+	createPOIBuildings(config)
+	createVegetation(config)
+	createScatteredBuildings(config)
+	createLootCaches(config)
+	createFoliageDetails(config)
+	createRockDetails(config)
 
 	task.wait() -- Final yield
 
+	-- Print generation summary
+	printGenerationSummary()
+
 	print("===========================================")
 	print("[MapManager] TERRAIN GENERATION COMPLETE!")
-	print(`  Total terrain cells: {totalCells}`)
-	print(`  Biome distribution:`)
-	print(`    Jungle: {biomeCounts.jungle} | Plains: {biomeCounts.plains}`)
-	print(`    Volcanic: {biomeCounts.volcanic} | Swamp: {biomeCounts.swamp}`)
-	print(`    Coastal: {biomeCounts.coastal}`)
+	if biomeCounts then
+		print(`  Biome distribution:`)
+		print(`    Jungle: {biomeCounts.jungle or 0} | Plains: {biomeCounts.plains or 0}`)
+		print(`    Volcanic: {biomeCounts.volcanic or 0} | Swamp: {biomeCounts.swamp or 0}`)
+		print(`    Coastal: {biomeCounts.coastal or 0}`)
+	end
 	print("  Features added:")
 	print("    - Solid base layer (no gaps)")
-	print("    - 4 rivers with solid beds")
-	print("    - 11 lakes with terrain beds")
-	print("    - 7 accessible caves")
-	print("    - 500+ trees (6 varieties, ground-anchored)")
-	print("    - 20+ multi-story buildings with interiors")
-	print("    - 80+ scattered structures (ground-anchored)")
-	print("    - 36 loot caches near spawn (~300 studs)")
-	print("    - 100 bushes, 100 ferns, 50 flower patches")
-	print("    - Building interiors with rooms, stairs, statues, chests")
+	print("    - Rivers with solid beds")
+	print("    - Lakes with terrain beds")
+	print("    - Accessible caves")
+	print("    - Trees (ground-anchored)")
+	print("    - Multi-story buildings with interiors")
+	print("    - Scattered structures (ground-anchored)")
+	print("    - Loot caches near spawn")
+	print("    - Bushes, ferns, flower patches")
 	print("  Coverage: ~30% water, ~30% foliage/structures")
 	print("===========================================")
 end
+
+--------------------------------------------------------------------------------
+-- PUBLIC API: INITIALIZATION & LIFECYCLE
+--------------------------------------------------------------------------------
 
 --[[
 	Initialize the map manager
@@ -2948,16 +2408,40 @@ function MapManager.StartMatch()
 end
 
 --[[
-	Reset for new match
+	Reset for new match - clears dynamic objects and respawns loot
 ]]
 function MapManager.Reset()
+	print("[MapManager] Resetting map for new match...")
+
 	currentMatchPhase = "Lobby"
 
+	-- Clear loot caches folder
+	local lootFolder = workspace:FindFirstChild("LootCaches")
+	if lootFolder then
+		for _, child in ipairs(lootFolder:GetChildren()) do
+			child:Destroy()
+		end
+	end
+
+	-- Reset sub-managers
 	BiomeManager.Reset()
 	POIManager.Reset()
 	EnvironmentalEventManager.Reset()
 
-	print("[MapManager] Reset for new match")
+	-- Respawn loot caches
+	createLootCaches(MapConfig)
+
+	-- Clear height cache (terrain doesn't change, but good for consistency)
+	clearHeightCache()
+
+	print("[MapManager] Map reset complete")
+end
+
+--[[
+	Full reset for new match (alias for Reset)
+]]
+function MapManager.ResetForNewMatch()
+	MapManager.Reset()
 end
 
 return MapManager

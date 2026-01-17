@@ -509,6 +509,109 @@ function LootManager.GetAllChests(): { Chest }
 end
 
 --[[
+	Spawn loot from a map loot cache (called when player opens a cache)
+	@param player The player who opened the cache
+	@param cache The cache model with attributes (LootTier, CacheType, IsLooted)
+	@param tier The loot tier ("Low", "Medium", "High")
+]]
+function LootManager.SpawnLootFromCache(player: Player, cache: Model, tier: string)
+	-- Check if already looted
+	if cache:GetAttribute("IsLooted") then
+		return
+	end
+
+	-- Verify player distance
+	local character = player.Character
+	if not character then return end
+
+	local rootPart = character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not rootPart then return end
+
+	local cachePosition = cache:GetPivot().Position
+	local distance = (rootPart.Position - cachePosition).Magnitude
+	if distance > 12 then return end -- Too far
+
+	-- Mark as looted
+	cache:SetAttribute("IsLooted", true)
+
+	-- Map tier string to LootData tier
+	local lootTier: LootData.LootTier = "Medium"
+	if tier == "High" then
+		lootTier = "High"
+	elseif tier == "Low" then
+		lootTier = "Low"
+	end
+
+	-- Get cache type for special handling
+	local cacheType = cache:GetAttribute("CacheType") or "supply_drop"
+
+	-- Determine item count based on tier
+	local itemCount = 2
+	if lootTier == "High" then
+		itemCount = 3
+	elseif lootTier == "Low" then
+		itemCount = 1
+	end
+
+	-- Determine guaranteed categories based on cache type
+	local guaranteedCategories: { LootData.LootCategory }? = nil
+	if cacheType == "weapon_crate" then
+		guaranteedCategories = { "Weapon" }
+	elseif cacheType == "ammo_box" then
+		guaranteedCategories = { "Ammo" }
+	elseif cacheType == "medkit" then
+		guaranteedCategories = { "Medical" }
+	end
+
+	-- Spawn items around the cache
+	local spawnedItems = {}
+	local chestConfig = LootData.ChestConfigs[lootTier]
+	local rarityBonus = chestConfig and chestConfig.rarityBonus or 0
+
+	-- Guaranteed category first if applicable
+	if guaranteedCategories then
+		for _, category in ipairs(guaranteedCategories) do
+			local item = LootManager.SelectRandomItem(category, rarityBonus)
+			if item then
+				local offset = Vector3.new(
+					math.cos(#spawnedItems * 2.4) * 2,
+					1,
+					math.sin(#spawnedItems * 2.4) * 2
+				)
+				local spawn = LootManager.SpawnRandomLoot(cachePosition + offset, lootTier)
+				if spawn then
+					table.insert(spawnedItems, spawn)
+				end
+			end
+		end
+	end
+
+	-- Fill remaining slots with random items
+	while #spawnedItems < itemCount do
+		local offset = Vector3.new(
+			math.cos(#spawnedItems * 2.4) * 2,
+			1,
+			math.sin(#spawnedItems * 2.4) * 2
+		)
+		local spawn = LootManager.SpawnRandomLoot(cachePosition + offset, lootTier)
+		if spawn then
+			table.insert(spawnedItems, spawn)
+		else
+			break -- Prevent infinite loop if no items available
+		end
+	end
+
+	-- Notify the player
+	Events.FireClient(player, "Loot", "CacheOpened", {
+		cacheType = cacheType,
+		tier = tier,
+		itemCount = #spawnedItems,
+	})
+
+	print(`[LootManager] {player.Name} opened {cacheType} cache, spawned {#spawnedItems} items`)
+end
+
+--[[
 	Reset for new match
 ]]
 function LootManager.Reset()
