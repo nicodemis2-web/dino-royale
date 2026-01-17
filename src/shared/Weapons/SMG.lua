@@ -95,7 +95,7 @@ end
 	Get recoil for SMG (less vertical kick)
 	@return Vector2 recoil
 ]]
-function SMG.GetRecoil(self: SMGInstance): Vector2
+function SMG.GetRecoil(_self: SMGInstance): Vector2
 	local vertical = 0.3 + (math.random() * 0.2)
 	local horizontal = (math.random() - 0.5) * 0.4
 	return Vector2.new(horizontal, vertical) * RECOIL_MULTIPLIER
@@ -105,7 +105,7 @@ end
 	Check if weapon is automatic
 	@return Always true for SMG
 ]]
-function SMG.IsAutomatic(self: SMGInstance): boolean
+function SMG.IsAutomatic(_self: SMGInstance): boolean
 	return true
 end
 

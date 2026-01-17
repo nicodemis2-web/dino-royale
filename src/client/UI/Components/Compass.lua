@@ -76,7 +76,7 @@ function Compass.CreateUI()
 	-- Main compass container
 	compassFrame = Instance.new("Frame")
 	compassFrame.Name = "Compass"
-	compassFrame.Size = UDim2.new(0, COMPASS_WIDTH, 0, COMPASS_HEIGHT)
+	compassFrame.Size = UDim2.fromOffset(COMPASS_WIDTH, COMPASS_HEIGHT)
 	compassFrame.Position = UDim2.new(0.5, 0, 0, 10)
 	compassFrame.AnchorPoint = Vector2.new(0.5, 0)
 	compassFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
@@ -113,8 +113,8 @@ function Compass.CreateUI()
 	for deg = 0, 359, 15 do
 		local marker = Instance.new("Frame")
 		marker.Name = `Deg_{deg}`
-		marker.Size = UDim2.new(0, 1, 0, deg % 45 == 0 and 15 or 8)
-		marker.Position = UDim2.new(deg / 360, 0, 1, 0)
+		marker.Size = UDim2.fromOffset(1, deg % 45 == 0 and 15 or 8)
+		marker.Position = UDim2.fromScale(deg / 360, 1)
 		marker.AnchorPoint = Vector2.new(0.5, 1)
 		marker.BackgroundColor3 = Color3.fromRGB(150, 150, 150)
 		marker.BorderSizePixel = 0
@@ -125,8 +125,8 @@ function Compass.CreateUI()
 	for _, dir in ipairs(CARDINAL_DIRECTIONS) do
 		local label = Instance.new("TextLabel")
 		label.Name = `Dir_{dir.label}`
-		label.Size = UDim2.new(0, 30, 0, 20)
-		label.Position = UDim2.new(dir.angle / 360, 0, 0.5, 0)
+		label.Size = UDim2.fromOffset(30, 20)
+		label.Position = UDim2.fromScale(dir.angle / 360, 0.5)
 		label.AnchorPoint = Vector2.new(0.5, 0.5)
 		label.BackgroundTransparency = 1
 		label.TextColor3 = dir.color
@@ -191,7 +191,7 @@ function Compass.Update()
 		local offset = 0.5 - normalizedHeading
 
 		-- Handle wrapping by using multiple instances
-		degreesFrame.Position = UDim2.new(0.5 + offset, 0, 0, 0)
+		degreesFrame.Position = UDim2.fromScale(0.5 + offset, 0)
 	end
 
 	-- Update markers
@@ -212,7 +212,7 @@ function Compass.UpdateMarkers(currentYaw: number)
 
 	local playerPos = rootPart.Position
 
-	for id, marker in pairs(activeMarkers) do
+	for _id, marker in pairs(activeMarkers) do
 		if marker.frame then
 			-- Calculate angle to marker
 			local direction = marker.position - playerPos
@@ -239,7 +239,7 @@ function Compass.UpdateMarkers(currentYaw: number)
 
 				-- Calculate position on compass
 				local normalizedPos = 0.5 + (relativeAngle / FOV_DEGREES)
-				marker.frame.Position = UDim2.new(normalizedPos, 0, 0.5, 0)
+				marker.frame.Position = UDim2.fromScale(normalizedPos, 0.5)
 
 				-- Calculate distance for display
 				local distance = direction.Magnitude
@@ -266,7 +266,7 @@ function Compass.AddMarker(id: string, position: Vector3, markerType: string, co
 	-- Create marker frame
 	local markerFrame = Instance.new("Frame")
 	markerFrame.Name = `Marker_{id}`
-	markerFrame.Size = UDim2.new(0, 20, 0, 30)
+	markerFrame.Size = UDim2.fromOffset(20, 30)
 	markerFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 	markerFrame.BackgroundTransparency = 1
 	markerFrame.Parent = markersContainer
@@ -274,7 +274,7 @@ function Compass.AddMarker(id: string, position: Vector3, markerType: string, co
 	-- Marker icon
 	local icon = Instance.new("Frame")
 	icon.Name = "Icon"
-	icon.Size = UDim2.new(0, 8, 0, 8)
+	icon.Size = UDim2.fromOffset(8, 8)
 	icon.Position = UDim2.new(0.5, 0, 0, 5)
 	icon.AnchorPoint = Vector2.new(0.5, 0)
 	icon.BackgroundColor3 = color or Color3.fromRGB(255, 200, 50)
@@ -288,7 +288,7 @@ function Compass.AddMarker(id: string, position: Vector3, markerType: string, co
 	-- Distance label
 	local distLabel = Instance.new("TextLabel")
 	distLabel.Name = "Distance"
-	distLabel.Size = UDim2.new(0, 40, 0, 12)
+	distLabel.Size = UDim2.fromOffset(40, 12)
 	distLabel.Position = UDim2.new(0.5, 0, 1, -2)
 	distLabel.AnchorPoint = Vector2.new(0.5, 1)
 	distLabel.BackgroundTransparency = 1

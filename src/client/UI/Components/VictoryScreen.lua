@@ -56,7 +56,7 @@ function VictoryScreen.CreateUI()
 	-- Main container
 	mainFrame = Instance.new("Frame")
 	mainFrame.Name = "MainFrame"
-	mainFrame.Size = UDim2.new(0, 600, 0, 500)
+	mainFrame.Size = UDim2.fromOffset(600, 500)
 	mainFrame.Position = UDim2.fromScale(0.5, 0.5)
 	mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 	mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
@@ -193,7 +193,7 @@ function VictoryScreen.CreateUI()
 	-- Return to lobby button
 	local lobbyButton = Instance.new("TextButton")
 	lobbyButton.Name = "LobbyButton"
-	lobbyButton.Size = UDim2.new(0, 200, 0, 50)
+	lobbyButton.Size = UDim2.fromOffset(200, 50)
 	lobbyButton.Position = UDim2.new(0.5, 0, 1, -70)
 	lobbyButton.AnchorPoint = Vector2.new(0.5, 0)
 	lobbyButton.BackgroundColor3 = Color3.fromRGB(80, 150, 255)
@@ -272,7 +272,7 @@ function VictoryScreen.Show(data: any)
 
 	-- Animate in
 	screenGui.Enabled = true
-	mainFrame.Position = UDim2.new(0.5, 0, 1.5, 0)
+	mainFrame.Position = UDim2.fromScale(0.5, 1.5)
 
 	local tween = TweenService:Create(
 		mainFrame,
@@ -344,7 +344,7 @@ function VictoryScreen.Hide()
 	local tween = TweenService:Create(
 		mainFrame,
 		TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In),
-		{ Position = UDim2.new(0.5, 0, 1.5, 0) }
+		{ Position = UDim2.fromScale(0.5, 1.5) }
 	)
 
 	tween:Play()

@@ -557,7 +557,7 @@ end
 	@param radius Search radius
 	@return Array of dinosaur models in range
 ]]
-function DinosaurVisualEffects.GetDinosaursInRadius(position: Vector3, radius: number): { Model }
+function DinosaurVisualEffects.GetDinosaursInRadius(_position: Vector3, radius: number): { Model }
 	local result = {}
 
 	for model, visualData in pairs(trackedDinosaurs) do

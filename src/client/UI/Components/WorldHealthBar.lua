@@ -40,11 +40,11 @@ local NAME_OFFSET = 0.3          -- Name label offset below bar
 -- Distance settings
 local MAX_VISIBLE_DISTANCE = 100  -- Maximum distance to show bar
 local FADE_START_DISTANCE = 80    -- Distance where fade begins
-local BOSS_BAR_ALWAYS_VISIBLE = true
+local _BOSS_BAR_ALWAYS_VISIBLE = true
 
 -- Animation timings
 local HEALTH_TWEEN_TIME = 0.3
-local FADE_TWEEN_TIME = 0.2
+local _FADE_TWEEN_TIME = 0.2
 
 -- Player type colors (from GDD 12.9)
 local PLAYER_COLORS = {
@@ -248,7 +248,7 @@ function WorldHealthBar:CreateNameLabel()
 	self.nameLabel = Instance.new("TextLabel")
 	self.nameLabel.Name = "NameLabel"
 	self.nameLabel.Size = UDim2.new(1, 0, 0, 14)
-	self.nameLabel.Position = UDim2.new(0, 0, 0, 10)
+	self.nameLabel.Position = UDim2.fromOffset(0, 10)
 	self.nameLabel.BackgroundTransparency = 1
 	self.nameLabel.Text = ""
 	self.nameLabel.TextColor3 = Color3.new(1, 1, 1)

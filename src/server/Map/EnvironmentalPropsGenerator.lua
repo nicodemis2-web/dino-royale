@@ -50,8 +50,8 @@ local COVER_PLACEMENT = {
 }
 
 -- Path settings for strategic placement
-local PATH_WIDTH = 32
-local ALLEY_WIDTH = 16
+local _PATH_WIDTH = 32
+local _ALLEY_WIDTH = 16
 
 --------------------------------------------------------------------------------
 -- STATE
@@ -114,7 +114,7 @@ end
 --[[
 	Create a prop from definition
 ]]
-local function createProp(definition: BiomeData.PropDefinition, position: Vector3, biome: string): Part | Model
+local function createProp(definition: BiomeData.PropDefinition, position: Vector3, biome: string): Part
 	local prop: Part
 
 	-- Create base part
@@ -233,7 +233,7 @@ function EnvironmentalPropsGenerator.GenerateCoverProps(
 
 	print(`[EnvironmentalPropsGenerator] Generating {count} cover props for {biome}`)
 
-	for i = 1, count do
+	for _ = 1, count do
 		-- Strategic placement: prefer corners and edges
 		local angle: number
 		local distance: number
@@ -308,7 +308,7 @@ function EnvironmentalPropsGenerator.GenerateDecorativeProps(
 
 	print(`[EnvironmentalPropsGenerator] Generating {count} decorative props for {biome}`)
 
-	for i = 1, count do
+	for _ = 1, count do
 		local angle = math.random() * math.pi * 2
 		local distance = radius * math.sqrt(math.random())
 
@@ -392,7 +392,7 @@ function EnvironmentalPropsGenerator.GenerateGroundDebris(
 
 	local biomeDebris = debrisTypes[biome] or debrisTypes.Plains
 
-	for i = 1, count do
+	for _ = 1, count do
 		local angle = math.random() * math.pi * 2
 		local distance = radius * math.sqrt(math.random())
 
@@ -608,7 +608,7 @@ function EnvironmentalPropsGenerator.GenerateAreaProps(
 	local coverProps = EnvironmentalPropsGenerator.GenerateCoverProps(centerPosition, radius, biome)
 	local decorativeProps = EnvironmentalPropsGenerator.GenerateDecorativeProps(centerPosition, radius, biome)
 	local debris = EnvironmentalPropsGenerator.GenerateGroundDebris(centerPosition, radius, biome)
-	local particles = EnvironmentalPropsGenerator.GenerateAmbientParticles(centerPosition, radius, biome)
+	local _particles = EnvironmentalPropsGenerator.GenerateAmbientParticles(centerPosition, radius, biome)
 
 	-- Generate landmarks
 	local landmarks = BiomeData.GetLandmarks(biome)
@@ -673,7 +673,7 @@ end
 ]]
 function EnvironmentalPropsGenerator.Reset()
 	-- Only clear destructible props that were destroyed
-	for biome, props in pairs(generatedProps) do
+	for _biome, props in pairs(generatedProps) do
 		for i = #props, 1, -1 do
 			local prop = props[i]
 			if not prop or not prop.Parent then

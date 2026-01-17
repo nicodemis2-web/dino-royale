@@ -8,8 +8,8 @@
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
-local CollectionService = game:GetService("CollectionService")
+local _TweenService = game:GetService("TweenService")
+local _CollectionService = game:GetService("CollectionService")
 
 local DinosaurTargeting = {}
 
@@ -17,14 +17,14 @@ local DinosaurTargeting = {}
 local localPlayer = Players.LocalPlayer
 local currentTarget: Model? = nil
 local healthBarGui: BillboardGui? = nil
-local targetInfoGui: ScreenGui? = nil
+local _targetInfoGui: ScreenGui? = nil
 local updateConnection: RBXScriptConnection? = nil
 local isInitialized = false
 
 -- Settings
 local MAX_TARGET_DISTANCE = 100
 local HEALTH_BAR_OFFSET = Vector3.new(0, 3, 0)
-local FADE_DURATION = 0.2
+local _FADE_DURATION = 0.2
 
 -- Tier colors
 local TIER_COLORS = {
@@ -76,7 +76,7 @@ local function createHealthBarGui(): BillboardGui
 	-- Tier indicator
 	local tierLabel = Instance.new("TextLabel")
 	tierLabel.Name = "TierLabel"
-	tierLabel.Size = UDim2.new(0, 50, 0, 12)
+	tierLabel.Size = UDim2.fromOffset(50, 12)
 	tierLabel.Position = UDim2.new(1, -55, 0, 3)
 	tierLabel.BackgroundTransparency = 1
 	tierLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -90,7 +90,7 @@ local function createHealthBarGui(): BillboardGui
 	local healthBg = Instance.new("Frame")
 	healthBg.Name = "HealthBg"
 	healthBg.Size = UDim2.new(1, -10, 0, 10)
-	healthBg.Position = UDim2.new(0, 5, 0, 20)
+	healthBg.Position = UDim2.fromOffset(5, 20)
 	healthBg.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
 	healthBg.BorderSizePixel = 0
 	healthBg.Parent = bgFrame
@@ -115,7 +115,7 @@ local function createHealthBarGui(): BillboardGui
 	local healthText = Instance.new("TextLabel")
 	healthText.Name = "HealthText"
 	healthText.Size = UDim2.new(1, 0, 0, 10)
-	healthText.Position = UDim2.new(0, 0, 0, 32)
+	healthText.Position = UDim2.fromOffset(0, 32)
 	healthText.BackgroundTransparency = 1
 	healthText.TextColor3 = Color3.fromRGB(255, 255, 255)
 	healthText.TextSize = 10

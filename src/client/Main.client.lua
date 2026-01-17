@@ -49,7 +49,7 @@ local ScreenEffects: any = nil
 local FeedbackNotifications: any = nil
 
 -- State
-local isInitialized = false
+local _isInitialized = false
 local currentGameState = "Loading"
 
 --[[
@@ -190,33 +190,57 @@ end
 local function handleStateChange(newState: string)
 	if newState == "Lobby" then
 		-- Show lobby UI
-		if HUDController then HUDController.OnGameStateChanged("Lobby") end
+		if HUDController then
+			HUDController.OnGameStateChanged("Lobby")
+		end
 
 	elseif newState == "Loading" then
 		-- Loading screen
-		if HUDController then HUDController.OnGameStateChanged("Loading") end
+		if HUDController then
+			HUDController.OnGameStateChanged("Loading")
+		end
 
 	elseif newState == "Deploying" then
 		-- Start deployment
-		if HUDController then HUDController.OnGameStateChanged("Deploying") end
-		if DeploymentController then DeploymentController.Enable() end
+		if HUDController then
+			HUDController.OnGameStateChanged("Deploying")
+		end
+		if DeploymentController then
+			DeploymentController.Enable()
+		end
 
 	elseif newState == "Playing" then
 		-- Full gameplay
-		if HUDController then HUDController.OnGameStateChanged("Playing") end
-		if DeploymentController then DeploymentController.Disable() end
-		if MovementController then MovementController.Enable() end
-		if WeaponController then WeaponController.SetEnabled(true) end
+		if HUDController then
+			HUDController.OnGameStateChanged("Playing")
+		end
+		if DeploymentController then
+			DeploymentController.Disable()
+		end
+		if MovementController then
+			MovementController.Enable()
+		end
+		if WeaponController then
+			WeaponController.SetEnabled(true)
+		end
 
 	elseif newState == "Ending" then
 		-- Match results
-		if HUDController then HUDController.OnGameStateChanged("Ending") end
-		if MovementController then MovementController.Disable() end
-		if WeaponController then WeaponController.SetEnabled(false) end
+		if HUDController then
+			HUDController.OnGameStateChanged("Ending")
+		end
+		if MovementController then
+			MovementController.Disable()
+		end
+		if WeaponController then
+			WeaponController.SetEnabled(false)
+		end
 
 	elseif newState == "Spectating" then
 		-- Spectator mode
-		if WeaponController then WeaponController.SetEnabled(false) end
+		if WeaponController then
+			WeaponController.SetEnabled(false)
+		end
 		-- Enable spectator camera
 	end
 end
@@ -224,12 +248,18 @@ end
 --[[
 	Handle local player death
 ]]
-local function handleDeath(_data: any)
-	if WeaponController then WeaponController.Disable() end
-	if VehicleController then VehicleController.Cleanup() end
+local function _handleDeath(_data: any)
+	if WeaponController then
+		WeaponController.Disable()
+	end
+	if VehicleController then
+		VehicleController.Cleanup()
+	end
 
 	-- Play death sound
-	if AudioController then AudioController.PlayUISound("Death") end
+	if AudioController then
+		AudioController.PlayUISound("Death")
+	end
 
 	-- Show elimination UI
 end
@@ -237,11 +267,15 @@ end
 --[[
 	Handle local player respawn
 ]]
-local function handleRespawn()
-	if WeaponController then WeaponController.Enable() end
+local function _handleRespawn()
+	if WeaponController then
+		WeaponController.Enable()
+	end
 
 	-- Play respawn sound
-	if AudioController then AudioController.PlayUISound("Heal") end
+	if AudioController then
+		AudioController.PlayUISound("Heal")
+	end
 end
 
 -- Countdown UI reference
@@ -261,7 +295,7 @@ local function createCountdownUI()
 
 	local frame = Instance.new("Frame")
 	frame.Name = "CountdownFrame"
-	frame.Size = UDim2.new(0, 300, 0, 150)
+	frame.Size = UDim2.fromOffset(300, 150)
 	frame.Position = UDim2.new(0.5, -150, 0.3, 0)
 	frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 	frame.BackgroundTransparency = 0.5
@@ -274,8 +308,8 @@ local function createCountdownUI()
 
 	local title = Instance.new("TextLabel")
 	title.Name = "Title"
-	title.Size = UDim2.new(1, 0, 0.4, 0)
-	title.Position = UDim2.new(0, 0, 0, 0)
+	title.Size = UDim2.fromScale(1, 0.4)
+	title.Position = UDim2.fromOffset(0, 0)
 	title.BackgroundTransparency = 1
 	title.Text = "MATCH STARTING IN"
 	title.TextColor3 = Color3.fromRGB(255, 200, 50)
@@ -285,8 +319,8 @@ local function createCountdownUI()
 
 	countdownLabel = Instance.new("TextLabel")
 	countdownLabel.Name = "Countdown"
-	countdownLabel.Size = UDim2.new(1, 0, 0.6, 0)
-	countdownLabel.Position = UDim2.new(0, 0, 0.4, 0)
+	countdownLabel.Size = UDim2.fromScale(1, 0.6)
+	countdownLabel.Position = UDim2.fromScale(0, 0.4)
 	countdownLabel.BackgroundTransparency = 1
 	countdownLabel.Text = "10"
 	countdownLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -354,7 +388,7 @@ local function showWelcomeMessage(data: any)
 	-- Main frame with semi-transparent background
 	local frame = Instance.new("Frame")
 	frame.Name = "WelcomeFrame"
-	frame.Size = UDim2.new(0, 500, 0, 400)
+	frame.Size = UDim2.fromOffset(500, 400)
 	frame.Position = UDim2.new(0.5, -250, 0.5, -200)
 	frame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 	frame.BackgroundTransparency = 0.1
@@ -369,7 +403,7 @@ local function showWelcomeMessage(data: any)
 	local title = Instance.new("TextLabel")
 	title.Name = "Title"
 	title.Size = UDim2.new(1, 0, 0, 60)
-	title.Position = UDim2.new(0, 0, 0, 20)
+	title.Position = UDim2.fromOffset(0, 20)
 	title.BackgroundTransparency = 1
 	title.Text = data.title or "WELCOME"
 	title.TextColor3 = Color3.fromRGB(255, 150, 50)
@@ -381,7 +415,7 @@ local function showWelcomeMessage(data: any)
 	local message = Instance.new("TextLabel")
 	message.Name = "Message"
 	message.Size = UDim2.new(1, -40, 0, 50)
-	message.Position = UDim2.new(0, 20, 0, 80)
+	message.Position = UDim2.fromOffset(20, 80)
 	message.BackgroundTransparency = 1
 	message.Text = data.message or ""
 	message.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -394,7 +428,7 @@ local function showWelcomeMessage(data: any)
 	local controlsLabel = Instance.new("TextLabel")
 	controlsLabel.Name = "ControlsLabel"
 	controlsLabel.Size = UDim2.new(1, 0, 0, 30)
-	controlsLabel.Position = UDim2.new(0, 0, 0, 140)
+	controlsLabel.Position = UDim2.fromOffset(0, 140)
 	controlsLabel.BackgroundTransparency = 1
 	controlsLabel.Text = "CONTROLS"
 	controlsLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
@@ -406,19 +440,19 @@ local function showWelcomeMessage(data: any)
 	local controlsFrame = Instance.new("Frame")
 	controlsFrame.Name = "Controls"
 	controlsFrame.Size = UDim2.new(1, -60, 0, 150)
-	controlsFrame.Position = UDim2.new(0, 30, 0, 175)
+	controlsFrame.Position = UDim2.fromOffset(30, 175)
 	controlsFrame.BackgroundTransparency = 1
 	controlsFrame.Parent = frame
 
 	local listLayout = Instance.new("UIGridLayout")
 	listLayout.CellSize = UDim2.new(0.5, -10, 0, 25)
-	listLayout.CellPadding = UDim2.new(0, 10, 0, 5)
+	listLayout.CellPadding = UDim2.fromOffset(10, 5)
 	listLayout.Parent = controlsFrame
 
 	if data.controls then
 		for _, ctrl in ipairs(data.controls) do
 			local ctrlLabel = Instance.new("TextLabel")
-			ctrlLabel.Size = UDim2.new(0, 200, 0, 25)
+			ctrlLabel.Size = UDim2.fromOffset(200, 25)
 			ctrlLabel.BackgroundTransparency = 1
 			ctrlLabel.Text = `[{ctrl.key}] {ctrl.action}`
 			ctrlLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
@@ -432,7 +466,7 @@ local function showWelcomeMessage(data: any)
 	-- Close button
 	local closeButton = Instance.new("TextButton")
 	closeButton.Name = "CloseButton"
-	closeButton.Size = UDim2.new(0, 200, 0, 50)
+	closeButton.Size = UDim2.fromOffset(200, 50)
 	closeButton.Position = UDim2.new(0.5, -100, 1, -70)
 	closeButton.BackgroundColor3 = Color3.fromRGB(80, 180, 80)
 	closeButton.BorderSizePixel = 0
@@ -540,13 +574,17 @@ local function setupEventHandlers()
 		end
 
 		-- Camera bump for kill confirmation
-		if CameraShake then CameraShake.ShakePreset("Bump") end
+		if CameraShake then
+			CameraShake.ShakePreset("Bump")
+		end
 	end)
 
 	-- Kill streak notification
 	Events.OnClientEvent("Combat", "KillStreak", function(data)
 		local streakCount = data.count or 2
-		if FeedbackNotifications then FeedbackNotifications.ShowKillStreak(streakCount) end
+		if FeedbackNotifications then
+			FeedbackNotifications.ShowKillStreak(streakCount)
+		end
 	end)
 
 	-- Dinosaur killed
@@ -579,7 +617,9 @@ local function setupEventHandlers()
 		local rarity = data.rarity
 		local quantity = data.quantity
 
-		if FeedbackNotifications then FeedbackNotifications.ShowLootPickup(itemName, rarity, quantity) end
+		if FeedbackNotifications then
+			FeedbackNotifications.ShowLootPickup(itemName, rarity, quantity)
+		end
 	end)
 
 	-- Explosion nearby
@@ -612,26 +652,34 @@ local function setupEventHandlers()
 	Events.OnClientEvent("Progression", "AchievementUnlocked", function(data)
 		local achievementName = data.name or "Achievement"
 		local description = data.description
-		if FeedbackNotifications then FeedbackNotifications.ShowAchievement(achievementName, description) end
+		if FeedbackNotifications then
+			FeedbackNotifications.ShowAchievement(achievementName, description)
+		end
 	end)
 
 	-- Level up
 	Events.OnClientEvent("Progression", "LevelUp", function(data)
 		local newLevel = data.level or 2
-		if FeedbackNotifications then FeedbackNotifications.ShowLevelUp(newLevel) end
+		if FeedbackNotifications then
+			FeedbackNotifications.ShowLevelUp(newLevel)
+		end
 	end)
 
 	-- XP gained
 	Events.OnClientEvent("Progression", "XPGained", function(data)
 		local amount = data.amount or 10
 		local reason = data.reason
-		if FeedbackNotifications then FeedbackNotifications.ShowXPGain(amount, reason) end
+		if FeedbackNotifications then
+			FeedbackNotifications.ShowXPGain(amount, reason)
+		end
 	end)
 
 	-- Biome changed - update color grading
 	Events.OnClientEvent("Map", "BiomeChanged", function(data)
 		local biomeName = data.biome or "Plains"
-		if ScreenEffects then ScreenEffects.SetBiomeColorGrade(biomeName) end
+		if ScreenEffects then
+			ScreenEffects.SetBiomeColorGrade(biomeName)
+		end
 	end)
 
 	-- Note: MatchStateChanged above handles all state transitions
@@ -677,7 +725,7 @@ local function main()
 		waitForCharacter()
 	end)
 
-	isInitialized = true
+	_isInitialized = true
 
 	print("[Client] Ready!")
 	print("==========================================")

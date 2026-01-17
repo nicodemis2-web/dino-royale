@@ -233,7 +233,7 @@ end
 --[[
 	Calculate shake offset for a single active shake
 ]]
-local function calculateShakeOffset(shake: ActiveShake, deltaTime: number): (Vector3, Vector3)
+local function calculateShakeOffset(shake: ActiveShake, _deltaTime: number): (Vector3, Vector3)
 	local config = shake.config
 	local t = (config.duration - shake.timeRemaining)
 	local seed = shake.seed
@@ -380,8 +380,7 @@ function CameraShake.ShakeForWeapon(weaponCategory: string)
 		CameraShake.ShakePreset("GunfireHeavy")
 	elseif weaponCategory == "Shotgun" then
 		CameraShake.ShakePreset("ShotgunBlast")
-	else
-		CameraShake.ShakePreset("GunfireLight")
+	-- else: Unknown weapon types already handled by Pistol/SMG case above
 	end
 end
 

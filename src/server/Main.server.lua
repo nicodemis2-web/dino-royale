@@ -494,8 +494,8 @@ local function setupRespawnHandler(player: Player)
 					if rootPart.Position.Y < 0 or rootPart.Position.Y > 200 then
 						local spawnX, spawnZ = 200, 200
 						local rayResult = Workspace:Raycast(Vector3.new(spawnX, 500, spawnZ), Vector3.new(0, -1000, 0))
-						local spawnY = rayResult and (rayResult.Position.Y + 5) or 30
-						rootPart.CFrame = CFrame.new(spawnX, spawnY, spawnZ)
+						local correctedSpawnY = rayResult and (rayResult.Position.Y + 5) or 30
+						rootPart.CFrame = CFrame.new(spawnX, correctedSpawnY, spawnZ)
 						print(`[Server] Corrected {player.Name} position to terrain`)
 					end
 				end

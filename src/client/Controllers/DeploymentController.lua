@@ -112,7 +112,7 @@ local function createDeploymentUI()
 	jumpButton = Instance.new("TextButton")
 	jumpButton.Name = "JumpButton"
 	jumpButton.AnchorPoint = Vector2.new(0.5, 0)
-	jumpButton.Position = UDim2.new(0.5, 0, 0, 0)
+	jumpButton.Position = UDim2.fromScale(0.5, 0)
 	jumpButton.Size = UDim2.fromOffset(220, 55)
 	jumpButton.BackgroundColor3 = Color3.fromRGB(50, 150, 255)
 	jumpButton.Text = "PRESS SPACE TO JUMP"
@@ -361,19 +361,19 @@ end
 --[[
 	Handle glider enabled event
 ]]
-local function onGliderEnabled(data: { position: Vector3, forced: boolean? })
+local function onGliderEnabled(_data: { position: Vector3, forced: boolean? })
 	hasJumped = true
 	isGliding = true
 
 	showGliderUI()
 
 	-- Bind glider controls
-	ContextActionService:BindAction("GliderPitch", function(_, inputState)
+	ContextActionService:BindAction("GliderPitch", function(_, _inputState)
 		-- Handled in update
 		return Enum.ContextActionResult.Pass
 	end, false, Enum.KeyCode.W, Enum.KeyCode.S)
 
-	ContextActionService:BindAction("GliderYaw", function(_, inputState)
+	ContextActionService:BindAction("GliderYaw", function(_, _inputState)
 		-- Handled in update
 		return Enum.ContextActionResult.Pass
 	end, false, Enum.KeyCode.A, Enum.KeyCode.D)
@@ -403,7 +403,7 @@ end
 local function onJumpDenied(data: { reason: string })
 	-- Load toast if not loaded
 	if not ToastNotification then
-		local success, result = pcall(function()
+		local success, _result = pcall(function()
 			return require(game.Players.LocalPlayer.PlayerGui:WaitForChild("ToastNotificationGui", 1))
 		end)
 		if not success then
@@ -435,7 +435,7 @@ end
 --[[
 	Update loop
 ]]
-local function update(dt: number)
+local function update(_dt: number)
 	if not isDeploymentActive then
 		return
 	end

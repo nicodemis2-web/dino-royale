@@ -1542,10 +1542,7 @@ local function createLootCache(position: Vector3, cacheType: string): Model
 		tier = "High"
 	elseif cacheType == "ammo_box" then
 		tier = "Low"
-	elseif cacheType == "medkit" then
-		tier = "Medium"
-	elseif cacheType == "supply_drop" then
-		tier = "Medium"
+	-- elseif cacheType == "medkit" or cacheType == "supply_drop": keep default "Medium"
 	end
 
 	-- Add loot data attributes for LootManager integration
@@ -1822,7 +1819,7 @@ end
 local function createVolcanicFeatures(terrain: Terrain, config: typeof(MapConfig)): boolean
 	return safeExecute("Phase 6: Volcanic Features", function()
 		local halfSize = config.MapSize / 2
-		for i = 1, config.LavaPoolCount do
+		for _ = 1, config.LavaPoolCount do
 			local lavaX = math.random(-600, 600)
 			local lavaZ = -halfSize + math.random(100, 700)
 			terrain:FillBlock(
@@ -1953,7 +1950,7 @@ local function createVegetation(config: typeof(MapConfig)): boolean
 		local itemsCreated = 0
 
 		-- JUNGLE VEGETATION
-		for i = 1, veg.JungleTreeClusters do
+		for _ = 1, veg.JungleTreeClusters do
 			local clusterX = math.random(-500, 500)
 			local clusterZ = math.random(-500, 400)
 			if math.abs(clusterX) > 120 or math.abs(clusterZ - (-200)) > 100 then
@@ -1963,7 +1960,7 @@ local function createVegetation(config: typeof(MapConfig)): boolean
 			if itemsCreated % yieldInterval == 0 then task.wait() end
 		end
 
-		for i = 1, veg.JungleIndividualTrees do
+		for _ = 1, veg.JungleIndividualTrees do
 			local treeX = math.random(-600, 600)
 			local treeZ = math.random(-600, 500)
 			if math.abs(treeX) > 100 or math.abs(treeZ - (-200)) > 80 then
@@ -1973,11 +1970,11 @@ local function createVegetation(config: typeof(MapConfig)): boolean
 			if itemsCreated % yieldInterval == 0 then task.wait() end
 		end
 
-		for i = 1, veg.JungleGrassPatches do
+		for _ = 1, veg.JungleGrassPatches do
 			createGrassPatch(terrain, Vector3.new(math.random(-500, 500), 25, math.random(-500, 400)), math.random(20, 50))
 		end
 
-		for i = 1, veg.JungleFlowerPatches do
+		for _ = 1, veg.JungleFlowerPatches do
 			pcall(function()
 				FloraGenerator.CreateFlowerPatch(
 					Vector3.new(math.random(-500, 500), 25, math.random(-500, 400)),
@@ -1989,7 +1986,7 @@ local function createVegetation(config: typeof(MapConfig)): boolean
 
 		-- PLAINS VEGETATION
 		local plainsCenter = biomes.Plains
-		for i = 1, veg.PlainsTreeClusters do
+		for _ = 1, veg.PlainsTreeClusters do
 			local clusterX = plainsCenter.X + math.random(-600, 600)
 			local clusterZ = plainsCenter.Z + math.random(-600, 600)
 			createTreeCluster(Vector3.new(clusterX, 18, clusterZ), 60, math.random(2, 4), "oak", 18)
@@ -1997,7 +1994,7 @@ local function createVegetation(config: typeof(MapConfig)): boolean
 			if itemsCreated % yieldInterval == 0 then task.wait() end
 		end
 
-		for i = 1, veg.PlainsBirchTrees do
+		for _ = 1, veg.PlainsBirchTrees do
 			local treeX = plainsCenter.X + math.random(-700, 700)
 			local treeZ = plainsCenter.Z + math.random(-700, 700)
 			createFloraTree(Vector3.new(treeX, 15, treeZ), "birch")
@@ -2005,15 +2002,15 @@ local function createVegetation(config: typeof(MapConfig)): boolean
 			if itemsCreated % yieldInterval == 0 then task.wait() end
 		end
 
-		for i = 1, veg.PlainsGrassPatches do
+		for _ = 1, veg.PlainsGrassPatches do
 			createGrassPatch(terrain, Vector3.new(plainsCenter.X + math.random(-600, 600), 18, plainsCenter.Z + math.random(-600, 600)), math.random(30, 80))
 		end
 
-		for i = 1, veg.PlainsRockFormations do
+		for _ = 1, veg.PlainsRockFormations do
 			createRockFormation(Vector3.new(plainsCenter.X + math.random(-500, 500), 18, plainsCenter.Z + math.random(-500, 500)), math.random(4, 8), 3, 10)
 		end
 
-		for i = 1, veg.PlainsFlowerPatches do
+		for _ = 1, veg.PlainsFlowerPatches do
 			pcall(function()
 				FloraGenerator.CreateFlowerPatch(
 					Vector3.new(plainsCenter.X + math.random(-600, 600), 18, plainsCenter.Z + math.random(-600, 600)),
@@ -2025,7 +2022,7 @@ local function createVegetation(config: typeof(MapConfig)): boolean
 
 		-- VOLCANIC VEGETATION
 		local volcanicCenter = biomes.Volcanic
-		for i = 1, veg.VolcanicTrees do
+		for _ = 1, veg.VolcanicTrees do
 			local treeX = volcanicCenter.X + math.random(-700, 700)
 			local treeZ = volcanicCenter.Z + math.random(-400, 500)
 			createFloraTree(Vector3.new(treeX, 45, treeZ), math.random() > 0.6 and "charred" or "heatResistant")
@@ -2033,14 +2030,14 @@ local function createVegetation(config: typeof(MapConfig)): boolean
 			if itemsCreated % yieldInterval == 0 then task.wait() end
 		end
 
-		for i = 1, veg.VolcanicRockFormations do
+		for _ = 1, veg.VolcanicRockFormations do
 			createRockFormation(
 				Vector3.new(volcanicCenter.X + math.random(-600, 600), 45, volcanicCenter.Z + math.random(-400, 400)),
 				math.random(5, 12), 5, 20, Enum.Material.Basalt
 			)
 		end
 
-		for i = 1, veg.VolcanicScatteredRocks do
+		for _ = 1, veg.VolcanicScatteredRocks do
 			local rockX = volcanicCenter.X + math.random(-800, 800)
 			local rockZ = volcanicCenter.Z + math.random(-500, 500)
 			createRock(Vector3.new(rockX, 45, rockZ), math.random(4, 15), Enum.Material.Basalt)
@@ -2053,7 +2050,7 @@ local function createVegetation(config: typeof(MapConfig)): boolean
 
 		-- SWAMP VEGETATION
 		local swampCenter = biomes.Swamp
-		for i = 1, veg.SwampTreeClusters do
+		for _ = 1, veg.SwampTreeClusters do
 			local clusterX = swampCenter.X + math.random(-500, 500)
 			local clusterZ = swampCenter.Z + math.random(-500, 500)
 			createTreeCluster(Vector3.new(clusterX, 12, clusterZ), 50, math.random(3, 6), "dead", 15)
@@ -2061,7 +2058,7 @@ local function createVegetation(config: typeof(MapConfig)): boolean
 			if itemsCreated % yieldInterval == 0 then task.wait() end
 		end
 
-		for i = 1, veg.SwampIndividualTrees do
+		for _ = 1, veg.SwampIndividualTrees do
 			local treeX = swampCenter.X + math.random(-600, 600)
 			local treeZ = swampCenter.Z + math.random(-600, 600)
 			createFloraTree(Vector3.new(treeX, 12, treeZ), math.random() > 0.4 and "dead" or "cypress")
@@ -2092,7 +2089,7 @@ local function createVegetation(config: typeof(MapConfig)): boolean
 
 		-- COASTAL VEGETATION
 		local coastalCenter = biomes.Coastal
-		for i = 1, veg.CoastalTreeClusters do
+		for _ = 1, veg.CoastalTreeClusters do
 			local clusterX = coastalCenter.X + math.random(-700, 700)
 			local clusterZ = coastalCenter.Z + math.random(-300, 200)
 			createTreeCluster(Vector3.new(clusterX, 10, clusterZ), 60, math.random(4, 7), "palm", 18)
@@ -2100,7 +2097,7 @@ local function createVegetation(config: typeof(MapConfig)): boolean
 			if itemsCreated % yieldInterval == 0 then task.wait() end
 		end
 
-		for i = 1, veg.CoastalIndividualTrees do
+		for _ = 1, veg.CoastalIndividualTrees do
 			local palmX = coastalCenter.X + math.random(-800, 800)
 			local palmZ = coastalCenter.Z + math.random(-400, 300)
 			createFloraTree(Vector3.new(palmX, 8, palmZ), math.random() > 0.3 and "palm" or "pine")
@@ -2108,7 +2105,7 @@ local function createVegetation(config: typeof(MapConfig)): boolean
 			if itemsCreated % yieldInterval == 0 then task.wait() end
 		end
 
-		for i = 1, veg.CoastalRockFormations do
+		for _ = 1, veg.CoastalRockFormations do
 			createRockFormation(
 				Vector3.new(coastalCenter.X + math.random(-600, 600), 8, coastalCenter.Z + math.random(0, 300)),
 				math.random(3, 7), 2, 8, Enum.Material.Sandstone
@@ -2184,7 +2181,7 @@ local function createLootCaches(config: typeof(MapConfig)): boolean
 		end
 
 		-- Additional random loot
-		for i = 1, 20 do
+		for _ = 1, 20 do
 			local angle = math.random() * math.pi * 2
 			local distance = 50 + math.random() * 250
 			local lootX = spawnCenter.X + math.cos(angle) * distance
@@ -2206,7 +2203,7 @@ local function createFoliageDetails(config: typeof(MapConfig)): boolean
 		local spawnCenter = config.GetSpawnCenter()
 
 		-- Bushes
-		for i = 1, veg.TotalBushes do
+		for _ = 1, veg.TotalBushes do
 			local bushX = math.random(-1800, 1800)
 			local bushZ = math.random(-1500, 1500)
 			local bushY = 20
@@ -2217,7 +2214,7 @@ local function createFoliageDetails(config: typeof(MapConfig)): boolean
 		end
 
 		-- Jungle ferns
-		for i = 1, veg.JungleFerns do
+		for _ = 1, veg.JungleFerns do
 			local fernX = math.random(-600, 600)
 			local fernZ = math.random(-500, 400)
 			createFern(Vector3.new(fernX, 25, fernZ))
@@ -2225,7 +2222,7 @@ local function createFoliageDetails(config: typeof(MapConfig)): boolean
 
 		-- Swamp ferns
 		local swampCenter = biomes.Swamp
-		for i = 1, veg.SwampFerns do
+		for _ = 1, veg.SwampFerns do
 			local fernX = swampCenter.X + math.random(-500, 500)
 			local fernZ = swampCenter.Z + math.random(-500, 500)
 			createFern(Vector3.new(fernX, 12, fernZ))
@@ -2233,7 +2230,7 @@ local function createFoliageDetails(config: typeof(MapConfig)): boolean
 
 		-- Plains flowers
 		local plainsCenter = biomes.Plains
-		for i = 1, veg.PlainsDetailFlowers do
+		for _ = 1, veg.PlainsDetailFlowers do
 			local flowerX = plainsCenter.X + math.random(-600, 600)
 			local flowerZ = plainsCenter.Z + math.random(-600, 600)
 			createFlowerPatch(Vector3.new(flowerX, 18, flowerZ), math.random(5, 12))
@@ -2241,14 +2238,14 @@ local function createFoliageDetails(config: typeof(MapConfig)): boolean
 
 		-- Coastal flowers
 		local coastalCenter = biomes.Coastal
-		for i = 1, veg.CoastalDetailFlowers do
+		for _ = 1, veg.CoastalDetailFlowers do
 			local flowerX = coastalCenter.X + math.random(-600, 600)
 			local flowerZ = coastalCenter.Z + math.random(-200, 200)
 			createFlowerPatch(Vector3.new(flowerX, 10, flowerZ), math.random(4, 8))
 		end
 
 		-- Spawn area bushes
-		for i = 1, veg.SpawnAreaBushes do
+		for _ = 1, veg.SpawnAreaBushes do
 			local angle = math.random() * math.pi * 2
 			local dist = 50 + math.random() * 150
 			local bushX = spawnCenter.X + math.cos(angle) * dist
@@ -2263,7 +2260,7 @@ end
 ]]
 local function createRockDetails(config: typeof(MapConfig)): boolean
 	return safeExecute("Phase 12: Rock Details", function()
-		for i = 1, config.Vegetation.FinalRockDetails do
+		for _ = 1, config.Vegetation.FinalRockDetails do
 			local x = math.random(-1800, 1800)
 			local z = math.random(-1600, 1600)
 			local y = 20

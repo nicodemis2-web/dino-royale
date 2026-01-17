@@ -7,10 +7,10 @@
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local ServerStorage = game:GetService("ServerStorage")
+local _ServerStorage = game:GetService("ServerStorage")
 
 local POIData = require(ReplicatedStorage.Shared.POIData)
-local BiomeData = require(ReplicatedStorage.Shared.BiomeData)
+local _BiomeData = require(ReplicatedStorage.Shared.BiomeData)
 local Events = require(ReplicatedStorage.Shared.Events)
 
 local POIManager = {}
@@ -64,7 +64,7 @@ function POIManager.SpawnLootAtPOI(poiName: string)
 	spawnedLoot[poiName] = {}
 
 	-- Spawn chests
-	for i = 1, state.totalChests do
+	for _ = 1, state.totalChests do
 		local chestData = {
 			id = poiName .. "_chest_" .. i,
 			poiName = poiName,
@@ -80,7 +80,7 @@ function POIManager.SpawnLootAtPOI(poiName: string)
 	end
 
 	-- Spawn floor loot
-	for i = 1, config.floorLootSpawns do
+	for _ = 1, config.floorLootSpawns do
 		local floorLootData = {
 			id = poiName .. "_floor_" .. i,
 			poiName = poiName,

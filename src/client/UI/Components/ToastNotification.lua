@@ -188,11 +188,11 @@ function ToastNotification.Show(config: ToastConfig)
 	toast.BackgroundTransparency = 1
 
 	-- Get stroke for animation
-	local stroke = toast:FindFirstChildOfClass("UIStroke")
+	local _stroke = toast:FindFirstChildOfClass("UIStroke")
 
 	-- Animate in
 	local tweenIn = TweenService:Create(toast, TweenInfo.new(ANIMATION_DURATION, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-		Position = UDim2.new(0, 0, 0, 0),
+		Position = UDim2.fromOffset(0, 0),
 		BackgroundTransparency = 0.1,
 	})
 	tweenIn:Play()

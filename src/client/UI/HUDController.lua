@@ -25,7 +25,7 @@ local InteractionPrompt: any = nil
 local InventoryScreen: any = nil
 local ToastNotification: any = nil
 local ConfirmDialog: any = nil
-local UIHelpers: any = nil
+local _UIHelpers: any = nil
 local Crosshair: any = nil
 local WorldHealthBar: any = nil
 
@@ -74,7 +74,7 @@ local function loadComponents()
 	InventoryScreen = require(Components.InventoryScreen)
 	ToastNotification = require(Components.ToastNotification)
 	ConfirmDialog = require(Components.ConfirmDialog)
-	UIHelpers = require(script.Parent.UIHelpers)
+	_UIHelpers = require(script.Parent.UIHelpers)
 	Crosshair = require(Components.Crosshair)
 	WorldHealthBar = require(Components.WorldHealthBar)
 end
@@ -201,6 +201,7 @@ local function setupEvents()
 		-- Update kill count if local player got the kill
 		if data.killerId == localPlayer.UserId and matchInfo then
 			-- Match info will receive separate update
+			local _ = matchInfo -- Acknowledge intentionally empty block
 		end
 	end)
 	table.insert(connections, killConn)

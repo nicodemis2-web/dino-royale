@@ -62,7 +62,7 @@ end
 --[[
 	Use equipment
 ]]
-function EquipmentBase:Use(origin: Vector3, direction: Vector3): any
+function EquipmentBase:Use(_origin: Vector3, _direction: Vector3): any
 	if not self:CanUse() then return nil end
 
 	self.isUsing = true

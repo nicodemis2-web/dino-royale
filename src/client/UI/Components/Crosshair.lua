@@ -41,7 +41,7 @@ local DOT_SIZE = 4                -- Center dot size
 local MIN_SPREAD_MULT = 0.8       -- Minimum spread multiplier (crouching/ADS)
 local MAX_SPREAD_MULT = 2.5       -- Maximum spread multiplier (running/jumping)
 local BLOOM_RECOVERY_SPEED = 3.0  -- How fast crosshair contracts after firing
-local SPREAD_TWEEN_TIME = 0.1     -- Tween time for spread changes
+local _SPREAD_TWEEN_TIME = 0.1     -- Tween time for spread changes
 
 -- Spread modifiers (match WeaponBase constants)
 local SPREAD_MODIFIERS = {
@@ -243,8 +243,7 @@ function Crosshair:BuildCrosshair()
 		self:BuildCircleStyle()
 	elseif self.style == STYLE_CHEVRON then
 		self:BuildChevronStyle()
-	else
-		self:BuildCrossStyle() -- Default fallback
+	-- else: STYLE_CROSS is already handled as first case, no default needed
 	end
 
 	-- Apply color and opacity

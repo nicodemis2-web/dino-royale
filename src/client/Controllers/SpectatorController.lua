@@ -10,7 +10,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
 local ContextActionService = game:GetService("ContextActionService")
-local RunService = game:GetService("RunService")
+local _RunService = game:GetService("RunService")
 
 local Events = require(ReplicatedStorage.Shared.Events)
 
@@ -54,7 +54,7 @@ function SpectatorController.Initialize()
 	SpectatorController.SetupEventListeners()
 	SpectatorController.SetupInputHandling()
 
-	RunService.RenderStepped:Connect(function(deltaTime)
+	game:GetService("RunService").RenderStepped:Connect(function(deltaTime)
 		if isSpectating then
 			SpectatorController.UpdateCamera(deltaTime)
 		end
@@ -79,7 +79,7 @@ function SpectatorController.CreateUI()
 	-- Main spectator panel
 	spectatorUI = Instance.new("Frame")
 	spectatorUI.Name = "SpectatorPanel"
-	spectatorUI.Size = UDim2.new(0, 300, 0, 80)
+	spectatorUI.Size = UDim2.fromOffset(300, 80)
 	spectatorUI.Position = UDim2.new(0.5, 0, 0, 20)
 	spectatorUI.AnchorPoint = Vector2.new(0.5, 0)
 	spectatorUI.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
@@ -107,7 +107,7 @@ function SpectatorController.CreateUI()
 	local targetLabel = Instance.new("TextLabel")
 	targetLabel.Name = "TargetName"
 	targetLabel.Size = UDim2.new(1, -20, 0, 30)
-	targetLabel.Position = UDim2.new(0, 10, 0, 25)
+	targetLabel.Position = UDim2.fromOffset(10, 25)
 	targetLabel.BackgroundTransparency = 1
 	targetLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 	targetLabel.TextSize = 22
@@ -130,7 +130,7 @@ function SpectatorController.CreateUI()
 	-- Player count
 	local countLabel = Instance.new("TextLabel")
 	countLabel.Name = "PlayerCount"
-	countLabel.Size = UDim2.new(0, 80, 0, 20)
+	countLabel.Size = UDim2.fromOffset(80, 20)
 	countLabel.Position = UDim2.new(1, -90, 0, 5)
 	countLabel.BackgroundTransparency = 1
 	countLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -145,7 +145,7 @@ end
 	Setup event listeners
 ]]
 function SpectatorController.SetupEventListeners()
-	Events.OnClientEvent("GameState", function(action, data)
+	Events.OnClientEvent("GameState", function(action, _data)
 		if action == "Spectate" then
 			SpectatorController.StartSpectating()
 		elseif action == "StopSpectate" then
@@ -154,7 +154,7 @@ function SpectatorController.SetupEventListeners()
 	end)
 
 	-- Update targets when players leave
-	Players.PlayerRemoving:Connect(function(removedPlayer)
+	Players.PlayerRemoving:Connect(function(_removedPlayer)
 		if isSpectating then
 			SpectatorController.RefreshTargets()
 		end
@@ -188,7 +188,7 @@ function SpectatorController.SetupInputHandling()
 	end, false, FREE_CAM_KEY)
 
 	-- Free cam mouse look (still use UserInputService for continuous mouse movement)
-	local mouseConn = UserInputService.InputChanged:Connect(function(input, gameProcessed)
+	local mouseConn = UserInputService.InputChanged:Connect(function(input, _gameProcessed)
 		if not isSpectating or not isFreeCam then return end
 
 		if input.UserInputType == Enum.UserInputType.MouseMovement then
@@ -387,7 +387,7 @@ end
 --[[
 	Update follow camera
 ]]
-function SpectatorController.UpdateFollowCam(deltaTime: number)
+function SpectatorController.UpdateFollowCam(_deltaTime: number)
 	if not currentTarget or not spectatorCamera then return end
 
 	local character = currentTarget.Character

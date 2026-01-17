@@ -65,7 +65,7 @@ local config: MinimapConfig = {
 
 local isInitialized = false
 local isVisible = true
-local currentBiome = ""
+local _currentBiome = ""
 
 -- Map bounds (would be set from map data)
 local mapCenter = Vector3.new(0, 0, 0)

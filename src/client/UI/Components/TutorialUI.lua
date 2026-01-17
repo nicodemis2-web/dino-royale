@@ -21,7 +21,7 @@ local screenGui: ScreenGui? = nil
 local tipFrame: Frame? = nil
 local objectiveFrame: Frame? = nil
 local promptFrame: Frame? = nil
-local currentStage: TutorialData.TutorialStage? = nil
+local __currentStage: TutorialData.TutorialStage? = nil
 local currentTip: string? = nil
 local isInTutorial = false
 
@@ -59,7 +59,7 @@ function TutorialUI.CreateUI()
 	-- Tutorial prompt frame
 	promptFrame = Instance.new("Frame")
 	promptFrame.Name = "TutorialPrompt"
-	promptFrame.Size = UDim2.new(0, 450, 0, 250)
+	promptFrame.Size = UDim2.fromOffset(450, 250)
 	promptFrame.Position = UDim2.fromScale(0.5, 0.5)
 	promptFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 	promptFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
@@ -85,7 +85,7 @@ function TutorialUI.CreateUI()
 	local promptDesc = Instance.new("TextLabel")
 	promptDesc.Name = "Description"
 	promptDesc.Size = UDim2.new(1, -40, 0, 60)
-	promptDesc.Position = UDim2.new(0, 20, 0, 70)
+	promptDesc.Position = UDim2.fromOffset(20, 70)
 	promptDesc.BackgroundTransparency = 1
 	promptDesc.TextColor3 = Color3.fromRGB(180, 180, 180)
 	promptDesc.TextSize = 14
@@ -96,7 +96,7 @@ function TutorialUI.CreateUI()
 
 	local startButton = Instance.new("TextButton")
 	startButton.Name = "StartButton"
-	startButton.Size = UDim2.new(0, 150, 0, 45)
+	startButton.Size = UDim2.fromOffset(150, 45)
 	startButton.Position = UDim2.new(0.3, 0, 1, -70)
 	startButton.AnchorPoint = Vector2.new(0.5, 0)
 	startButton.BackgroundColor3 = Color3.fromRGB(80, 180, 80)
@@ -117,7 +117,7 @@ function TutorialUI.CreateUI()
 
 	local skipButton = Instance.new("TextButton")
 	skipButton.Name = "SkipButton"
-	skipButton.Size = UDim2.new(0, 150, 0, 45)
+	skipButton.Size = UDim2.fromOffset(150, 45)
 	skipButton.Position = UDim2.new(0.7, 0, 1, -70)
 	skipButton.AnchorPoint = Vector2.new(0.5, 0)
 	skipButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
@@ -139,7 +139,7 @@ function TutorialUI.CreateUI()
 	-- Context tip frame
 	tipFrame = Instance.new("Frame")
 	tipFrame.Name = "TipFrame"
-	tipFrame.Size = UDim2.new(0, 400, 0, 60)
+	tipFrame.Size = UDim2.fromOffset(400, 60)
 	tipFrame.Position = UDim2.new(0.5, 0, 0, 150)
 	tipFrame.AnchorPoint = Vector2.new(0.5, 0)
 	tipFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
@@ -166,7 +166,7 @@ function TutorialUI.CreateUI()
 	local tipText = Instance.new("TextLabel")
 	tipText.Name = "Text"
 	tipText.Size = UDim2.new(1, -70, 1, -10)
-	tipText.Position = UDim2.new(0, 55, 0, 5)
+	tipText.Position = UDim2.fromOffset(55, 5)
 	tipText.BackgroundTransparency = 1
 	tipText.TextColor3 = Color3.fromRGB(220, 220, 220)
 	tipText.TextSize = 14
@@ -179,7 +179,7 @@ function TutorialUI.CreateUI()
 	-- Objective tracker frame (for active tutorial)
 	objectiveFrame = Instance.new("Frame")
 	objectiveFrame.Name = "Objectives"
-	objectiveFrame.Size = UDim2.new(0, 300, 0, 200)
+	objectiveFrame.Size = UDim2.fromOffset(300, 200)
 	objectiveFrame.Position = UDim2.new(1, -20, 0.5, 0)
 	objectiveFrame.AnchorPoint = Vector2.new(1, 0.5)
 	objectiveFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
@@ -205,7 +205,7 @@ function TutorialUI.CreateUI()
 	local objList = Instance.new("Frame")
 	objList.Name = "List"
 	objList.Size = UDim2.new(1, -20, 1, -40)
-	objList.Position = UDim2.new(0, 10, 0, 35)
+	objList.Position = UDim2.fromOffset(10, 35)
 	objList.BackgroundTransparency = 1
 	objList.Parent = objectiveFrame
 
@@ -276,7 +276,7 @@ end
 function TutorialUI.ShowStage(stage: TutorialData.TutorialStage)
 	if not objectiveFrame then return end
 
-	currentStage = stage
+	_currentStage = stage
 	isInTutorial = true
 	objectiveFrame.Visible = true
 
@@ -343,7 +343,7 @@ end
 ]]
 function TutorialUI.OnTutorialCompleted()
 	isInTutorial = false
-	currentStage = nil
+	_currentStage = nil
 
 	if objectiveFrame then
 		objectiveFrame.Visible = false
@@ -358,7 +358,7 @@ end
 ]]
 function TutorialUI.OnTutorialSkipped()
 	isInTutorial = false
-	currentStage = nil
+	_currentStage = nil
 
 	if objectiveFrame then
 		objectiveFrame.Visible = false
@@ -426,7 +426,7 @@ end
 --[[
 	On progress update
 ]]
-function TutorialUI.OnProgressUpdate(data: any)
+function TutorialUI.OnProgressUpdate(_data: any)
 	-- Could update UI to show which stages are complete
 end
 

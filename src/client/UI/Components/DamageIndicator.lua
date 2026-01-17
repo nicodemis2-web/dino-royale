@@ -21,7 +21,7 @@
 
 local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
+local _RunService = game:GetService("RunService")
 
 local DamageIndicator = {}
 DamageIndicator.__index = DamageIndicator
@@ -278,7 +278,7 @@ function DamageIndicator:ShowDamageFrom(sourcePosition: Vector3, damage: number,
 	-- Create arrow shape using frames
 	local arrowLeft = Instance.new("Frame")
 	arrowLeft.Size = UDim2.fromOffset(INDICATOR_SIZE / 2, 6)
-	arrowLeft.Position = UDim2.new(0.3, 0, 0.5, 0)
+	arrowLeft.Position = UDim2.fromScale(0.3, 0.5)
 	arrowLeft.AnchorPoint = Vector2.new(0.5, 0.5)
 	arrowLeft.Rotation = 30
 	arrowLeft.BackgroundColor3 = color
@@ -288,7 +288,7 @@ function DamageIndicator:ShowDamageFrom(sourcePosition: Vector3, damage: number,
 
 	local arrowRight = Instance.new("Frame")
 	arrowRight.Size = UDim2.fromOffset(INDICATOR_SIZE / 2, 6)
-	arrowRight.Position = UDim2.new(0.7, 0, 0.5, 0)
+	arrowRight.Position = UDim2.fromScale(0.7, 0.5)
 	arrowRight.AnchorPoint = Vector2.new(0.5, 0.5)
 	arrowRight.Rotation = -30
 	arrowRight.BackgroundColor3 = color
@@ -360,10 +360,10 @@ function DamageIndicator:ShowStormDamage()
 
 	-- Create gradient edges
 	local edges = {
-		{ pos = UDim2.fromScale(0.5, 0), anchor = Vector2.new(0.5, 0), size = UDim2.new(1, 0, 0.15, 0), rot = 180 },
-		{ pos = UDim2.fromScale(0.5, 1), anchor = Vector2.new(0.5, 1), size = UDim2.new(1, 0, 0.15, 0), rot = 0 },
-		{ pos = UDim2.fromScale(0, 0.5), anchor = Vector2.new(0, 0.5), size = UDim2.new(0.1, 0, 1, 0), rot = 90 },
-		{ pos = UDim2.fromScale(1, 0.5), anchor = Vector2.new(1, 0.5), size = UDim2.new(0.1, 0, 1, 0), rot = -90 },
+		{ pos = UDim2.fromScale(0.5, 0), anchor = Vector2.new(0.5, 0), size = UDim2.fromScale(1, 0.15), rot = 180 },
+		{ pos = UDim2.fromScale(0.5, 1), anchor = Vector2.new(0.5, 1), size = UDim2.fromScale(1, 0.15), rot = 0 },
+		{ pos = UDim2.fromScale(0, 0.5), anchor = Vector2.new(0, 0.5), size = UDim2.fromScale(0.1, 1), rot = 90 },
+		{ pos = UDim2.fromScale(1, 0.5), anchor = Vector2.new(1, 0.5), size = UDim2.fromScale(0.1, 1), rot = -90 },
 	}
 
 	for _, edge in ipairs(edges) do
@@ -410,7 +410,7 @@ end
 	@param isKill Whether it killed the target
 	@param damage Optional damage amount for floating number
 ]]
-function DamageIndicator:ShowHitMarker(isHeadshot: boolean?, isKill: boolean?, damage: number?)
+function DamageIndicator:ShowHitMarker(isHeadshot: boolean?, isKill: boolean?, _damage: number?)
 	-- Determine color and size
 	local color = COLORS.HitNormal
 	local sizeMultiplier = HIT_MARKER_SIZES.Normal
@@ -546,7 +546,7 @@ function DamageIndicator:ShowKillConfirm(victimName: string?)
 	if victimName then
 		local killBanner = Instance.new("TextLabel")
 		killBanner.Name = "KillBanner"
-		killBanner.Position = UDim2.new(0.5, 0, 0.4, 0)
+		killBanner.Position = UDim2.fromScale(0.5, 0.4)
 		killBanner.AnchorPoint = Vector2.new(0.5, 0.5)
 		killBanner.Size = UDim2.fromOffset(200, 30)
 		killBanner.BackgroundTransparency = 1
@@ -565,7 +565,7 @@ function DamageIndicator:ShowKillConfirm(victimName: string?)
 			TweenService:Create(killBanner, TweenInfo.new(1.0), {
 				TextTransparency = 1,
 				TextStrokeTransparency = 1,
-				Position = UDim2.new(0.5, 0, 0.35, 0),
+				Position = UDim2.fromScale(0.5, 0.35),
 			}):Play()
 		end)
 

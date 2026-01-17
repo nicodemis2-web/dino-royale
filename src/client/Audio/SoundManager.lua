@@ -14,7 +14,7 @@ local Events = require(game.ReplicatedStorage.Shared.Events)
 local SoundManager = {}
 
 -- Local player reference
-local localPlayer = Players.LocalPlayer
+local _localPlayer = Players.LocalPlayer
 
 -- Sound groups
 local soundGroups = {

@@ -31,7 +31,7 @@ local claimedRewards: { [string]: boolean } = {}
 -- Constants
 local TIER_WIDTH = 120
 local TIER_HEIGHT = 180
-local VISIBLE_TIERS = 7
+local _VISIBLE_TIERS = 7
 
 --[[
 	Initialize the battle pass UI
@@ -79,7 +79,7 @@ function BattlePassUI.CreateUI()
 	-- Main container
 	mainFrame = Instance.new("Frame")
 	mainFrame.Name = "MainFrame"
-	mainFrame.Size = UDim2.new(0, 900, 0, 600)
+	mainFrame.Size = UDim2.fromOffset(900, 600)
 	mainFrame.Position = UDim2.fromScale(0.5, 0.5)
 	mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 	mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
@@ -118,7 +118,7 @@ function BattlePassUI.CreateUI()
 	-- Tier display
 	local tierLabel = Instance.new("TextLabel")
 	tierLabel.Name = "Tier"
-	tierLabel.Size = UDim2.new(0, 150, 0, 30)
+	tierLabel.Size = UDim2.fromOffset(150, 30)
 	tierLabel.Position = UDim2.new(1, -170, 0, 15)
 	tierLabel.BackgroundTransparency = 1
 	tierLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -132,7 +132,7 @@ function BattlePassUI.CreateUI()
 	local progressBg = Instance.new("Frame")
 	progressBg.Name = "ProgressBg"
 	progressBg.Size = UDim2.new(0.7, 0, 0, 20)
-	progressBg.Position = UDim2.new(0, 20, 0, 50)
+	progressBg.Position = UDim2.fromOffset(20, 50)
 	progressBg.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
 	progressBg.BorderSizePixel = 0
 	progressBg.Parent = header
@@ -143,7 +143,7 @@ function BattlePassUI.CreateUI()
 
 	local progressFill = Instance.new("Frame")
 	progressFill.Name = "Fill"
-	progressFill.Size = UDim2.new(0, 0, 1, 0)
+	progressFill.Size = UDim2.fromScale(0, 1)
 	progressFill.BackgroundColor3 = Color3.fromRGB(100, 200, 255)
 	progressFill.BorderSizePixel = 0
 	progressFill.Parent = progressBg
@@ -167,7 +167,7 @@ function BattlePassUI.CreateUI()
 	-- Close button
 	local closeButton = Instance.new("TextButton")
 	closeButton.Name = "Close"
-	closeButton.Size = UDim2.new(0, 40, 0, 40)
+	closeButton.Size = UDim2.fromOffset(40, 40)
 	closeButton.Position = UDim2.new(1, -50, 0, 20)
 	closeButton.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
 	closeButton.BorderSizePixel = 0
@@ -189,7 +189,7 @@ function BattlePassUI.CreateUI()
 	tierContainer = Instance.new("ScrollingFrame")
 	tierContainer.Name = "TierContainer"
 	tierContainer.Size = UDim2.new(1, -40, 0, 400)
-	tierContainer.Position = UDim2.new(0, 20, 0, 100)
+	tierContainer.Position = UDim2.fromOffset(20, 100)
 	tierContainer.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 	tierContainer.BorderSizePixel = 0
 	tierContainer.ScrollBarThickness = 8
@@ -208,7 +208,7 @@ function BattlePassUI.CreateUI()
 	-- Premium purchase button
 	local premiumButton = Instance.new("TextButton")
 	premiumButton.Name = "PremiumButton"
-	premiumButton.Size = UDim2.new(0, 200, 0, 50)
+	premiumButton.Size = UDim2.fromOffset(200, 50)
 	premiumButton.Position = UDim2.new(0.5, 0, 1, -70)
 	premiumButton.AnchorPoint = Vector2.new(0.5, 0)
 	premiumButton.BackgroundColor3 = Color3.fromRGB(255, 180, 50)
@@ -266,7 +266,7 @@ function BattlePassUI.CreateTierFrames()
 		local freeSection = Instance.new("Frame")
 		freeSection.Name = "FreeReward"
 		freeSection.Size = UDim2.new(1, -10, 0, 60)
-		freeSection.Position = UDim2.new(0, 5, 0, 30)
+		freeSection.Position = UDim2.fromOffset(5, 30)
 		freeSection.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
 		freeSection.BorderSizePixel = 0
 		freeSection.Parent = tierFrame
@@ -301,7 +301,7 @@ function BattlePassUI.CreateTierFrames()
 		local premiumSection = Instance.new("Frame")
 		premiumSection.Name = "PremiumReward"
 		premiumSection.Size = UDim2.new(1, -10, 0, 60)
-		premiumSection.Position = UDim2.new(0, 5, 0, 95)
+		premiumSection.Position = UDim2.fromOffset(5, 95)
 		premiumSection.BackgroundColor3 = Color3.fromRGB(60, 50, 30)
 		premiumSection.BorderSizePixel = 0
 		premiumSection.Parent = tierFrame
@@ -335,7 +335,7 @@ function BattlePassUI.CreateTierFrames()
 		-- Lock indicator (for premium)
 		local lockIcon = Instance.new("TextLabel")
 		lockIcon.Name = "Lock"
-		lockIcon.Size = UDim2.new(0, 20, 0, 20)
+		lockIcon.Size = UDim2.fromOffset(20, 20)
 		lockIcon.Position = UDim2.new(1, -22, 0, 2)
 		lockIcon.BackgroundTransparency = 1
 		lockIcon.TextColor3 = Color3.fromRGB(150, 100, 50)

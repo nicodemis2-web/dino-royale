@@ -138,7 +138,7 @@ local function createLoadingScreen()
 	titleLabel = Instance.new("TextLabel")
 	titleLabel.Name = "Title"
 	titleLabel.Size = UDim2.new(0.8, 0, 0, 80)
-	titleLabel.Position = UDim2.new(0.5, 0, 0.25, 0)
+	titleLabel.Position = UDim2.fromScale(0.5, 0.25)
 	titleLabel.AnchorPoint = Vector2.new(0.5, 0.5)
 	titleLabel.BackgroundTransparency = 1
 	titleLabel.Font = Enum.Font.GothamBold
@@ -152,7 +152,7 @@ local function createLoadingScreen()
 	local subtitle = Instance.new("TextLabel")
 	subtitle.Name = "Subtitle"
 	subtitle.Size = UDim2.new(0.6, 0, 0, 30)
-	subtitle.Position = UDim2.new(0.5, 0, 0.32, 0)
+	subtitle.Position = UDim2.fromScale(0.5, 0.32)
 	subtitle.AnchorPoint = Vector2.new(0.5, 0.5)
 	subtitle.BackgroundTransparency = 1
 	subtitle.Font = Enum.Font.Gotham
@@ -164,8 +164,8 @@ local function createLoadingScreen()
 	-- Dinosaur silhouette container (animated)
 	local silhouetteContainer = Instance.new("Frame")
 	silhouetteContainer.Name = "SilhouetteContainer"
-	silhouetteContainer.Size = UDim2.new(0.4, 0, 0.3, 0)
-	silhouetteContainer.Position = UDim2.new(0.5, 0, 0.5, 0)
+	silhouetteContainer.Size = UDim2.fromScale(0.4, 0.3)
+	silhouetteContainer.Position = UDim2.fromScale(0.5, 0.5)
 	silhouetteContainer.AnchorPoint = Vector2.new(0.5, 0.5)
 	silhouetteContainer.BackgroundTransparency = 1
 	silhouetteContainer.Parent = mainFrame
@@ -181,8 +181,8 @@ local function createLoadingScreen()
 		-- Body
 		local body = Instance.new("Frame")
 		body.Name = "Body"
-		body.Size = UDim2.new(0.4, 0, 0.3, 0)
-		body.Position = UDim2.new(0.3, 0, 0.4, 0)
+		body.Size = UDim2.fromScale(0.4, 0.3)
+		body.Position = UDim2.fromScale(0.3, 0.4)
 		body.BackgroundColor3 = COLORS.Primary
 		body.BackgroundTransparency = 0.3
 		body.BorderSizePixel = 0
@@ -195,8 +195,8 @@ local function createLoadingScreen()
 		-- Head
 		local head = Instance.new("Frame")
 		head.Name = "Head"
-		head.Size = UDim2.new(0.25, 0, 0.2, 0)
-		head.Position = UDim2.new(0.55, 0, 0.25, 0)
+		head.Size = UDim2.fromScale(0.25, 0.2)
+		head.Position = UDim2.fromScale(0.55, 0.25)
 		head.BackgroundColor3 = COLORS.Primary
 		head.BackgroundTransparency = 0.3
 		head.BorderSizePixel = 0
@@ -209,8 +209,8 @@ local function createLoadingScreen()
 		-- Tail
 		local tail = Instance.new("Frame")
 		tail.Name = "Tail"
-		tail.Size = UDim2.new(0.35, 0, 0.15, 0)
-		tail.Position = UDim2.new(0, 0, 0.45, 0)
+		tail.Size = UDim2.fromScale(0.35, 0.15)
+		tail.Position = UDim2.fromScale(0, 0.45)
 		tail.BackgroundColor3 = COLORS.Primary
 		tail.BackgroundTransparency = 0.3
 		tail.BorderSizePixel = 0
@@ -223,8 +223,8 @@ local function createLoadingScreen()
 		-- Legs
 		local leg1 = Instance.new("Frame")
 		leg1.Name = "Leg1"
-		leg1.Size = UDim2.new(0.08, 0, 0.25, 0)
-		leg1.Position = UDim2.new(0.38, 0, 0.65, 0)
+		leg1.Size = UDim2.fromScale(0.08, 0.25)
+		leg1.Position = UDim2.fromScale(0.38, 0.65)
 		leg1.BackgroundColor3 = COLORS.Primary
 		leg1.BackgroundTransparency = 0.3
 		leg1.BorderSizePixel = 0
@@ -232,8 +232,8 @@ local function createLoadingScreen()
 
 		local leg2 = Instance.new("Frame")
 		leg2.Name = "Leg2"
-		leg2.Size = UDim2.new(0.08, 0, 0.25, 0)
-		leg2.Position = UDim2.new(0.55, 0, 0.65, 0)
+		leg2.Size = UDim2.fromScale(0.08, 0.25)
+		leg2.Position = UDim2.fromScale(0.55, 0.65)
 		leg2.BackgroundColor3 = COLORS.Primary
 		leg2.BackgroundTransparency = 0.3
 		leg2.BorderSizePixel = 0
@@ -248,7 +248,7 @@ local function createLoadingScreen()
 	local progressContainer = Instance.new("Frame")
 	progressContainer.Name = "ProgressContainer"
 	progressContainer.Size = UDim2.new(0.6, 0, 0, 100)
-	progressContainer.Position = UDim2.new(0.5, 0, 0.75, 0)
+	progressContainer.Position = UDim2.fromScale(0.5, 0.75)
 	progressContainer.AnchorPoint = Vector2.new(0.5, 0.5)
 	progressContainer.BackgroundTransparency = 1
 	progressContainer.Parent = mainFrame
@@ -257,7 +257,7 @@ local function createLoadingScreen()
 	statusLabel = Instance.new("TextLabel")
 	statusLabel.Name = "Status"
 	statusLabel.Size = UDim2.new(1, 0, 0, 24)
-	statusLabel.Position = UDim2.new(0, 0, 0, 0)
+	statusLabel.Position = UDim2.fromOffset(0, 0)
 	statusLabel.BackgroundTransparency = 1
 	statusLabel.Font = Enum.Font.GothamMedium
 	statusLabel.Text = "Loading..."
@@ -269,7 +269,7 @@ local function createLoadingScreen()
 	progressBar = Instance.new("Frame")
 	progressBar.Name = "ProgressBar"
 	progressBar.Size = UDim2.new(1, 0, 0, 8)
-	progressBar.Position = UDim2.new(0, 0, 0, 35)
+	progressBar.Position = UDim2.fromOffset(0, 35)
 	progressBar.BackgroundColor3 = COLORS.ProgressBg
 	progressBar.BorderSizePixel = 0
 	progressBar.Parent = progressContainer
@@ -281,7 +281,7 @@ local function createLoadingScreen()
 	-- Progress bar fill
 	progressFill = Instance.new("Frame")
 	progressFill.Name = "Fill"
-	progressFill.Size = UDim2.new(0, 0, 1, 0)
+	progressFill.Size = UDim2.fromScale(0, 1)
 	progressFill.BackgroundColor3 = COLORS.ProgressFill
 	progressFill.BorderSizePixel = 0
 	progressFill.Parent = progressBar
@@ -309,7 +309,7 @@ local function createLoadingScreen()
 	tipLabel = Instance.new("TextLabel")
 	tipLabel.Name = "Tip"
 	tipLabel.Size = UDim2.new(1, 0, 0, 40)
-	tipLabel.Position = UDim2.new(0, 0, 0, 55)
+	tipLabel.Position = UDim2.fromOffset(0, 55)
 	tipLabel.BackgroundTransparency = 1
 	tipLabel.Font = Enum.Font.Gotham
 	tipLabel.Text = "TIP: " .. TIPS[1]
@@ -322,7 +322,7 @@ local function createLoadingScreen()
 	-- Version info
 	local versionLabel = Instance.new("TextLabel")
 	versionLabel.Name = "Version"
-	versionLabel.Size = UDim2.new(0, 200, 0, 20)
+	versionLabel.Size = UDim2.fromOffset(200, 20)
 	versionLabel.Position = UDim2.new(1, -10, 1, -10)
 	versionLabel.AnchorPoint = Vector2.new(1, 1)
 	versionLabel.BackgroundTransparency = 1
@@ -494,7 +494,7 @@ function LoadingScreen.PreloadAssets(assets: { Instance }, callback: (() -> ())?
 
 	LoadingScreen.SetStatus("Loading assets...")
 
-	ContentProvider:PreloadAsync(assets, function(assetId, status)
+	ContentProvider:PreloadAsync(assets, function(_assetId, _status)
 		loaded += 1
 		LoadingScreen.SetProgress(loaded / total)
 		LoadingScreen.SetStatus(`Loading assets... ({loaded}/{total})`)

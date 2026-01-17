@@ -19,7 +19,7 @@
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local Lighting = game:GetService("Lighting")
-local Workspace = game:GetService("Workspace")
+local _Workspace = game:GetService("Workspace")
 
 local AtmosphereController = {}
 
@@ -210,7 +210,7 @@ local cycleStartTime = 0
 --[[
 	Lerp between Color3 values
 ]]
-local function lerpColor3(a: Color3, b: Color3, t: number): Color3
+local function _lerpColor3(a: Color3, b: Color3, t: number): Color3
 	return Color3.new(
 		a.R + (b.R - a.R) * t,
 		a.G + (b.G - a.G) * t,
@@ -359,7 +359,7 @@ end
 --[[
 	Update function for day/night cycle
 ]]
-local function onUpdate(deltaTime: number)
+local function onUpdate(_deltaTime: number)
 	if not dayNightEnabled then return end
 
 	-- Calculate current time based on cycle
@@ -586,8 +586,12 @@ end
 function AtmosphereController.SetBloom(intensity: number, size: number?, threshold: number?)
 	if bloom then
 		bloom.Intensity = intensity
-		if size then bloom.Size = size end
-		if threshold then bloom.Threshold = threshold end
+		if size then
+			bloom.Size = size
+		end
+		if threshold then
+			bloom.Threshold = threshold
+		end
 	end
 end
 

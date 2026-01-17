@@ -21,7 +21,7 @@ type MusicTrack = MusicData.MusicTrack
 type MusicLayer = MusicData.MusicLayer
 
 -- State
-local player = Players.LocalPlayer
+local _player = Players.LocalPlayer
 local isInitialized = false
 local currentTrack: MusicTrack? = nil
 local currentContext = "Lobby"
@@ -30,7 +30,7 @@ local targetIntensity = 1
 local layerSounds: { [string]: Sound } = {}
 local layerTweens: { [string]: Tween } = {}
 local musicFolder: Folder? = nil
-local musicEnabled = true
+local _musicEnabled = true
 local masterVolume = 1
 
 -- Constants
@@ -90,13 +90,13 @@ function AdaptiveMusicController.SetupEventListeners()
 			AdaptiveMusicController.SetContext("Exploration")
 			AdaptiveMusicController.SetIntensity(2)
 		elseif newState == "Ending" then
-			-- Victory/Defeat handled by separate events
+			return -- Victory/Defeat music handled by separate events
 		end
 	end)
 
 	-- Combat events
 	Events.OnClientEvent("Combat", "PlayerKilled", function(data)
-		if data.killerId == player.UserId then
+		if data.killerId == _player.UserId then
 			-- We got a kill, play stinger
 			AdaptiveMusicController.PlayStinger("PlayerEliminated")
 		end
@@ -166,7 +166,7 @@ end
 ]]
 function AdaptiveMusicController.TransitionToTrack(track: MusicTrack)
 	-- Fade out current layers
-	for layerId, sound in pairs(layerSounds) do
+	for _layerId, sound in pairs(layerSounds) do
 		local tween = TweenService:Create(sound, TweenInfo.new(1.5), {
 			Volume = 0,
 		})
@@ -261,7 +261,7 @@ function AdaptiveMusicController.ApplyIntensity(overrideLevel: number?)
 
 	-- Determine which layers should be active
 	local activeLayers = intensityData.activeLayers
-	local transitionTime = intensityData.transitionTime
+	local _transitionTime = intensityData.transitionTime
 
 	for _, layer in ipairs(currentTrack.layers) do
 		local sound = layerSounds[layer.id]
@@ -321,17 +321,17 @@ end
 function AdaptiveMusicController.FadeOut(duration: number?)
 	local fadeTime = duration or 2
 
-	for layerId, sound in pairs(layerSounds) do
+	for _layerId, sound in pairs(layerSounds) do
 		-- Cancel existing tween
-		if layerTweens[layerId] then
-			layerTweens[layerId]:Cancel()
+		if layerTweens[_layerId] then
+			layerTweens[_layerId]:Cancel()
 		end
 
 		local tween = TweenService:Create(sound, TweenInfo.new(fadeTime), {
 			Volume = 0,
 		})
 
-		layerTweens[layerId] = tween
+		layerTweens[_layerId] = tween
 		tween:Play()
 	end
 end
@@ -339,7 +339,7 @@ end
 --[[
 	Fade in current track
 ]]
-function AdaptiveMusicController.FadeIn(duration: number?)
+function AdaptiveMusicController.FadeIn(_duration: number?)
 	AdaptiveMusicController.ApplyIntensity()
 end
 
@@ -364,7 +364,7 @@ end
 	Enable/disable music
 ]]
 function AdaptiveMusicController.SetEnabled(enabled: boolean)
-	musicEnabled = enabled
+	_musicEnabled = enabled
 
 	if enabled then
 		AdaptiveMusicController.FadeIn()

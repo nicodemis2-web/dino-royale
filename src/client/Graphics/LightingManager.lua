@@ -525,7 +525,7 @@ function LightingManager.EnableTimeOfDay(cycleDuration: number?)
 	timeOfDayEnabled = true
 
 	local cycleTime = cycleDuration or 600 -- 10 minute day cycle
-	local startTime = Lighting.ClockTime
+	local _startTime = Lighting.ClockTime
 
 	timeOfDayConnection = RunService.Heartbeat:Connect(function(dt)
 		-- Advance time (24 hours over cycle duration)
@@ -663,12 +663,24 @@ function LightingManager.Shutdown()
 	end
 
 	-- Remove created effects
-	if bloomEffect then bloomEffect:Destroy() end
-	if colorCorrection then colorCorrection:Destroy() end
-	if depthOfField then depthOfField:Destroy() end
-	if sunRays then sunRays:Destroy() end
-	if atmosphere then atmosphere:Destroy() end
-	if sky then sky:Destroy() end
+	if bloomEffect then
+		bloomEffect:Destroy()
+	end
+	if colorCorrection then
+		colorCorrection:Destroy()
+	end
+	if depthOfField then
+		depthOfField:Destroy()
+	end
+	if sunRays then
+		sunRays:Destroy()
+	end
+	if atmosphere then
+		atmosphere:Destroy()
+	end
+	if sky then
+		sky:Destroy()
+	end
 
 	print("[LightingManager] Shutdown complete")
 end

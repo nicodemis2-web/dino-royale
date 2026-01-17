@@ -14,8 +14,8 @@ local AdaptiveMusicController = require(script.Parent.AdaptiveMusicController)
 
 local AudioController = {}
 
--- Local player
-local localPlayer = Players.LocalPlayer
+-- Local player (kept for potential future use)
+local _localPlayer = Players.LocalPlayer
 
 -- Settings (would be loaded from data store)
 local settings = {

@@ -43,7 +43,7 @@ local isInitialized = false
 local MAX_ACTIVE_DINOSAURS = 50
 local UPDATE_RADIUS = 200 -- Only update dinosaurs within this distance of players
 local SLEEP_RADIUS = 250 -- Sleep dinosaurs beyond this distance
-local MIN_SPAWN_DISTANCE = 50 -- Minimum distance between packs
+local _MIN_SPAWN_DISTANCE = 50 -- Minimum distance between packs
 local RESPAWN_CHECK_INTERVAL = 30 -- Check for respawns every 30 seconds
 
 -- Spatial hash for efficient proximity queries

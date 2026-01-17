@@ -19,7 +19,7 @@
 ]]
 
 local TweenService = game:GetService("TweenService")
-local RunService = game:GetService("RunService")
+local _RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 
 local ScreenEffects = {}
@@ -81,12 +81,12 @@ local lowHealthOverlay: Frame? = nil
 local flashOverlay: Frame? = nil
 local speedLinesContainer: Frame? = nil
 local colorGradeOverlay: Frame? = nil
-local bloodSplatter: ImageLabel? = nil
+local _bloodSplatter: ImageLabel? = nil
 
 -- State tracking
 local isInitialized = false
-local currentHealth = 100
-local maxHealth = 100
+local _currentHealth = 100
+local _maxHealth = 100
 local isLowHealthPulsing = false
 local lowHealthTween: Tween? = nil
 local updateConnection: RBXScriptConnection? = nil
@@ -98,7 +98,7 @@ local updateConnection: RBXScriptConnection? = nil
 --[[
 	Create a radial gradient for vignette effects
 ]]
-local function createVignetteGradient(parent: Frame, color: Color3)
+local function _createVignetteGradient(parent: Frame, color: Color3)
 	local gradient = Instance.new("UIGradient")
 	gradient.Transparency = NumberSequence.new({
 		NumberSequenceKeypoint.new(0, 1),
@@ -139,10 +139,10 @@ local function createScreenGui()
 	-- Create edge-only effect using multiple frames
 	local edges = {"Top", "Bottom", "Left", "Right"}
 	local edgeSizes = {
-		Top = UDim2.new(1, 0, 0.15, 0),
-		Bottom = UDim2.new(1, 0, 0.15, 0),
-		Left = UDim2.new(0.1, 0, 1, 0),
-		Right = UDim2.new(0.1, 0, 1, 0),
+		Top = UDim2.fromScale(1, 0.15),
+		Bottom = UDim2.fromScale(1, 0.15),
+		Left = UDim2.fromScale(0.1, 1),
+		Right = UDim2.fromScale(0.1, 1),
 	}
 	local edgePositions = {
 		Top = UDim2.fromScale(0, 0),
@@ -433,8 +433,8 @@ end
 	Update health state for automatic effects
 ]]
 function ScreenEffects.UpdateHealth(health: number, max: number)
-	currentHealth = health
-	maxHealth = max
+	_currentHealth = health
+	_maxHealth = max
 
 	local healthPercent = health / max
 

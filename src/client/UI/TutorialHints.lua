@@ -236,7 +236,7 @@ local MAX_VISIBLE_HINTS = 3
 local function createKeybindVisual(parent: Frame, key: string): Frame
 	local keyFrame = Instance.new("Frame")
 	keyFrame.Name = "Key_" .. key
-	keyFrame.Size = UDim2.new(0, 32, 0, 24)
+	keyFrame.Size = UDim2.fromOffset(32, 24)
 	keyFrame.BackgroundColor3 = COLORS.KeybindBg
 	keyFrame.BorderSizePixel = 0
 	keyFrame.Parent = parent
@@ -431,7 +431,7 @@ local function showHint(id: string, definition: HintDefinition)
 	frame.Parent = hintContainer
 
 	-- Initial state (invisible, offset)
-	frame.Position = frame.Position + UDim2.new(0, 50, 0, 0)
+	frame.Position = frame.Position + UDim2.fromOffset(50, 0)
 	frame.BackgroundTransparency = 1
 	for _, child in frame:GetDescendants() do
 		if child:IsA("TextLabel") then
@@ -447,7 +447,7 @@ local function showHint(id: string, definition: HintDefinition)
 	local tweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 
 	TweenService:Create(frame, tweenInfo, {
-		Position = UDim2.new(0, 0, 0, 0),
+		Position = UDim2.fromOffset(0, 0),
 		BackgroundTransparency = 0.1,
 	}):Play()
 
@@ -487,7 +487,7 @@ local function hideHint(hint: ActiveHint)
 	local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 
 	TweenService:Create(frame, tweenInfo, {
-		Position = frame.Position + UDim2.new(0, 50, 0, 0),
+		Position = frame.Position + UDim2.fromOffset(50, 0),
 		BackgroundTransparency = 1,
 	}):Play()
 

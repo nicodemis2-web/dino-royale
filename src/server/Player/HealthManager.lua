@@ -7,7 +7,7 @@
 ]]
 
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
+local _RunService = game:GetService("RunService")
 
 local Constants = require(game.ReplicatedStorage.Shared.Constants)
 local Events = require(game.ReplicatedStorage.Shared.Events)
@@ -48,7 +48,7 @@ local BLEEDOUT_DURATION = 90 -- seconds
 local BLEEDOUT_BASE_RATE = Constants.PLAYER.MAX_HEALTH / BLEEDOUT_DURATION
 local BLEEDOUT_DAMAGE_ACCELERATION = 0.5 -- Extra bleed rate per damage taken while downed
 local BLEEDOUT_MAX_RATE = BLEEDOUT_BASE_RATE * 5 -- Cap at 5x normal bleedout rate
-local REVIVE_TIME = 5 -- seconds to revive
+local _REVIVE_TIME = 5 -- seconds to revive
 
 --[[
 	Initialize health tracking for a player

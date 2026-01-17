@@ -7,7 +7,7 @@
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Players = game:GetService("Players")
+local _Players = game:GetService("Players")
 
 local Events = require(ReplicatedStorage.Shared.Events)
 local LootData = require(ReplicatedStorage.Shared.LootData)
@@ -81,12 +81,12 @@ end
 function LootManager.SpawnPOILoot()
 	print("[LootManager] Spawning POI loot...")
 
-	for poiId, poi in pairs(POIData.POIs) do
+	for _poiId, poi in pairs(POIData.POIs) do
 		local position = POIData.GetPosition(poi)
 
 		-- Spawn chests
 		local chestCount = math.random(poi.chestCount.min, poi.chestCount.max)
-		for i = 1, chestCount do
+		for _ = 1, chestCount do
 			local offset = Vector3.new(
 				math.random(-poi.radius, poi.radius) * 0.8,
 				0,
@@ -96,7 +96,7 @@ function LootManager.SpawnPOILoot()
 		end
 
 		-- Spawn floor loot
-		for i = 1, poi.floorLootSpawns do
+		for _ = 1, poi.floorLootSpawns do
 			local offset = Vector3.new(
 				math.random(-poi.radius, poi.radius) * 0.9,
 				math.random(0, 3),
@@ -395,7 +395,7 @@ end
 --[[
 	Spawn death loot when player is eliminated
 ]]
-function LootManager.SpawnDeathLoot(player: Player, position: Vector3, inventory: { [string]: number })
+function LootManager.SpawnDeathLoot(_player: Player, position: Vector3, inventory: { [string]: number })
 	for itemId, amount in pairs(inventory) do
 		local item = LootData.Items[itemId]
 		if item then
@@ -433,7 +433,7 @@ end
 --[[
 	Spawn dinosaur loot when dino is killed
 ]]
-function LootManager.SpawnDinoLoot(dinoType: string, tier: string, position: Vector3)
+function LootManager.SpawnDinoLoot(_dinoType: string, tier: string, position: Vector3)
 	-- Dino-specific drops
 	local dinoDrops = {
 		Common = { "DinoScale", "MeatBait" },
@@ -448,7 +448,7 @@ function LootManager.SpawnDinoLoot(dinoType: string, tier: string, position: Vec
 	-- Random number of drops
 	local dropCount = math.random(1, math.min(3, #possibleDrops))
 
-	for i = 1, dropCount do
+	for _ = 1, dropCount do
 		local itemId = possibleDrops[math.random(1, #possibleDrops)]
 		local item = LootData.Items[itemId]
 

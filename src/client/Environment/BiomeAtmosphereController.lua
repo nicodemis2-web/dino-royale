@@ -15,7 +15,7 @@
 
 local Players = game:GetService("Players")
 local Lighting = game:GetService("Lighting")
-local TweenService = game:GetService("TweenService")
+local _TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 
 local BiomeData = require(game.ReplicatedStorage.Shared.BiomeData)
@@ -354,7 +354,7 @@ local function getTimeOfDayMultiplier(): number
 end
 
 local function applyTimeOfDayModifiers()
-	local multiplier = getTimeOfDayMultiplier()
+	local _multiplier = getTimeOfDayMultiplier()
 
 	if colorCorrection then
 		-- Warm tint at dawn/dusk
@@ -495,7 +495,7 @@ function BiomeAtmosphereController.Update(deltaTime: number)
 	end
 
 	-- Detect current biome
-	local detectedBiome, influence = detectCurrentBiome(position)
+	local detectedBiome, _influence = detectCurrentBiome(position)
 
 	-- Check if biome changed
 	if detectedBiome ~= currentBiome and not isTransitioning then

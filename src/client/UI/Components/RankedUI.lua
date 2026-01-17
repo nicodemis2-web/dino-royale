@@ -54,7 +54,7 @@ function RankedUI.CreateUI()
 	-- Rank badge (always visible in ranked mode)
 	rankBadge = Instance.new("Frame")
 	rankBadge.Name = "RankBadge"
-	rankBadge.Size = UDim2.new(0, 180, 0, 50)
+	rankBadge.Size = UDim2.fromOffset(180, 50)
 	rankBadge.Position = UDim2.new(0.5, -90, 0, 10)
 	rankBadge.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 	rankBadge.BackgroundTransparency = 0.2
@@ -68,7 +68,7 @@ function RankedUI.CreateUI()
 
 	local rankIcon = Instance.new("Frame")
 	rankIcon.Name = "Icon"
-	rankIcon.Size = UDim2.new(0, 40, 0, 40)
+	rankIcon.Size = UDim2.fromOffset(40, 40)
 	rankIcon.Position = UDim2.new(0, 5, 0.5, -20)
 	rankIcon.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
 	rankIcon.Parent = rankBadge
@@ -79,8 +79,8 @@ function RankedUI.CreateUI()
 
 	local rankName = Instance.new("TextLabel")
 	rankName.Name = "RankName"
-	rankName.Size = UDim2.new(0, 100, 0, 20)
-	rankName.Position = UDim2.new(0, 50, 0, 5)
+	rankName.Size = UDim2.fromOffset(100, 20)
+	rankName.Position = UDim2.fromOffset(50, 5)
 	rankName.BackgroundTransparency = 1
 	rankName.TextColor3 = Color3.fromRGB(255, 215, 0)
 	rankName.TextSize = 14
@@ -91,8 +91,8 @@ function RankedUI.CreateUI()
 
 	local rpLabel = Instance.new("TextLabel")
 	rpLabel.Name = "RP"
-	rpLabel.Size = UDim2.new(0, 100, 0, 16)
-	rpLabel.Position = UDim2.new(0, 50, 0, 27)
+	rpLabel.Size = UDim2.fromOffset(100, 16)
+	rpLabel.Position = UDim2.fromOffset(50, 27)
 	rpLabel.BackgroundTransparency = 1
 	rpLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
 	rpLabel.TextSize = 12
@@ -104,7 +104,7 @@ function RankedUI.CreateUI()
 	-- Main ranked panel
 	mainFrame = Instance.new("Frame")
 	mainFrame.Name = "RankedPanel"
-	mainFrame.Size = UDim2.new(0, 450, 0, 550)
+	mainFrame.Size = UDim2.fromOffset(450, 550)
 	mainFrame.Position = UDim2.fromScale(0.5, 0.5)
 	mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 	mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
@@ -142,7 +142,7 @@ function RankedUI.CreateUI()
 
 	local closeButton = Instance.new("TextButton")
 	closeButton.Name = "Close"
-	closeButton.Size = UDim2.new(0, 30, 0, 30)
+	closeButton.Size = UDim2.fromOffset(30, 30)
 	closeButton.Position = UDim2.new(1, -40, 0.5, -15)
 	closeButton.BackgroundColor3 = Color3.fromRGB(180, 60, 60)
 	closeButton.BorderSizePixel = 0
@@ -164,7 +164,7 @@ function RankedUI.CreateUI()
 	local rankDisplay = Instance.new("Frame")
 	rankDisplay.Name = "RankDisplay"
 	rankDisplay.Size = UDim2.new(1, -40, 0, 180)
-	rankDisplay.Position = UDim2.new(0, 20, 0, 70)
+	rankDisplay.Position = UDim2.fromOffset(20, 70)
 	rankDisplay.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 	rankDisplay.BorderSizePixel = 0
 	rankDisplay.Parent = mainFrame
@@ -175,7 +175,7 @@ function RankedUI.CreateUI()
 
 	local largeIcon = Instance.new("Frame")
 	largeIcon.Name = "LargeIcon"
-	largeIcon.Size = UDim2.new(0, 80, 0, 80)
+	largeIcon.Size = UDim2.fromOffset(80, 80)
 	largeIcon.Position = UDim2.new(0.5, -40, 0, 20)
 	largeIcon.BackgroundColor3 = Color3.fromRGB(255, 215, 0)
 	largeIcon.Parent = rankDisplay
@@ -187,7 +187,7 @@ function RankedUI.CreateUI()
 	local largeRankName = Instance.new("TextLabel")
 	largeRankName.Name = "RankName"
 	largeRankName.Size = UDim2.new(1, 0, 0, 30)
-	largeRankName.Position = UDim2.new(0, 0, 0, 105)
+	largeRankName.Position = UDim2.fromOffset(0, 105)
 	largeRankName.BackgroundTransparency = 1
 	largeRankName.TextColor3 = Color3.fromRGB(255, 215, 0)
 	largeRankName.TextSize = 22
@@ -222,7 +222,7 @@ function RankedUI.CreateUI()
 	local statsFrame = Instance.new("Frame")
 	statsFrame.Name = "Stats"
 	statsFrame.Size = UDim2.new(1, -40, 0, 120)
-	statsFrame.Position = UDim2.new(0, 20, 0, 265)
+	statsFrame.Position = UDim2.fromOffset(20, 265)
 	statsFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 	statsFrame.BorderSizePixel = 0
 	statsFrame.Parent = mainFrame
@@ -245,13 +245,13 @@ function RankedUI.CreateUI()
 	local statsGrid = Instance.new("Frame")
 	statsGrid.Name = "Grid"
 	statsGrid.Size = UDim2.new(1, -20, 0, 80)
-	statsGrid.Position = UDim2.new(0, 10, 0, 35)
+	statsGrid.Position = UDim2.fromOffset(10, 35)
 	statsGrid.BackgroundTransparency = 1
 	statsGrid.Parent = statsFrame
 
 	local gridLayout = Instance.new("UIGridLayout")
 	gridLayout.CellSize = UDim2.new(0.25, -5, 0.5, -5)
-	gridLayout.CellPadding = UDim2.new(0, 5, 0, 5)
+	gridLayout.CellPadding = UDim2.fromOffset(5, 5)
 	gridLayout.Parent = statsGrid
 
 	-- Create stat displays
@@ -289,7 +289,7 @@ function RankedUI.CreateUI()
 	local seasonFrame = Instance.new("Frame")
 	seasonFrame.Name = "Season"
 	seasonFrame.Size = UDim2.new(1, -40, 0, 60)
-	seasonFrame.Position = UDim2.new(0, 20, 0, 400)
+	seasonFrame.Position = UDim2.fromOffset(20, 400)
 	seasonFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
 	seasonFrame.BorderSizePixel = 0
 	seasonFrame.Parent = mainFrame
@@ -312,7 +312,7 @@ function RankedUI.CreateUI()
 	local timeRemaining = Instance.new("TextLabel")
 	timeRemaining.Name = "TimeRemaining"
 	timeRemaining.Size = UDim2.new(1, 0, 0, 20)
-	timeRemaining.Position = UDim2.new(0, 0, 0, 32)
+	timeRemaining.Position = UDim2.fromOffset(0, 32)
 	timeRemaining.BackgroundTransparency = 1
 	timeRemaining.TextColor3 = Color3.fromRGB(150, 150, 150)
 	timeRemaining.TextSize = 12
@@ -324,7 +324,7 @@ function RankedUI.CreateUI()
 	local leaderboardBtn = Instance.new("TextButton")
 	leaderboardBtn.Name = "LeaderboardButton"
 	leaderboardBtn.Size = UDim2.new(1, -40, 0, 45)
-	leaderboardBtn.Position = UDim2.new(0, 20, 0, 475)
+	leaderboardBtn.Position = UDim2.fromOffset(20, 475)
 	leaderboardBtn.BackgroundColor3 = Color3.fromRGB(60, 120, 180)
 	leaderboardBtn.BorderSizePixel = 0
 	leaderboardBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -344,7 +344,7 @@ function RankedUI.CreateUI()
 	-- Match result popup
 	resultPopup = Instance.new("Frame")
 	resultPopup.Name = "MatchResult"
-	resultPopup.Size = UDim2.new(0, 350, 0, 200)
+	resultPopup.Size = UDim2.fromOffset(350, 200)
 	resultPopup.Position = UDim2.fromScale(0.5, 0.5)
 	resultPopup.AnchorPoint = Vector2.new(0.5, 0.5)
 	resultPopup.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
@@ -402,7 +402,7 @@ function RankedUI.CreateUI()
 
 	local dismissButton = Instance.new("TextButton")
 	dismissButton.Name = "Dismiss"
-	dismissButton.Size = UDim2.new(0, 120, 0, 35)
+	dismissButton.Size = UDim2.fromOffset(120, 35)
 	dismissButton.Position = UDim2.new(0.5, -60, 1, -50)
 	dismissButton.BackgroundColor3 = Color3.fromRGB(80, 80, 85)
 	dismissButton.BorderSizePixel = 0
@@ -602,11 +602,11 @@ function RankedUI.OnMatchResult(data: any)
 
 	-- Show popup
 	resultPopup.Visible = true
-	resultPopup.Size = UDim2.new(0, 0, 0, 0)
+	resultPopup.Size = UDim2.fromOffset(0, 0)
 	resultPopup.BackgroundTransparency = 1
 
 	TweenService:Create(resultPopup, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-		Size = UDim2.new(0, 350, 0, 200),
+		Size = UDim2.fromOffset(350, 200),
 		BackgroundTransparency = 0,
 	}):Play()
 end
@@ -618,7 +618,7 @@ function RankedUI.HideMatchResult()
 	if not resultPopup then return end
 
 	local tween = TweenService:Create(resultPopup, TweenInfo.new(0.2), {
-		Size = UDim2.new(0, 0, 0, 0),
+		Size = UDim2.fromOffset(0, 0),
 		BackgroundTransparency = 1,
 	})
 

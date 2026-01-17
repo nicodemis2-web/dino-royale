@@ -25,7 +25,7 @@ export type SniperInstance = WeaponBase.WeaponInstance & {
 local SWAY_FREQUENCY = 1.5 -- Cycles per second
 local SWAY_AMPLITUDE = 0.02 -- Base sway amount
 local BREATH_HOLD_DURATION = 5 -- Seconds can hold breath
-local BREATH_HOLD_COOLDOWN = 3 -- Seconds before can hold again
+local _BREATH_HOLD_COOLDOWN = 3 -- Seconds before can hold again (reserved for future use)
 
 --[[
 	Create a new sniper rifle instance
@@ -210,7 +210,7 @@ end
 	Check if weapon is automatic
 	@return Always false for sniper
 ]]
-function SniperRifle.IsAutomatic(self: SniperInstance): boolean
+function SniperRifle.IsAutomatic(_self: SniperInstance): boolean
 	return false
 end
 
@@ -218,7 +218,7 @@ end
 	Get recoil for sniper (high vertical kick)
 	@return Vector2 recoil
 ]]
-function SniperRifle.GetRecoil(self: SniperInstance): Vector2
+function SniperRifle.GetRecoil(_self: SniperInstance): Vector2
 	return Vector2.new((math.random() - 0.5) * 0.2, 3.0 + (math.random() * 0.5))
 end
 

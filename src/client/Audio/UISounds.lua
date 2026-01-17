@@ -242,7 +242,7 @@ local SOUND_DEFINITIONS = {
 -- STATE
 --------------------------------------------------------------------------------
 
-local localPlayer = Players.LocalPlayer
+local _localPlayer = Players.LocalPlayer
 local soundFolder: Folder? = nil
 local soundInstances: { [string]: Sound } = {}
 local lastPlayedTime: { [string]: number } = {}

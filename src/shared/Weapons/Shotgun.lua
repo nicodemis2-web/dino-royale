@@ -59,7 +59,7 @@ function Shotgun.Fire(self: ShotgunInstance, origin: Vector3, direction: Vector3
 	local damagePerPellet = self.stats.damage / pelletCount
 	local pellets = {} :: { PelletResult }
 
-	for i = 1, pelletCount do
+	for _ = 1, pelletCount do
 		local pelletSpread = Shotgun.CalculatePelletSpread(self, direction)
 		table.insert(pellets, {
 			direction = pelletSpread,
@@ -169,7 +169,7 @@ end
 	Check if weapon is automatic
 	@return Always false for shotgun
 ]]
-function Shotgun.IsAutomatic(self: ShotgunInstance): boolean
+function Shotgun.IsAutomatic(_self: ShotgunInstance): boolean
 	return false
 end
 
@@ -177,7 +177,7 @@ end
 	Get recoil for shotgun (high kick)
 	@return Vector2 recoil
 ]]
-function Shotgun.GetRecoil(self: ShotgunInstance): Vector2
+function Shotgun.GetRecoil(_self: ShotgunInstance): Vector2
 	local vertical = 2.0 + (math.random() * 0.5)
 	local horizontal = (math.random() - 0.5) * 0.6
 	return Vector2.new(horizontal, vertical)

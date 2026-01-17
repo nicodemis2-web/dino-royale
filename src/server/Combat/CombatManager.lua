@@ -70,7 +70,9 @@ CombatManager.OnArmorBroken = onArmorBroken.Event
 	Initialize the combat manager
 ]]
 function CombatManager.Initialize()
-	if isInitialized then return end
+	if isInitialized then
+		return
+	end
 	isInitialized = true
 
 	print("[CombatManager] Initializing...")
@@ -139,10 +141,14 @@ end
 ]]
 function CombatManager.SyncWithCharacter(player: Player, character: Model)
 	local state = playerStates[player]
-	if not state then return end
+	if not state then
+		return
+	end
 
 	local humanoid = character:WaitForChild("Humanoid", 5) :: Humanoid?
-	if not humanoid then return end
+	if not humanoid then
+		return
+	end
 
 	-- Set max health
 	humanoid.MaxHealth = state.maxHealth
@@ -193,7 +199,9 @@ end
 ]]
 function CombatManager.ProcessHitRequest(attacker: Player, data: any)
 	local targetPlayer = Players:GetPlayerByUserId(data.targetId)
-	if not targetPlayer then return end
+	if not targetPlayer then
+		return
+	end
 
 	local weaponId = data.weaponId
 	local hitPosition = data.hitPosition
@@ -201,16 +209,22 @@ function CombatManager.ProcessHitRequest(attacker: Player, data: any)
 
 	-- Validate weapon
 	local weaponStats = WeaponData.GetWeapon(weaponId)
-	if not weaponStats then return end
+	if not weaponStats then
+		return
+	end
 
 	-- Validate distance (anti-cheat)
 	local attackerChar = attacker.Character
 	local targetChar = targetPlayer.Character
-	if not attackerChar or not targetChar then return end
+	if not attackerChar or not targetChar then
+		return
+	end
 
 	local attackerRoot = attackerChar:FindFirstChild("HumanoidRootPart") :: BasePart?
 	local targetRoot = targetChar:FindFirstChild("HumanoidRootPart") :: BasePart?
-	if not attackerRoot or not targetRoot then return end
+	if not attackerRoot or not targetRoot then
+		return
+	end
 
 	local distance = (attackerRoot.Position - targetRoot.Position).Magnitude
 	local maxRange = weaponStats.range * 1.2 -- Allow some tolerance
@@ -264,19 +278,27 @@ end
 ]]
 function CombatManager.ProcessMeleeRequest(attacker: Player, data: any)
 	local targetPlayer = Players:GetPlayerByUserId(data.targetId)
-	if not targetPlayer then return end
+	if not targetPlayer then
+		return
+	end
 
 	-- Validate melee range
 	local attackerChar = attacker.Character
 	local targetChar = targetPlayer.Character
-	if not attackerChar or not targetChar then return end
+	if not attackerChar or not targetChar then
+		return
+	end
 
 	local attackerRoot = attackerChar:FindFirstChild("HumanoidRootPart") :: BasePart?
 	local targetRoot = targetChar:FindFirstChild("HumanoidRootPart") :: BasePart?
-	if not attackerRoot or not targetRoot then return end
+	if not attackerRoot or not targetRoot then
+		return
+	end
 
 	local distance = (attackerRoot.Position - targetRoot.Position).Magnitude
-	if distance > 5 then return end -- Melee range
+	if distance > 5 then
+		return
+	end -- Melee range
 
 	local damageInfo: DamageInfo = {
 		amount = 25, -- Base melee damage
@@ -296,10 +318,14 @@ end
 ]]
 function CombatManager.DealDamage(target: Player, damageInfo: DamageInfo)
 	local state = playerStates[target]
-	if not state then return end
+	if not state then
+		return
+	end
 
 	-- Prevent damage to dead players (race condition guard)
-	if state.isDead then return end
+	if state.isDead then
+		return
+	end
 
 	local damage = damageInfo.amount
 
@@ -434,10 +460,14 @@ end
 ]]
 function CombatManager.HandlePlayerDeath(victim: Player)
 	local state = playerStates[victim]
-	if not state then return end
+	if not state then
+		return
+	end
 
 	-- Prevent duplicate death processing (race condition guard)
-	if state.isDead then return end
+	if state.isDead then
+		return
+	end
 	state.isDead = true
 
 	local killer = state.lastDamageSource
@@ -495,7 +525,9 @@ end
 ]]
 function CombatManager.HealPlayer(target: Player, amount: number, source: string?)
 	local state = playerStates[target]
-	if not state then return end
+	if not state then
+		return
+	end
 
 	local previousHealth = state.health
 	state.health = math.min(state.maxHealth, state.health + amount)
@@ -525,7 +557,9 @@ end
 ]]
 function CombatManager.AddArmor(target: Player, amount: number, armorType: string?)
 	local state = playerStates[target]
-	if not state then return end
+	if not state then
+		return
+	end
 
 	local previousArmor = state.armor
 	state.armor = math.min(state.maxArmor, state.armor + amount)
@@ -544,7 +578,9 @@ end
 ]]
 function CombatManager.SetArmor(target: Player, amount: number)
 	local state = playerStates[target]
-	if not state then return end
+	if not state then
+		return
+	end
 
 	state.armor = math.clamp(amount, 0, state.maxArmor)
 

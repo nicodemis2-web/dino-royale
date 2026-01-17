@@ -99,7 +99,8 @@ function UIHelpers.FadeIn(element: GuiObject, duration: number?, properties: { [
 	-- Handle different element types
 	if element:IsA("Frame") or element:IsA("TextLabel") or element:IsA("TextButton") or element:IsA("ImageLabel") then
 		if element.BackgroundTransparency == 1 then
-			-- For transparent backgrounds, fade children
+			-- Already transparent, no background fade needed
+			local _ = element -- Suppress warning
 		else
 			element.BackgroundTransparency = 1
 			tweenProps.BackgroundTransparency = tweenProps.BackgroundTransparency or 0

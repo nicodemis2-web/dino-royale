@@ -7,7 +7,7 @@
 ]]
 
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
+local _RunService = game:GetService("RunService")
 
 local Constants = require(game.ReplicatedStorage.Shared.Constants)
 local PlayerState = require(game.ReplicatedStorage.Shared.Player.PlayerState)
@@ -222,7 +222,7 @@ function MovementValidator.CheckSpeed(
 	allowedDistance = allowedDistance + Config.POSITION_TOLERANCE
 
 	if distance > allowedDistance then
-		local actualSpeed = distance / deltaTime
+		local _actualSpeed = distance / deltaTime
 		return {
 			isValid = false,
 			violation = "SpeedHack",

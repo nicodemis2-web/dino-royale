@@ -65,7 +65,7 @@ end
 --[[
 	Use repellent at current position
 ]]
-function DinoRepellent:Use(origin: Vector3, direction: Vector3): any
+function DinoRepellent:Use(origin: Vector3, _direction: Vector3): any
 	if not self:CanUse() then return nil end
 
 	self.isUsing = true

@@ -60,7 +60,9 @@ local updateThread: thread? = nil
 	Initialize the healing manager
 ]]
 function HealingManager.Initialize()
-	if isInitialized then return end
+	if isInitialized then
+		return
+	end
 	isInitialized = true
 
 	print("[HealingManager] Initializing...")
@@ -101,7 +103,9 @@ function HealingManager.StartUsingItem(player: Player, itemId: string)
 	end
 
 	local item = HealingData.GetItem(itemId)
-	if not item then return end
+	if not item then
+		return
+	end
 
 	-- TODO: Check if player has item in inventory
 	-- local hasItem = InventoryManager.HasItem(player, itemId)
@@ -134,7 +138,9 @@ end
 ]]
 function HealingManager.CancelUsingItem(player: Player)
 	local inProgress = healingInProgress[player]
-	if not inProgress then return end
+	if not inProgress then
+		return
+	end
 
 	if not inProgress.item.canCancelUse then
 		return -- Can't cancel this item
@@ -154,7 +160,9 @@ end
 ]]
 function HealingManager.CompleteUsingItem(player: Player)
 	local inProgress = healingInProgress[player]
-	if not inProgress then return end
+	if not inProgress then
+		return
+	end
 
 	local item = inProgress.item
 	healingInProgress[player] = nil
@@ -250,10 +258,14 @@ end
 ]]
 function HealingManager.ApplyBuffEffect(player: Player, buffType: string, value: number)
 	local character = player.Character
-	if not character then return end
+	if not character then
+		return
+	end
 
 	local humanoid = character:FindFirstChild("Humanoid") :: Humanoid?
-	if not humanoid then return end
+	if not humanoid then
+		return
+	end
 
 	if buffType == "Speed" then
 		local baseSpeed = 16
@@ -268,10 +280,14 @@ end
 ]]
 function HealingManager.RemoveBuffEffect(player: Player, buffType: string)
 	local character = player.Character
-	if not character then return end
+	if not character then
+		return
+	end
 
 	local humanoid = character:FindFirstChild("Humanoid") :: Humanoid?
-	if not humanoid then return end
+	if not humanoid then
+		return
+	end
 
 	if buffType == "Speed" then
 		humanoid.WalkSpeed = 16 -- Reset to default
@@ -283,10 +299,14 @@ end
 ]]
 function HealingManager.GetBuffValue(player: Player, buffType: string): number
 	local buffs = activeBuffs[player]
-	if not buffs then return 0 end
+	if not buffs then
+		return 0
+	end
 
 	local buff = buffs[buffType]
-	if not buff then return 0 end
+	if not buff then
+		return 0
+	end
 
 	if tick() > buff.endTime then
 		return 0

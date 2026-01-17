@@ -330,7 +330,7 @@ end
 -- Calculate XP for placement
 function ProgressionData.CalculatePlacementXP(placement: number, totalPlayers: number): number
 	local outlasted = totalPlayers - placement
-	local baseXP = outlasted * ProgressionData.XPValues.Placement
+	local placementXP = outlasted * ProgressionData.XPValues.Placement
 
 	-- Apply placement multiplier
 	local multiplier = 1.0
@@ -344,7 +344,7 @@ function ProgressionData.CalculatePlacementXP(placement: number, totalPlayers: n
 		multiplier = ProgressionData.BonusMultipliers.Top25
 	end
 
-	return math.floor(baseXP * multiplier)
+	return math.floor(placementXP * multiplier)
 end
 
 return ProgressionData

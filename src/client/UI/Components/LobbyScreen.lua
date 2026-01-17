@@ -99,7 +99,7 @@ function LobbyScreen.CreateUI()
 	-- Player count display
 	local playerCountFrame = Instance.new("Frame")
 	playerCountFrame.Name = "PlayerCount"
-	playerCountFrame.Size = UDim2.new(0, 300, 0, 80)
+	playerCountFrame.Size = UDim2.fromOffset(300, 80)
 	playerCountFrame.Position = UDim2.new(0.5, 0, 0, 220)
 	playerCountFrame.AnchorPoint = Vector2.new(0.5, 0)
 	playerCountFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
@@ -134,14 +134,14 @@ function LobbyScreen.CreateUI()
 	-- Player list container
 	playerListFrame = Instance.new("ScrollingFrame")
 	playerListFrame.Name = "PlayerList"
-	playerListFrame.Size = UDim2.new(0, 400, 0, 300)
+	playerListFrame.Size = UDim2.fromOffset(400, 300)
 	playerListFrame.Position = UDim2.new(0.5, 0, 0, 320)
 	playerListFrame.AnchorPoint = Vector2.new(0.5, 0)
 	playerListFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 	playerListFrame.BorderSizePixel = 0
 	playerListFrame.ScrollBarThickness = 4
 	playerListFrame.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
-	playerListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+	playerListFrame.CanvasSize = UDim2.fromOffset(0, 0)
 	playerListFrame.Parent = mainFrame
 
 	local listCorner = Instance.new("UICorner")
@@ -162,7 +162,7 @@ function LobbyScreen.CreateUI()
 	-- Ready button
 	local readyButton = Instance.new("TextButton")
 	readyButton.Name = "ReadyButton"
-	readyButton.Size = UDim2.new(0, 250, 0, 60)
+	readyButton.Size = UDim2.fromOffset(250, 60)
 	readyButton.Position = UDim2.new(0.5, 0, 1, -120)
 	readyButton.AnchorPoint = Vector2.new(0.5, 0)
 	readyButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
@@ -195,7 +195,7 @@ function LobbyScreen.CreateUI()
 	-- Countdown display (hidden by default)
 	local countdownFrame = Instance.new("Frame")
 	countdownFrame.Name = "Countdown"
-	countdownFrame.Size = UDim2.new(0, 400, 0, 100)
+	countdownFrame.Size = UDim2.fromOffset(400, 100)
 	countdownFrame.Position = UDim2.new(0.5, 0, 1, -250)
 	countdownFrame.AnchorPoint = Vector2.new(0.5, 0)
 	countdownFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 35)

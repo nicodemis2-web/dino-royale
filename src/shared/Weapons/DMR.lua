@@ -128,7 +128,7 @@ end
 	Check if weapon is automatic
 	@return Always false for DMR
 ]]
-function DMR.IsAutomatic(self: DMRInstance): boolean
+function DMR.IsAutomatic(_self: DMRInstance): boolean
 	return false
 end
 
@@ -136,7 +136,7 @@ end
 	Get recoil for DMR (moderate-high kick)
 	@return Vector2 recoil
 ]]
-function DMR.GetRecoil(self: DMRInstance): Vector2
+function DMR.GetRecoil(_self: DMRInstance): Vector2
 	local vertical = 1.2 + (math.random() * 0.3)
 	local horizontal = (math.random() - 0.5) * 0.25
 	return Vector2.new(horizontal, vertical)

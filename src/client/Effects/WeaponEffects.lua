@@ -21,7 +21,7 @@
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local Debris = game:GetService("Debris")
-local SoundService = game:GetService("SoundService")
+local _SoundService = game:GetService("SoundService")
 
 local WeaponBase = require(game.ReplicatedStorage.Shared.Weapons.WeaponBase)
 
@@ -48,7 +48,7 @@ local shellPool = {} :: { Part }
 local POOL_SIZE = 20
 
 -- Quality settings (can be updated by VisualQualityController)
-local effectQuality = {
+local _effectQuality = {
 	muzzleFlashEnabled = true,
 	shellCasingsEnabled = true,
 	bulletTracersEnabled = true,
@@ -63,19 +63,19 @@ local effectQuality = {
 ]]
 function WeaponEffects.SetQualitySettings(settings: { [string]: any })
 	if settings.muzzleFlashEnabled ~= nil then
-		effectQuality.muzzleFlashEnabled = settings.muzzleFlashEnabled
+		_effectQuality.muzzleFlashEnabled = settings.muzzleFlashEnabled
 	end
 	if settings.shellCasingsEnabled ~= nil then
-		effectQuality.shellCasingsEnabled = settings.shellCasingsEnabled
+		_effectQuality.shellCasingsEnabled = settings.shellCasingsEnabled
 	end
 	if settings.bulletTracersEnabled ~= nil then
-		effectQuality.bulletTracersEnabled = settings.bulletTracersEnabled
+		_effectQuality.bulletTracersEnabled = settings.bulletTracersEnabled
 	end
 	if settings.impactEffectsEnabled ~= nil then
-		effectQuality.impactEffectsEnabled = settings.impactEffectsEnabled
+		_effectQuality.impactEffectsEnabled = settings.impactEffectsEnabled
 	end
 	if settings.particleMultiplier ~= nil then
-		effectQuality.particleMultiplier = settings.particleMultiplier
+		_effectQuality.particleMultiplier = settings.particleMultiplier
 	end
 end
 
@@ -146,7 +146,7 @@ end
 	Get an item from a pool
 ]]
 local function getFromPool(pool: { Part }): Part?
-	for i, item in ipairs(pool) do
+	for _, item in ipairs(pool) do
 		if not item.Parent then
 			return item
 		end
@@ -181,7 +181,7 @@ function WeaponEffects.CreateHitMarkerUI()
 		local line = Instance.new("Frame")
 		line.AnchorPoint = Vector2.new(0.5, 0.5)
 		line.Position = UDim2.fromScale(0.5, 0.5)
-		line.Size = UDim2.new(0, 3, 0, 30)
+		line.Size = UDim2.fromOffset(3, 30)
 		line.Rotation = rotation
 		line.BackgroundColor3 = Color3.new(1, 1, 1)
 		line.BorderSizePixel = 0
@@ -199,7 +199,7 @@ end
 	@param weaponModel The weapon model (optional)
 	@param weaponType The weapon type/category
 ]]
-function WeaponEffects.MuzzleFlash(weaponModel: Model?, weaponType: string)
+function WeaponEffects.MuzzleFlash(_weaponModel: Model?, weaponType: string)
 	-- Find muzzle position from character
 	local character = localPlayer.Character
 	if not character then return end
@@ -283,7 +283,7 @@ end
 	@param target End position
 	@param weaponType The weapon type/category
 ]]
-function WeaponEffects.BulletTracer(origin: Vector3, target: Vector3, weaponType: string)
+function WeaponEffects.BulletTracer(origin: Vector3, target: Vector3, _weaponType: string)
 	local tracer = getFromPool(tracerPool)
 	if not tracer then
 		return
@@ -316,7 +316,7 @@ end
 	@param normal Surface normal
 	@param material Surface material
 ]]
-function WeaponEffects.ImpactEffect(position: Vector3, normal: Vector3, material: Enum.Material)
+function WeaponEffects.ImpactEffect(position: Vector3, _normal: Vector3, material: Enum.Material)
 	local impact = getFromPool(impactPool)
 	if not impact then
 		return
@@ -359,7 +359,7 @@ end
 	@param origin Ejection origin
 	@param weaponType The weapon type
 ]]
-function WeaponEffects.ShellCasing(origin: Vector3, weaponType: string)
+function WeaponEffects.ShellCasing(_origin: Vector3, weaponType: string)
 	local shell = getFromPool(shellPool)
 	if not shell then
 		return
@@ -542,7 +542,7 @@ end
 	Apply camera recoil
 	@param weapon The weapon that fired
 ]]
-function WeaponEffects.ApplyRecoil(weapon: WeaponInstance)
+function WeaponEffects.ApplyRecoil(_weapon: WeaponInstance)
 	-- Get recoil from weapon (would need method added to weapon classes)
 	local vertical = 0.5
 	local horizontal = (math.random() - 0.5) * 0.2
@@ -571,7 +571,7 @@ function WeaponEffects.PlayFireSound(weapon: WeaponInstance)
 	sound.RollOffMaxDistance = 200
 
 	-- Different sounds per weapon category
-	local category = weapon.definition.category
+	local _category = weapon.definition.category
 	-- sound.SoundId = SoundData.GetFireSound(category)
 
 	local character = localPlayer.Character

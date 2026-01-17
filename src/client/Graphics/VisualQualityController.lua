@@ -22,7 +22,7 @@
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Lighting = game:GetService("Lighting")
-local Players = game:GetService("Players")
+local _Players = game:GetService("Players")
 
 local VisualQualityController = {}
 
@@ -276,11 +276,9 @@ function VisualQualityController.DetectOptimalQuality(): number
 		if screenSize.X >= 1920 then
 			baseLevel = 3 -- High-res mobile can handle medium
 		end
-	elseif isConsole then
-		-- Consoles: typically good hardware
-		baseLevel = 4
-	elseif isPC then
-		-- PC: default to high, will auto-adjust if needed
+	elseif isConsole or isPC then
+		-- Consoles and PC: typically good hardware, default to high
+		-- Will auto-adjust if needed based on performance
 		baseLevel = 4
 	end
 

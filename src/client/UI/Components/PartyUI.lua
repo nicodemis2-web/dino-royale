@@ -23,11 +23,11 @@ local invitePopup: Frame? = nil
 local memberFrames: { [number]: Frame } = {}
 local currentParty: PartyData.Party? = nil
 local pendingInvites: { any } = {}
-local isVisible = false
+local __isVisible = false
 
 -- Constants
-local MEMBER_HEIGHT = 50
-local INVITE_DISPLAY_TIME = 60
+local _MEMBER_HEIGHT = 50
+local _INVITE_DISPLAY_TIME = 60
 
 --[[
 	Initialize the party UI
@@ -59,7 +59,7 @@ function PartyUI.CreateUI()
 	-- Party panel (left side)
 	partyFrame = Instance.new("Frame")
 	partyFrame.Name = "PartyPanel"
-	partyFrame.Size = UDim2.new(0, 220, 0, 280)
+	partyFrame.Size = UDim2.fromOffset(220, 280)
 	partyFrame.Position = UDim2.new(0, 20, 0.5, -140)
 	partyFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
 	partyFrame.BackgroundTransparency = 0.1
@@ -98,7 +98,7 @@ function PartyUI.CreateUI()
 	local gameModeLabel = Instance.new("TextLabel")
 	gameModeLabel.Name = "GameMode"
 	gameModeLabel.Size = UDim2.new(1, -10, 0, 20)
-	gameModeLabel.Position = UDim2.new(0, 5, 0, 42)
+	gameModeLabel.Position = UDim2.fromOffset(5, 42)
 	gameModeLabel.BackgroundTransparency = 1
 	gameModeLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
 	gameModeLabel.TextSize = 12
@@ -111,7 +111,7 @@ function PartyUI.CreateUI()
 	local membersList = Instance.new("Frame")
 	membersList.Name = "MembersList"
 	membersList.Size = UDim2.new(1, -10, 0, 160)
-	membersList.Position = UDim2.new(0, 5, 0, 65)
+	membersList.Position = UDim2.fromOffset(5, 65)
 	membersList.BackgroundTransparency = 1
 	membersList.Parent = partyFrame
 
@@ -136,7 +136,7 @@ function PartyUI.CreateUI()
 	-- Ready button
 	local readyButton = Instance.new("TextButton")
 	readyButton.Name = "ReadyButton"
-	readyButton.Size = UDim2.new(0, 90, 0, 35)
+	readyButton.Size = UDim2.fromOffset(90, 35)
 	readyButton.BackgroundColor3 = Color3.fromRGB(80, 180, 80)
 	readyButton.BorderSizePixel = 0
 	readyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -156,7 +156,7 @@ function PartyUI.CreateUI()
 	-- Leave button
 	local leaveButton = Instance.new("TextButton")
 	leaveButton.Name = "LeaveButton"
-	leaveButton.Size = UDim2.new(0, 90, 0, 35)
+	leaveButton.Size = UDim2.fromOffset(90, 35)
 	leaveButton.BackgroundColor3 = Color3.fromRGB(180, 60, 60)
 	leaveButton.BorderSizePixel = 0
 	leaveButton.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -176,7 +176,7 @@ function PartyUI.CreateUI()
 	-- Invite popup (appears when receiving invites)
 	invitePopup = Instance.new("Frame")
 	invitePopup.Name = "InvitePopup"
-	invitePopup.Size = UDim2.new(0, 350, 0, 120)
+	invitePopup.Size = UDim2.fromOffset(350, 120)
 	invitePopup.Position = UDim2.new(0.5, 0, 0, -130)
 	invitePopup.AnchorPoint = Vector2.new(0.5, 0)
 	invitePopup.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
@@ -202,7 +202,7 @@ function PartyUI.CreateUI()
 	local inviteDesc = Instance.new("TextLabel")
 	inviteDesc.Name = "Description"
 	inviteDesc.Size = UDim2.new(1, -20, 0, 30)
-	inviteDesc.Position = UDim2.new(0, 10, 0, 40)
+	inviteDesc.Position = UDim2.fromOffset(10, 40)
 	inviteDesc.BackgroundTransparency = 1
 	inviteDesc.TextColor3 = Color3.fromRGB(200, 200, 200)
 	inviteDesc.TextSize = 14
@@ -214,7 +214,7 @@ function PartyUI.CreateUI()
 	-- Accept button
 	local acceptButton = Instance.new("TextButton")
 	acceptButton.Name = "AcceptButton"
-	acceptButton.Size = UDim2.new(0, 120, 0, 35)
+	acceptButton.Size = UDim2.fromOffset(120, 35)
 	acceptButton.Position = UDim2.new(0.3, 0, 1, -50)
 	acceptButton.AnchorPoint = Vector2.new(0.5, 0)
 	acceptButton.BackgroundColor3 = Color3.fromRGB(80, 180, 80)
@@ -236,7 +236,7 @@ function PartyUI.CreateUI()
 	-- Decline button
 	local declineButton = Instance.new("TextButton")
 	declineButton.Name = "DeclineButton"
-	declineButton.Size = UDim2.new(0, 120, 0, 35)
+	declineButton.Size = UDim2.fromOffset(120, 35)
 	declineButton.Position = UDim2.new(0.7, 0, 1, -50)
 	declineButton.AnchorPoint = Vector2.new(0.5, 0)
 	declineButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
@@ -273,9 +273,8 @@ function PartyUI.SetupEventListeners()
 			PartyUI.OnPartyKicked()
 		elseif action == "MemberJoined" then
 			PartyUI.OnMemberJoined(data.member)
-		elseif action == "MemberLeft" then
-			PartyUI.OnMemberLeft(data.userId)
-		elseif action == "MemberKicked" then
+		elseif action == "MemberLeft" or action == "MemberKicked" then
+			-- Both actions result in member leaving the party
 			PartyUI.OnMemberLeft(data.userId)
 		elseif action == "MemberReady" then
 			PartyUI.OnMemberReady(data.userId, data.isReady)
@@ -536,7 +535,7 @@ function PartyUI.CreateMemberFrame(member: PartyData.PartyMember): Frame
 	-- Ready indicator
 	local readyIndicator = Instance.new("Frame")
 	readyIndicator.Name = "ReadyIndicator"
-	readyIndicator.Size = UDim2.new(0, 12, 0, 12)
+	readyIndicator.Size = UDim2.fromOffset(12, 12)
 	readyIndicator.Position = UDim2.new(1, -25, 0.5, -6)
 	readyIndicator.BackgroundColor3 = member.isReady and Color3.fromRGB(80, 180, 80) or Color3.fromRGB(100, 100, 100)
 	readyIndicator.Parent = frame
@@ -697,7 +696,7 @@ end
 ]]
 function PartyUI.Show()
 	if not partyFrame then return end
-	isVisible = true
+	_isVisible = true
 	partyFrame.Visible = true
 end
 
@@ -706,7 +705,7 @@ end
 ]]
 function PartyUI.Hide()
 	if not partyFrame then return end
-	isVisible = false
+	_isVisible = false
 	partyFrame.Visible = false
 end
 

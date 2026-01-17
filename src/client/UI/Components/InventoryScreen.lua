@@ -13,7 +13,7 @@ local InventoryScreen = {}
 InventoryScreen.__index = InventoryScreen
 
 -- Display settings
-local SCREEN_PADDING = 50
+local _SCREEN_PADDING = 50
 local SLOT_SIZE = 70
 local SLOT_SPACING = 8
 local GRID_COLUMNS = 5
@@ -34,7 +34,7 @@ local RARITY_COLORS = {
 }
 
 -- Category colors
-local CATEGORY_COLORS = {
+local _CATEGORY_COLORS = {
 	Weapons = Color3.fromRGB(255, 100, 100),
 	Healing = Color3.fromRGB(100, 255, 100),
 	Ammo = Color3.fromRGB(255, 200, 100),
@@ -393,7 +393,7 @@ end
 function InventoryScreen:SetItems(items: { [number]: ItemData })
 	self.items = items
 
-	for i, slot in ipairs(self.slots) do
+	for i, _slot in ipairs(self.slots) do
 		self:UpdateSlotVisual(i, items[i])
 	end
 end

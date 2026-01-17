@@ -534,14 +534,14 @@ local function createNameLabel(model: Model, species: string, tier: string)
 
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "NameLabel"
-	billboard.Size = UDim2.new(0, 200, 0, 50)
+	billboard.Size = UDim2.fromOffset(200, 50)
 	billboard.StudsOffset = Vector3.new(0, 8, 0)
 	billboard.AlwaysOnTop = true
 	billboard.Adornee = primaryPart
 	billboard.Parent = primaryPart
 
 	local label = Instance.new("TextLabel")
-	label.Size = UDim2.new(1, 0, 1, 0)
+	label.Size = UDim2.fromScale(1, 1)
 	label.BackgroundTransparency = 0.5
 	label.BackgroundColor3 = Color3.new(0, 0, 0)
 	label.Text = species .. " (" .. tier .. ")"
@@ -579,16 +579,12 @@ function DinosaurModelBuilder.Build(species: string, position: Vector3, tier: st
 
 	local primaryPart: BasePart
 
-	if config.stance == "bipedal" then
-		primaryPart = createBipedalBody(config, model)
-	elseif config.stance == "quadruped" then
+	if config.stance == "quadruped" then
 		primaryPart = createQuadrupedBody(config, model)
 	elseif config.stance == "flying" then
 		primaryPart = createFlyingBody(config, model)
-	elseif config.stance == "aquatic" then
-		-- Aquatic uses similar to bipedal but horizontal
-		primaryPart = createBipedalBody(config, model)
 	else
+		-- bipedal, aquatic, and default all use bipedal body builder
 		primaryPart = createBipedalBody(config, model)
 	end
 

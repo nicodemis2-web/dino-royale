@@ -176,7 +176,7 @@ end
 --[[
 	Crossfade between two sounds
 ]]
-local function crossfade(fromSound: Sound?, toSound: Sound, duration: number)
+local function crossfade(fromSound: Sound?, toSound: Sound, _duration: number)
 	local fadeTime = duration or 1.0
 
 	-- Start new sound at 0 volume
@@ -385,13 +385,13 @@ local function onGameStateChanged(newState: string)
 		MusicManager.PlayMusic("Lobby")
 		MusicManager.PlayAmbient("Forest")
 	elseif newState == "Loading" then
-		-- Keep lobby music
+		return -- Keep lobby music playing
 	elseif newState == "Deploying" then
 		MusicManager.PlayMusic("Deployment")
 	elseif newState == "Playing" then
 		MusicManager.PlayMusic("Exploration")
 	elseif newState == "Ending" then
-		-- Victory/Defeat handled separately
+		return -- Victory/Defeat music handled by separate events
 	end
 end
 

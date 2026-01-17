@@ -149,7 +149,7 @@ function ConfirmDialog.Initialize()
 	-- Cancel button
 	local cancelButton = Instance.new("TextButton")
 	cancelButton.Name = "Cancel"
-	cancelButton.Size = UDim2.new(0, 120, 0, 45)
+	cancelButton.Size = UDim2.fromOffset(120, 45)
 	cancelButton.BackgroundColor3 = Color3.fromRGB(60, 60, 65)
 	cancelButton.BorderSizePixel = 0
 	cancelButton.TextColor3 = Color3.new(1, 1, 1)
@@ -188,7 +188,7 @@ function ConfirmDialog.Initialize()
 	-- Confirm button
 	local confirmButton = Instance.new("TextButton")
 	confirmButton.Name = "Confirm"
-	confirmButton.Size = UDim2.new(0, 120, 0, 45)
+	confirmButton.Size = UDim2.fromOffset(120, 45)
 	confirmButton.BackgroundColor3 = Color3.fromRGB(180, 60, 60)
 	confirmButton.BorderSizePixel = 0
 	confirmButton.TextColor3 = Color3.new(1, 1, 1)

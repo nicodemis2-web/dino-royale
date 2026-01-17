@@ -7,7 +7,7 @@
 	Based on GDD Section 6.3: Vehicles
 ]]
 
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local _ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local VehicleBase = require(script.Parent.VehicleBase)
 

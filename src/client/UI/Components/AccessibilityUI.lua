@@ -60,7 +60,7 @@ function AccessibilityUI.CreateUI()
 	-- Main settings panel
 	mainFrame = Instance.new("Frame")
 	mainFrame.Name = "AccessibilityPanel"
-	mainFrame.Size = UDim2.new(0, 550, 0, 600)
+	mainFrame.Size = UDim2.fromOffset(550, 600)
 	mainFrame.Position = UDim2.fromScale(0.5, 0.5)
 	mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 	mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
@@ -98,7 +98,7 @@ function AccessibilityUI.CreateUI()
 
 	local closeButton = Instance.new("TextButton")
 	closeButton.Name = "Close"
-	closeButton.Size = UDim2.new(0, 30, 0, 30)
+	closeButton.Size = UDim2.fromOffset(30, 30)
 	closeButton.Position = UDim2.new(1, -40, 0.5, -15)
 	closeButton.BackgroundColor3 = Color3.fromRGB(180, 60, 60)
 	closeButton.BorderSizePixel = 0
@@ -120,7 +120,7 @@ function AccessibilityUI.CreateUI()
 	local tabFrame = Instance.new("Frame")
 	tabFrame.Name = "Tabs"
 	tabFrame.Size = UDim2.new(1, -20, 0, 35)
-	tabFrame.Position = UDim2.new(0, 10, 0, 55)
+	tabFrame.Position = UDim2.fromOffset(10, 55)
 	tabFrame.BackgroundTransparency = 1
 	tabFrame.Parent = mainFrame
 
@@ -133,12 +133,12 @@ function AccessibilityUI.CreateUI()
 	local contentScroll = Instance.new("ScrollingFrame")
 	contentScroll.Name = "Content"
 	contentScroll.Size = UDim2.new(1, -20, 1, -150)
-	contentScroll.Position = UDim2.new(0, 10, 0, 95)
+	contentScroll.Position = UDim2.fromOffset(10, 95)
 	contentScroll.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
 	contentScroll.BorderSizePixel = 0
 	contentScroll.ScrollBarThickness = 6
 	contentScroll.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
-	contentScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+	contentScroll.CanvasSize = UDim2.fromOffset(0, 0)
 	contentScroll.Parent = mainFrame
 
 	local contentCorner = Instance.new("UICorner")
@@ -182,7 +182,7 @@ function AccessibilityUI.CreateUI()
 	-- Bottom buttons
 	local resetButton = Instance.new("TextButton")
 	resetButton.Name = "Reset"
-	resetButton.Size = UDim2.new(0, 150, 0, 40)
+	resetButton.Size = UDim2.fromOffset(150, 40)
 	resetButton.Position = UDim2.new(0.5, -80, 1, -55)
 	resetButton.BackgroundColor3 = Color3.fromRGB(180, 80, 80)
 	resetButton.BorderSizePixel = 0
@@ -334,7 +334,7 @@ end
 function AccessibilityUI.CreateToggle(settingId: string, isOn: boolean): Frame
 	local container = Instance.new("Frame")
 	container.Name = "Toggle"
-	container.Size = UDim2.new(0, 55, 0, 30)
+	container.Size = UDim2.fromOffset(55, 30)
 	container.BackgroundColor3 = isOn and Color3.fromRGB(60, 180, 80) or Color3.fromRGB(80, 80, 85)
 	container.BorderSizePixel = 0
 
@@ -344,7 +344,7 @@ function AccessibilityUI.CreateToggle(settingId: string, isOn: boolean): Frame
 
 	local knob = Instance.new("Frame")
 	knob.Name = "Knob"
-	knob.Size = UDim2.new(0, 24, 0, 24)
+	knob.Size = UDim2.fromOffset(24, 24)
 	knob.Position = isOn and UDim2.new(1, -27, 0.5, -12) or UDim2.new(0, 3, 0.5, -12)
 	knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 	knob.Parent = container
@@ -410,7 +410,7 @@ function AccessibilityUI.CreateSlider(settingId: string, currentValue: number, m
 
 	local knob = Instance.new("Frame")
 	knob.Name = "Knob"
-	knob.Size = UDim2.new(0, 16, 0, 16)
+	knob.Size = UDim2.fromOffset(16, 16)
 	knob.Position = UDim2.new(normalizedValue, -8, 0.5, -8)
 	knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 	knob.Parent = track
@@ -439,7 +439,7 @@ function AccessibilityUI.CreateSlider(settingId: string, currentValue: number, m
 	button.Text = ""
 	button.Parent = track
 
-	local isDragging = false
+	local __isDragging = false
 
 	local function updateSlider(inputPos: Vector2)
 		local trackAbsPos = track.AbsolutePosition
@@ -467,12 +467,12 @@ function AccessibilityUI.CreateSlider(settingId: string, currentValue: number, m
 	end
 
 	button.MouseButton1Down:Connect(function()
-		isDragging = true
+		_isDragging = true
 	end)
 
 	button.InputEnded:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseButton1 then
-			isDragging = false
+			_isDragging = false
 		end
 	end)
 

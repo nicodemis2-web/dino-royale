@@ -78,7 +78,7 @@ function LootUI.CreateUI()
 	-- Pickup prompt
 	pickupPrompt = Instance.new("Frame")
 	pickupPrompt.Name = "PickupPrompt"
-	pickupPrompt.Size = UDim2.new(0, 200, 0, 60)
+	pickupPrompt.Size = UDim2.fromOffset(200, 60)
 	pickupPrompt.Position = UDim2.fromScale(0.5, 0.65)
 	pickupPrompt.AnchorPoint = Vector2.new(0.5, 0.5)
 	pickupPrompt.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
@@ -94,7 +94,7 @@ function LootUI.CreateUI()
 	local itemName = Instance.new("TextLabel")
 	itemName.Name = "ItemName"
 	itemName.Size = UDim2.new(1, -20, 0, 25)
-	itemName.Position = UDim2.new(0, 10, 0, 5)
+	itemName.Position = UDim2.fromOffset(10, 5)
 	itemName.BackgroundTransparency = 1
 	itemName.TextColor3 = Color3.fromRGB(255, 255, 255)
 	itemName.TextSize = 16
@@ -105,7 +105,7 @@ function LootUI.CreateUI()
 
 	local itemAmount = Instance.new("TextLabel")
 	itemAmount.Name = "ItemAmount"
-	itemAmount.Size = UDim2.new(0, 50, 0, 25)
+	itemAmount.Size = UDim2.fromOffset(50, 25)
 	itemAmount.Position = UDim2.new(1, -60, 0, 5)
 	itemAmount.BackgroundTransparency = 1
 	itemAmount.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -197,7 +197,7 @@ function LootUI.AddLootDisplay(data: any)
 	-- Create world-space billboard
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = `Loot_{data.id}`
-	billboard.Size = UDim2.new(0, 80, 0, 40)
+	billboard.Size = UDim2.fromOffset(80, 40)
 	billboard.StudsOffset = Vector3.new(0, 1, 0)
 	billboard.AlwaysOnTop = true
 	billboard.MaxDistance = 30
@@ -239,7 +239,7 @@ function LootUI.AddLootDisplay(data: any)
 	-- Item name
 	local nameLabel = Instance.new("TextLabel")
 	nameLabel.Size = UDim2.new(1, -4, 0.6, 0)
-	nameLabel.Position = UDim2.new(0, 2, 0, 4)
+	nameLabel.Position = UDim2.fromOffset(2, 4)
 	nameLabel.BackgroundTransparency = 1
 	nameLabel.TextColor3 = rarityColor
 	nameLabel.TextSize = 10
@@ -289,7 +289,7 @@ end
 --[[
 	Add chest display
 ]]
-function LootUI.AddChestDisplay(data: any)
+function LootUI.AddChestDisplay(_data: any)
 	-- Would create chest marker in world
 end
 

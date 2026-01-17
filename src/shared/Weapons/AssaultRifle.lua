@@ -130,7 +130,7 @@ end
 	Check if weapon is automatic
 	@return Always true for AR
 ]]
-function AssaultRifle.IsAutomatic(self: AssaultRifleInstance): boolean
+function AssaultRifle.IsAutomatic(_self: AssaultRifleInstance): boolean
 	return true
 end
 

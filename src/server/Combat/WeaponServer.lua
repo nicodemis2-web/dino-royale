@@ -42,7 +42,7 @@ local Players = game:GetService("Players")
 --------------------------------------------------------------------------------
 
 local Events = require(game.ReplicatedStorage.Shared.Events)
-local Constants = require(game.ReplicatedStorage.Shared.Constants)
+local _Constants = require(game.ReplicatedStorage.Shared.Constants)
 local WeaponData = require(game.ReplicatedStorage.Shared.Config.WeaponData)
 local WeaponBase = require(game.ReplicatedStorage.Shared.Weapons.WeaponBase)
 
@@ -368,7 +368,8 @@ function WeaponServer.ProcessHit(shooter: Player, weapon: WeaponInstance, hitRes
 
 			-- Check for elimination
 			if damageResult.isKill then
-				-- EliminationManager handles this
+				-- EliminationManager handles this via its own event subscription
+				local _ = damageResult -- Acknowledge intentionally empty block
 			end
 		end
 	elseif hitResult.isDinosaur then
@@ -394,6 +395,7 @@ function WeaponServer.ProcessHit(shooter: Player, weapon: WeaponInstance, hitRes
 		-- Hit environment - broadcast impact position for effects
 		if hitResult.position and hitResult.normal and hitResult.material then
 			-- Could broadcast impact effect here
+			local _ = hitResult -- Acknowledge intentionally empty block
 		end
 	end
 end

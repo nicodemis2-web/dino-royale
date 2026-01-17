@@ -173,7 +173,7 @@ end
 ]]
 function VehicleManager.OnVehicleInteract(vehicle: VehicleBase.VehicleInstance, player: Player)
 	-- Check if player is already in this vehicle
-	for seatIndex, occupant in pairs(vehicle.seats) do
+	for _seatIndex, occupant in pairs(vehicle.seats) do
 		if occupant == player then
 			-- Exit vehicle
 			vehicle:Exit(player)
@@ -351,7 +351,7 @@ function VehicleManager.Update(dt: number)
 		return
 	end
 
-	for id, vehicle in pairs(activeVehicles) do
+	for _id, vehicle in pairs(activeVehicles) do
 		if vehicle.isDestroyed then
 			VehicleManager.OnVehicleDestroyed(vehicle)
 			continue
@@ -362,6 +362,7 @@ function VehicleManager.Update(dt: number)
 		if vehicle.driver then
 			-- Input comes from VehicleInput events
 			-- For now, vehicle just coasts
+			local _ = vehicle.driver -- Acknowledge intentionally empty block
 		end
 
 		vehicle:Update(dt, input)
@@ -471,7 +472,7 @@ end
 	Reset the manager
 ]]
 function VehicleManager.Reset()
-	for id, vehicle in pairs(activeVehicles) do
+	for _id, vehicle in pairs(activeVehicles) do
 		if vehicle.model then
 			vehicle.model:Destroy()
 		end

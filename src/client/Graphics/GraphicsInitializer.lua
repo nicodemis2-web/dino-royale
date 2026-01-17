@@ -26,7 +26,7 @@
 	GraphicsInitializer.Initialize()
 ]]
 
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local _ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 
 -- Module references (lazy loaded)
@@ -107,7 +107,7 @@ end
 function GraphicsInitializer.LoadModules()
 	-- Load from client Graphics folder
 	local clientScript = Players.LocalPlayer:WaitForChild("PlayerScripts")
-	local clientModules = clientScript:FindFirstChild("Client")
+	local _clientModules = clientScript:FindFirstChild("Client")
 
 	-- Try to load each module
 	local success, result

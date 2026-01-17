@@ -6,7 +6,7 @@
 	Handles physics, passengers, damage, and destruction
 ]]
 
-local Players = game:GetService("Players")
+local _Players = game:GetService("Players")
 
 local Events = require(game.ReplicatedStorage.Shared.Events)
 

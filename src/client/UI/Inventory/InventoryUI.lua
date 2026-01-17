@@ -7,7 +7,7 @@
 ]]
 
 local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
+local _TweenService = game:GetService("TweenService")
 local ContextActionService = game:GetService("ContextActionService")
 
 local Events = require(game.ReplicatedStorage.Shared.Events)

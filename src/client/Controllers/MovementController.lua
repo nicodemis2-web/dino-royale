@@ -36,7 +36,7 @@ local connections = {} :: { RBXScriptConnection }
 -- Camera settings
 local DEFAULT_FOV = 70
 local SPRINT_FOV = 80
-local ADS_FOV = 50
+local _ADS_FOV = 50
 local FOV_LERP_SPEED = 10
 
 --[[
@@ -213,7 +213,7 @@ end
 	@param humanoid The player's humanoid
 	@return The appropriate movement state
 ]]
-function MovementController.DetermineState(humanoid: Humanoid): PlayerState.MovementState
+function MovementController.DetermineState(_humanoid: Humanoid): PlayerState.MovementState
 	local isMoving = moveDirection.Magnitude > 0.1
 
 	-- Check for prone

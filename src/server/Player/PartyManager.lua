@@ -7,7 +7,7 @@
 ]]
 
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local _ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Events = require(ReplicatedStorage.Shared.Events)
 local PartyData = require(ReplicatedStorage.Shared.PartyData)

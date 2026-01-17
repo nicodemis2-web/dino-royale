@@ -7,7 +7,7 @@
 ]]
 
 local TweenService = game:GetService("TweenService")
-local Players = game:GetService("Players")
+local _Players = game:GetService("Players")
 
 local Minimap = {}
 Minimap.__index = Minimap
@@ -24,8 +24,8 @@ local PING_PULSE_SPEED = 2
 
 -- Colors
 local PLAYER_COLOR = Color3.fromRGB(50, 200, 50)
-local ENEMY_COLOR = Color3.fromRGB(255, 50, 50)
-local TEAMMATE_COLOR = Color3.fromRGB(50, 150, 255)
+local _ENEMY_COLOR = Color3.fromRGB(255, 50, 50)
+local _TEAMMATE_COLOR = Color3.fromRGB(50, 150, 255)
 local STORM_COLOR = Color3.fromRGB(255, 100, 50)
 local SAFE_ZONE_COLOR = Color3.fromRGB(255, 255, 255)
 local PING_COLOR = Color3.fromRGB(255, 200, 50)
@@ -282,7 +282,8 @@ function Minimap:Update(playerPosition: Vector3, playerRotation: number)
 
 	-- Update marker positions
 	for id, marker in pairs(self.markers) do
-		-- Would need stored world positions
+		-- TODO: Implement world-to-minimap coordinate mapping
+		local _, _ = id, marker -- Suppress unused until implemented
 	end
 end
 
@@ -383,7 +384,7 @@ end
 --[[
 	Add a ping to the map
 ]]
-function Minimap:AddPing(position: Vector3, pingType: string?)
+function Minimap:AddPing(position: Vector3, _pingType: string?)
 	local pingId = `ping_{tick()}`
 
 	local ping = Instance.new("Frame")

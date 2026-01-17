@@ -65,9 +65,9 @@ local xpContainer: Frame? = nil
 local levelUpOverlay: Frame? = nil
 
 local isInitialized = false
-local activeNotifications: { Frame } = {}
-local pendingXP: { { amount: number, reason: string } } = {}
-local isProcessingXP = false
+local _activeNotifications: { Frame } = {}
+local _pendingXP: { { amount: number, reason: string } } = {}
+local _isProcessingXP = false
 
 --------------------------------------------------------------------------------
 -- UI CREATION
@@ -102,7 +102,7 @@ local function createScreenGui()
 	-- XP notification container (center-right, for XP popups)
 	xpContainer = Instance.new("Frame")
 	xpContainer.Name = "XPContainer"
-	xpContainer.Size = UDim2.new(0, 200, 0, 300)
+	xpContainer.Size = UDim2.fromOffset(200, 300)
 	xpContainer.Position = UDim2.new(1, -220, 0.5, -150)
 	xpContainer.BackgroundTransparency = 1
 	xpContainer.Parent = screenGui
@@ -149,7 +149,7 @@ local function createNotificationBanner(
 	local accent = Instance.new("Frame")
 	accent.Name = "Accent"
 	accent.Size = UDim2.new(0, 4, 1, -8)
-	accent.Position = UDim2.new(0, 4, 0, 4)
+	accent.Position = UDim2.fromOffset(4, 4)
 	accent.BackgroundColor3 = color
 	accent.BorderSizePixel = 0
 	accent.Parent = banner
@@ -163,7 +163,7 @@ local function createNotificationBanner(
 	if icon then
 		local iconLabel = Instance.new("ImageLabel")
 		iconLabel.Name = "Icon"
-		iconLabel.Size = UDim2.new(0, 36, 0, 36)
+		iconLabel.Size = UDim2.fromOffset(36, 36)
 		iconLabel.Position = UDim2.new(0, 16, 0.5, -18)
 		iconLabel.BackgroundTransparency = 1
 		iconLabel.Image = icon
@@ -205,7 +205,7 @@ local function createNotificationBanner(
 	banner.GroupTransparency = 1
 
 	TweenService:Create(banner, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
-		Position = UDim2.new(0, 0, 0, 0),
+		Position = UDim2.fromOffset(0, 0),
 		GroupTransparency = 0,
 	}):Play()
 
@@ -238,7 +238,7 @@ local function createXPPopup(amount: number, reason: string?)
 	local popup = Instance.new("TextLabel")
 	popup.Name = "XPPopup"
 	popup.Size = UDim2.new(1, 0, 0, 30)
-	popup.Position = UDim2.new(0, 0, 1, 0)
+	popup.Position = UDim2.fromScale(0, 1)
 	popup.BackgroundTransparency = 1
 	popup.FontFace = FONTS.Title
 	popup.TextSize = 20
@@ -253,7 +253,7 @@ local function createXPPopup(amount: number, reason: string?)
 
 	-- Animate up and fade
 	TweenService:Create(popup, TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-		Position = UDim2.new(0, 0, 0.3, 0),
+		Position = UDim2.fromScale(0, 0.3),
 		TextTransparency = 1,
 		TextStrokeTransparency = 1,
 	}):Play()
@@ -288,7 +288,7 @@ function FeedbackNotifications.ShowLevelUp(newLevel: number)
 	local levelText = Instance.new("TextLabel")
 	levelText.Name = "LevelUpText"
 	levelText.Size = UDim2.new(1, 0, 0, 100)
-	levelText.Position = UDim2.new(0, 0, 0.4, 0)
+	levelText.Position = UDim2.fromScale(0, 0.4)
 	levelText.BackgroundTransparency = 1
 	levelText.FontFace = FONTS.Title
 	levelText.TextSize = 72
@@ -387,7 +387,7 @@ function FeedbackNotifications.ShowKillStreak(streakCount: number)
 	local streakText = Instance.new("TextLabel")
 	streakText.Name = "StreakText"
 	streakText.Size = UDim2.new(1, 0, 0, 80)
-	streakText.Position = UDim2.new(0, 0, 0.35, 0)
+	streakText.Position = UDim2.fromScale(0, 0.35)
 	streakText.BackgroundTransparency = 1
 	streakText.FontFace = FONTS.Title
 	streakText.TextSize = 56

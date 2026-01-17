@@ -35,7 +35,7 @@ local warningUI: Frame? = nil
 
 -- Constants
 local STORM_HEIGHT = 500
-local STORM_SEGMENTS = 64
+local _STORM_SEGMENTS = 64
 local STORM_COLOR = Color3.fromRGB(100, 50, 150)
 local STORM_TRANSPARENCY = 0.3
 local DAMAGE_OVERLAY_COLOR = Color3.fromRGB(150, 50, 200)
@@ -154,7 +154,7 @@ function StormController.CreateUI()
 	-- Warning indicator
 	warningUI = Instance.new("Frame")
 	warningUI.Name = "StormWarning"
-	warningUI.Size = UDim2.new(0, 300, 0, 50)
+	warningUI.Size = UDim2.fromOffset(300, 50)
 	warningUI.Position = UDim2.new(0.5, 0, 0, 100)
 	warningUI.AnchorPoint = Vector2.new(0.5, 0)
 	warningUI.BackgroundColor3 = Color3.fromRGB(100, 30, 130)

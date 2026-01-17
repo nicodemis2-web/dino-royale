@@ -12,7 +12,7 @@ local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 
 local Events = require(ReplicatedStorage.Shared.Events)
-local TeamData = require(ReplicatedStorage.Shared.TeamData)
+local _TeamData = require(ReplicatedStorage.Shared.TeamData)
 
 local RevivalUI = {}
 
@@ -25,8 +25,8 @@ local rebootCardIndicator: Frame? = nil
 local teammateMarkers: { [number]: Frame } = {}
 
 local isInitialized = false
-local isDowned = false
-local bleedOutTime = 0
+local _isDowned = false
+local _bleedOutTime = 0
 local currentReviveProgress = 0
 
 -- Constants
@@ -257,7 +257,7 @@ function RevivalUI.CreateRebootCardUI()
 
 	rebootCardIndicator = Instance.new("Frame")
 	rebootCardIndicator.Name = "RebootCardIndicator"
-	rebootCardIndicator.Size = UDim2.new(0, 200, 0, 50)
+	rebootCardIndicator.Size = UDim2.fromOffset(200, 50)
 	rebootCardIndicator.Position = UDim2.new(0, 20, 0.5, 0)
 	rebootCardIndicator.AnchorPoint = Vector2.new(0, 0.5)
 	rebootCardIndicator.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
@@ -272,7 +272,7 @@ function RevivalUI.CreateRebootCardUI()
 
 	local icon = Instance.new("ImageLabel")
 	icon.Name = "Icon"
-	icon.Size = UDim2.new(0, 40, 0, 40)
+	icon.Size = UDim2.fromOffset(40, 40)
 	icon.Position = UDim2.new(0, 5, 0.5, 0)
 	icon.AnchorPoint = Vector2.new(0, 0.5)
 	icon.BackgroundTransparency = 1
@@ -283,7 +283,7 @@ function RevivalUI.CreateRebootCardUI()
 	local nameLabel = Instance.new("TextLabel")
 	nameLabel.Name = "Name"
 	nameLabel.Size = UDim2.new(1, -55, 0.5, 0)
-	nameLabel.Position = UDim2.new(0, 50, 0, 5)
+	nameLabel.Position = UDim2.fromOffset(50, 5)
 	nameLabel.BackgroundTransparency = 1
 	nameLabel.Text = "Player's Card"
 	nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)

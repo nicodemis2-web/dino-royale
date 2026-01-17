@@ -7,7 +7,7 @@
 ]]
 
 local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
+local _UserInputService = game:GetService("UserInputService")
 local ContextActionService = game:GetService("ContextActionService")
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

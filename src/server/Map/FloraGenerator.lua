@@ -27,7 +27,7 @@
 	@server
 ]]
 
-local TweenService = game:GetService("TweenService")
+local _TweenService = game:GetService("TweenService")
 
 local FloraGenerator = {}
 
@@ -215,7 +215,7 @@ local function pickRandom<T>(array: { T }): T
 	return array[math.random(1, #array)]
 end
 
-local function addCorner(part: BasePart, radius: number?)
+local function addCorner(_part: BasePart, _radius: number?)
 	-- Parts don't support UICorner, but we can use Mesh for rounded look
 	-- For now, skip this - parts are naturally blocky
 end
@@ -269,7 +269,7 @@ local function createCurvedBranch(
 	local currentRadius = startRadius
 	local segmentLength = totalLength / segmentCount
 
-	for i = 1, segmentCount do
+	for _ = 1, segmentCount do
 		-- Add slight random rotation for organic feel
 		local angleX = math.rad(randomInRange(-SEGMENT_ANGLE_VARIANCE, SEGMENT_ANGLE_VARIANCE))
 		local angleZ = math.rad(randomInRange(-SEGMENT_ANGLE_VARIANCE, SEGMENT_ANGLE_VARIANCE))
@@ -508,7 +508,7 @@ function FloraGenerator.AddPalmFronds(
 
 	-- Add coconuts if configured
 	if config.hasCoconuts then
-		for i = 1, math.random(2, 4) do
+		for _ = 1, math.random(2, 4) do
 			local coconut = Instance.new("Part")
 			coconut.Name = "Coconut"
 			coconut.Shape = Enum.PartType.Ball
@@ -588,7 +588,7 @@ function FloraGenerator.AddCanopy(
 			createLeafCluster(tree, clusterPos, Vector3.new(canopyRadius * 0.5, height * 0.15, canopyRadius * 0.5), leafColor)
 		else
 			-- Round canopy (default)
-			local mainCluster = createLeafCluster(
+			local _mainCluster = createLeafCluster(
 				tree,
 				Vector3.new(topCF.Position.X, layerHeight, topCF.Position.Z),
 				Vector3.new(canopyRadius, canopyRadius * 0.7, canopyRadius),
@@ -713,12 +713,12 @@ function FloraGenerator.AddVines(
 	tree: Model,
 	topCF: CFrame,
 	height: number,
-	colors: any
+	_colors: any
 )
 	local vineCount = math.random(4, 8)
 	local vineColor = Color3.fromRGB(34, 100, 34)
 
-	for i = 1, vineCount do
+	for _ = 1, vineCount do
 		local angle = (i / vineCount) * math.pi * 2
 		local vineLength = height * randomInRange(0.2, 0.5)
 		local vineRadius = 0.15
@@ -747,7 +747,7 @@ end
 --[[
 	Add moss patches to tree
 ]]
-function FloraGenerator.AddMoss(tree: Model, height: number)
+function FloraGenerator.AddMoss(tree: Model, _height: number)
 	local mossColor = Color3.fromRGB(85, 107, 47)
 
 	-- Find trunk segments and add moss

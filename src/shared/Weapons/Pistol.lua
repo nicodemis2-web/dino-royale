@@ -80,7 +80,7 @@ end
 	Get weapon switch time (faster for pistols)
 	@return Switch time in seconds
 ]]
-function Pistol.GetSwitchTime(self: PistolInstance): number
+function Pistol.GetSwitchTime(_self: PistolInstance): number
 	return FAST_SWITCH_TIME
 end
 
@@ -88,7 +88,7 @@ end
 	Check if weapon is automatic
 	@return Always false for pistol
 ]]
-function Pistol.IsAutomatic(self: PistolInstance): boolean
+function Pistol.IsAutomatic(_self: PistolInstance): boolean
 	return false
 end
 
@@ -96,7 +96,7 @@ end
 	Get recoil for pistol (moderate kick)
 	@return Vector2 recoil
 ]]
-function Pistol.GetRecoil(self: PistolInstance): Vector2
+function Pistol.GetRecoil(_self: PistolInstance): Vector2
 	local vertical = 0.8 + (math.random() * 0.3)
 	local horizontal = (math.random() - 0.5) * 0.3
 	return Vector2.new(horizontal, vertical)
@@ -106,7 +106,7 @@ end
 	Check if this is a sidearm (for slot logic)
 	@return Always true for pistol
 ]]
-function Pistol.IsSidearm(self: PistolInstance): boolean
+function Pistol.IsSidearm(_self: PistolInstance): boolean
 	return true
 end
 

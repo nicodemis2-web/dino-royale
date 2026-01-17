@@ -32,7 +32,7 @@ type PlayerDeployState = {
 local isActive = false
 local flightPath: FlightPath? = nil
 local deployStartTime = 0
-local helicopterPosition = Vector3.zero
+local _helicopterPosition = Vector3.zero
 
 local playerStates = {} :: { [number]: PlayerDeployState }
 
@@ -303,7 +303,7 @@ function DeploymentManager.ValidateGliderInput(player: Player, input: { pitch: n
 
 	-- Get current facing direction and apply yaw
 	local currentCFrame = rootPart.CFrame
-	local lookVector = currentCFrame.LookVector
+	local _lookVector = currentCFrame.LookVector
 
 	-- Apply yaw rotation
 	local yawRotation = CFrame.Angles(0, -yaw * 0.05, 0)
@@ -386,7 +386,7 @@ function DeploymentManager.Reset()
 	isActive = false
 	flightPath = nil
 	deployStartTime = 0
-	helicopterPosition = Vector3.zero
+	_helicopterPosition = Vector3.zero
 	playerStates = {}
 
 	print("[DeploymentManager] Reset")

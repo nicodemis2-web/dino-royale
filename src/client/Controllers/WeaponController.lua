@@ -375,7 +375,8 @@ function WeaponController.EnterADS()
 	if currentWeapon then
 		local hasScope = currentWeapon.definition.scopeZoom and currentWeapon.definition.scopeZoom > 0
 		if hasScope then
-			-- Would trigger scope overlay UI
+			-- TODO: Trigger scope overlay UI
+			local _ = hasScope -- Silence unused warning
 		end
 	end
 end

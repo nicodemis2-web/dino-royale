@@ -9,7 +9,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local SoundService = game:GetService("SoundService")
-local Lighting = game:GetService("Lighting")
+local _Lighting = game:GetService("Lighting")
 local UserInputService = game:GetService("UserInputService")
 
 local Events = require(ReplicatedStorage.Shared.Events)
@@ -18,7 +18,7 @@ local AccessibilityData = require(ReplicatedStorage.Shared.AccessibilityData)
 local AccessibilityController = {}
 
 -- State
-local player = Players.LocalPlayer
+local _player = Players.LocalPlayer
 local currentSettings: AccessibilityData.AccessibilitySettings = AccessibilityData.Defaults
 local isInitialized = false
 

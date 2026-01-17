@@ -476,6 +476,7 @@ function ProgressionManager.RecordDinoKill(player: Player, dinoTier: string)
 		ProgressionManager.UpdateChallengeProgress(player, "legendary_dino_kill", 1)
 		if matchStats then
 			-- Track for T-Rex specifically (would need more context)
+			local _ = matchStats -- Acknowledge intentionally empty block
 		end
 	end
 end

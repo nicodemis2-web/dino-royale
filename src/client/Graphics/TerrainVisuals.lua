@@ -18,8 +18,8 @@
 	- Add environmental particles for immersion (dust, leaves, etc.)
 ]]
 
-local Lighting = game:GetService("Lighting")
-local RunService = game:GetService("RunService")
+local _Lighting = game:GetService("Lighting")
+local _RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
@@ -309,6 +309,7 @@ function TerrainVisuals.ApplyTerrainColors()
 		-- Note: Terrain material colors are set via MaterialService in modern Roblox
 		-- This is a placeholder for when MaterialVariants are fully supported
 		-- For now, we rely on the default material appearance enhanced by lighting
+		local _, _ = material, color -- Suppress unused warnings until API support
 	end
 
 	print("[TerrainVisuals] Terrain material colors configured")
@@ -373,7 +374,7 @@ function TerrainVisuals.SetTimeOfDayWater(hour: number)
 		TerrainVisuals.ApplyWaterPreset("Night", 5)
 	elseif hour >= 5 and hour < 7 then
 		-- Dawn transition
-		local progress = (hour - 5) / 2
+		local _progress = (hour - 5) / 2
 		-- Blend from night to default (simplified - just use default)
 		TerrainVisuals.ApplyWaterPreset("Default", 2)
 	elseif hour >= 18 and hour < 20 then

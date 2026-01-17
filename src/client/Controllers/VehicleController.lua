@@ -8,7 +8,7 @@
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
+local _UserInputService = game:GetService("UserInputService")
 local ContextActionService = game:GetService("ContextActionService")
 
 local Events = require(game.ReplicatedStorage.Shared.Events)
@@ -21,7 +21,7 @@ local localPlayer = Players.LocalPlayer
 -- State
 local currentVehicle: { [string]: any }? = nil
 local isDriver = false
-local currentSeatIndex = 0
+local __currentSeatIndex = 0
 
 -- Input state
 local throttleInput = 0
@@ -356,7 +356,7 @@ local function onPlayerEntered(data: { vehicleId: string, playerId: number, seat
 		health = 100,
 		maxHealth = 100,
 	}
-	currentSeatIndex = data.seatIndex
+	_currentSeatIndex = data.seatIndex
 	isDriver = data.seatIndex == 1
 
 	createVehicleUI()
@@ -381,7 +381,7 @@ local function onPlayerExited(data: { vehicleId: string, playerId: number })
 
 	currentVehicle = nil
 	isDriver = false
-	currentSeatIndex = 0
+	_currentSeatIndex = 0
 
 	print("[VehicleController] Exited vehicle")
 end
@@ -412,14 +412,14 @@ local function onVehicleDestroyed(data: { vehicleId: string })
 		destroyVehicleUI()
 		currentVehicle = nil
 		isDriver = false
-		currentSeatIndex = 0
+		_currentSeatIndex = 0
 	end
 end
 
 --[[
 	Update loop
 ]]
-local function update(dt: number)
+local function update(_dt: number)
 	if currentVehicle then
 		updateVehicleUI()
 
@@ -475,7 +475,8 @@ function VehicleController.Initialize()
 	-- Enter vehicle with E key when near
 	ContextActionService:BindAction("InteractVehicle", function(_, inputState)
 		if inputState == Enum.UserInputState.Begin and not currentVehicle then
-			-- Server handles proximity check
+			-- Server handles proximity check via RemoteEvent
+			return Enum.ContextActionResult.Pass
 		end
 		return Enum.ContextActionResult.Pass
 	end, false, Enum.KeyCode.E)

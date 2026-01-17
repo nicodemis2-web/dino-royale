@@ -42,7 +42,7 @@ local CORNER_RADIUS = 6
 -- Thresholds
 local LOW_HEALTH_THRESHOLD = 25
 local CRITICAL_HEALTH_THRESHOLD = 15
-local MEDIUM_HEALTH_THRESHOLD = 50
+local _MEDIUM_HEALTH_THRESHOLD = 50
 
 -- Animation timings
 local HEALTH_TWEEN_TIME = 0.3
@@ -345,7 +345,7 @@ end
 --[[
 	Create critical health vignette effect
 ]]
-function HealthDisplay:CreateVignette(parent: GuiObject)
+function HealthDisplay:CreateVignette(_parent: GuiObject)
 	-- Get the PlayerGui for fullscreen effect
 	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui") :: PlayerGui
 
@@ -496,7 +496,7 @@ function HealthDisplay:UpdateShield()
 	local shieldPerSegment = self.maxShield / SHIELD_SEGMENT_COUNT
 	local remainingShield = self.currentShield
 
-	for i, segment in ipairs(self.shieldSegments) do
+	for _, segment in ipairs(self.shieldSegments) do
 		local segmentShield = math.clamp(remainingShield, 0, shieldPerSegment)
 		local fillPercent = segmentShield / shieldPerSegment
 		remainingShield = remainingShield - shieldPerSegment

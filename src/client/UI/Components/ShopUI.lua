@@ -127,7 +127,7 @@ function ShopUI.CreateUI()
 	-- Close button
 	local closeButton = Instance.new("TextButton")
 	closeButton.Name = "Close"
-	closeButton.Size = UDim2.new(0, 40, 0, 40)
+	closeButton.Size = UDim2.fromOffset(40, 40)
 	closeButton.Position = UDim2.new(1, -50, 0, 10)
 	closeButton.BackgroundColor3 = Color3.fromRGB(150, 50, 50)
 	closeButton.BorderSizePixel = 0
@@ -149,11 +149,11 @@ function ShopUI.CreateUI()
 	contentContainer = Instance.new("ScrollingFrame")
 	contentContainer.Name = "Content"
 	contentContainer.Size = UDim2.new(1, -40, 1, -80)
-	contentContainer.Position = UDim2.new(0, 20, 0, 70)
+	contentContainer.Position = UDim2.fromOffset(20, 70)
 	contentContainer.BackgroundTransparency = 1
 	contentContainer.ScrollBarThickness = 8
 	contentContainer.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
-	contentContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
+	contentContainer.CanvasSize = UDim2.fromOffset(0, 0)
 	contentContainer.Parent = mainFrame
 end
 
@@ -313,7 +313,7 @@ end
 --[[
 	Create an item card
 ]]
-function ShopUI.CreateItemCard(parent: Frame, itemData: any, width: number, isFeatured: boolean)
+function ShopUI.CreateItemCard(parent: Frame, itemData: any, width: number, _isFeatured: boolean)
 	local rarityColor = ShopData.GetRarityColor(itemData.rarity)
 	local isOwned = ownedItems[itemData.id] or itemData.isOwned
 
@@ -362,7 +362,7 @@ function ShopUI.CreateItemCard(parent: Frame, itemData: any, width: number, isFe
 	local nameLabel = Instance.new("TextLabel")
 	nameLabel.Name = "Name"
 	nameLabel.Size = UDim2.new(1, -10, 0, 20)
-	nameLabel.Position = UDim2.new(0, 5, 0, 110)
+	nameLabel.Position = UDim2.fromOffset(5, 110)
 	nameLabel.BackgroundTransparency = 1
 	nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 	nameLabel.TextSize = 14
@@ -376,7 +376,7 @@ function ShopUI.CreateItemCard(parent: Frame, itemData: any, width: number, isFe
 	local rarityLabel = Instance.new("TextLabel")
 	rarityLabel.Name = "Rarity"
 	rarityLabel.Size = UDim2.new(1, -10, 0, 15)
-	rarityLabel.Position = UDim2.new(0, 5, 0, 130)
+	rarityLabel.Position = UDim2.fromOffset(5, 130)
 	rarityLabel.BackgroundTransparency = 1
 	rarityLabel.TextColor3 = rarityColor
 	rarityLabel.TextSize = 11
@@ -389,7 +389,7 @@ function ShopUI.CreateItemCard(parent: Frame, itemData: any, width: number, isFe
 	if itemData.isOnSale and itemData.originalPrice then
 		local saleLabel = Instance.new("TextLabel")
 		saleLabel.Name = "Sale"
-		saleLabel.Size = UDim2.new(0, 50, 0, 20)
+		saleLabel.Size = UDim2.fromOffset(50, 20)
 		saleLabel.Position = UDim2.new(1, -55, 0, 5)
 		saleLabel.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 		saleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -454,7 +454,7 @@ function ShopUI.CreateItemCard(parent: Frame, itemData: any, width: number, isFe
 		local contentsLabel = Instance.new("TextLabel")
 		contentsLabel.Name = "Contents"
 		contentsLabel.Size = UDim2.new(1, -10, 0, 30)
-		contentsLabel.Position = UDim2.new(0, 5, 0, 145)
+		contentsLabel.Position = UDim2.fromOffset(5, 145)
 		contentsLabel.BackgroundTransparency = 1
 		contentsLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
 		contentsLabel.TextSize = 10

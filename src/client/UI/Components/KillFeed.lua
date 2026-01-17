@@ -122,14 +122,14 @@ function KillFeed:PushEntry(entry: Frame)
 	for i, existingEntry in ipairs(self.entries) do
 		local targetY = (i) * (ENTRY_HEIGHT + ENTRY_SPACING)
 		TweenService:Create(existingEntry, TweenInfo.new(0.2), {
-			Position = UDim2.new(0, 0, 0, targetY),
+			Position = UDim2.fromOffset(0, targetY),
 		}):Play()
 	end
 
 	-- Insert new entry at top
-	entry.Position = UDim2.new(0, 0, 0, -ENTRY_HEIGHT)
+	entry.Position = UDim2.fromOffset(0, -ENTRY_HEIGHT)
 	TweenService:Create(entry, TweenInfo.new(0.2), {
-		Position = UDim2.new(0, 0, 0, 0),
+		Position = UDim2.fromOffset(0, 0),
 	}):Play()
 
 	table.insert(self.entries, 1, entry)
@@ -187,7 +187,7 @@ function KillFeed:FadeOutEntry(entry: Frame)
 		-- Shift remaining entries up
 		for i, e in ipairs(self.entries) do
 			TweenService:Create(e, TweenInfo.new(0.2), {
-				Position = UDim2.new(0, 0, 0, (i - 1) * (ENTRY_HEIGHT + ENTRY_SPACING)),
+				Position = UDim2.fromOffset(0, (i - 1) * (ENTRY_HEIGHT + ENTRY_SPACING)),
 			}):Play()
 		end
 	end)
@@ -205,7 +205,7 @@ function KillFeed:AddKill(entryData: KillEntry)
 	-- Killer name
 	local killerLabel = Instance.new("TextLabel")
 	killerLabel.Position = UDim2.fromOffset(0, 0)
-	killerLabel.Size = UDim2.new(0.4, 0, 1, 0)
+	killerLabel.Size = UDim2.fromScale(0.4, 1)
 	killerLabel.BackgroundTransparency = 1
 	killerLabel.Text = entryData.killerName
 	killerLabel.TextXAlignment = Enum.TextXAlignment.Right
@@ -234,7 +234,7 @@ function KillFeed:AddKill(entryData: KillEntry)
 	-- Weapon name (small)
 	local weaponLabel = Instance.new("TextLabel")
 	weaponLabel.Position = UDim2.new(0.4, 25, 0.5, 0)
-	weaponLabel.Size = UDim2.new(0.15, 0, 0.8, 0)
+	weaponLabel.Size = UDim2.fromScale(0.15, 0.8)
 	weaponLabel.AnchorPoint = Vector2.new(0, 0.5)
 	weaponLabel.BackgroundTransparency = 1
 	weaponLabel.Text = entryData.weapon or ""
@@ -246,8 +246,8 @@ function KillFeed:AddKill(entryData: KillEntry)
 
 	-- Victim name
 	local victimLabel = Instance.new("TextLabel")
-	victimLabel.Position = UDim2.new(0.6, 0, 0, 0)
-	victimLabel.Size = UDim2.new(0.4, 0, 1, 0)
+	victimLabel.Position = UDim2.fromScale(0.6, 0)
+	victimLabel.Size = UDim2.fromScale(0.4, 1)
 	victimLabel.BackgroundTransparency = 1
 	victimLabel.Text = entryData.victimName
 	victimLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -278,7 +278,7 @@ function KillFeed:AddDinosaurKill(dinoName: string, victimName: string, victimId
 	-- Dino name
 	local dinoLabel = Instance.new("TextLabel")
 	dinoLabel.Position = UDim2.fromOffset(0, 0)
-	dinoLabel.Size = UDim2.new(0.4, 0, 1, 0)
+	dinoLabel.Size = UDim2.fromScale(0.4, 1)
 	dinoLabel.BackgroundTransparency = 1
 	dinoLabel.Text = dinoName
 	dinoLabel.TextColor3 = DINOSAUR_COLOR
@@ -299,8 +299,8 @@ function KillFeed:AddDinosaurKill(dinoName: string, victimName: string, victimId
 
 	-- Victim name
 	local victimLabel = Instance.new("TextLabel")
-	victimLabel.Position = UDim2.new(0.5, 0, 0, 0)
-	victimLabel.Size = UDim2.new(0.5, 0, 1, 0)
+	victimLabel.Position = UDim2.fromScale(0.5, 0)
+	victimLabel.Size = UDim2.fromScale(0.5, 1)
 	victimLabel.BackgroundTransparency = 1
 	victimLabel.Text = victimName
 	victimLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -329,7 +329,7 @@ function KillFeed:AddStormKill(victimName: string, victimId: number?)
 	-- Storm label
 	local stormLabel = Instance.new("TextLabel")
 	stormLabel.Position = UDim2.fromOffset(0, 0)
-	stormLabel.Size = UDim2.new(0.5, 0, 1, 0)
+	stormLabel.Size = UDim2.fromScale(0.5, 1)
 	stormLabel.BackgroundTransparency = 1
 	stormLabel.Text = "Extinction Wave"
 	stormLabel.TextColor3 = STORM_COLOR
@@ -340,8 +340,8 @@ function KillFeed:AddStormKill(victimName: string, victimId: number?)
 
 	-- Victim name
 	local victimLabel = Instance.new("TextLabel")
-	victimLabel.Position = UDim2.new(0.55, 0, 0, 0)
-	victimLabel.Size = UDim2.new(0.45, 0, 1, 0)
+	victimLabel.Position = UDim2.fromScale(0.55, 0)
+	victimLabel.Size = UDim2.fromScale(0.45, 1)
 	victimLabel.BackgroundTransparency = 1
 	victimLabel.Text = victimName
 	victimLabel.TextXAlignment = Enum.TextXAlignment.Left
