@@ -55,6 +55,10 @@ local bloom: BloomEffect? = nil
 local depthOfField: DepthOfFieldEffect? = nil
 local sunRays: SunRaysEffect? = nil
 
+-- Forward declarations for local functions
+local applyBiomeAtmosphere: (biomeConfig: any, influence: number) -> ()
+local blendBiomeAtmospheres: (fromBiome: string, toBiome: string, t: number) -> ()
+
 -- Biome center positions (matching BiomeData sectors)
 local BIOME_CENTERS = {
 	Jungle = Vector3.new(0, 25, 0),
@@ -208,7 +212,7 @@ local function lerpNumber(a: number, b: number, t: number): number
 	return a + (b - a) * t
 end
 
-local function applyBiomeAtmosphere(biomeConfig: BiomeData.BiomeConfig, influence: number)
+applyBiomeAtmosphere = function(biomeConfig: BiomeData.BiomeConfig, influence: number)
 	if not atmosphere or not colorCorrection or not bloom then
 		return
 	end
@@ -274,7 +278,7 @@ local function applyBiomeAtmosphere(biomeConfig: BiomeData.BiomeConfig, influenc
 	end
 end
 
-local function blendBiomeAtmospheres(fromBiome: string, toBiome: string, t: number)
+blendBiomeAtmospheres = function(fromBiome: string, toBiome: string, t: number)
 	local fromConfig = BiomeData.Biomes[fromBiome]
 	local toConfig = BiomeData.Biomes[toBiome]
 
